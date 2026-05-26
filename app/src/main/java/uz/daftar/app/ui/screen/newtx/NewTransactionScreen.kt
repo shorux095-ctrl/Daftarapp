@@ -182,7 +182,6 @@ ali p100          — Ali to'lov 100
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PreviewCard(entry: ParsedEntry) {
