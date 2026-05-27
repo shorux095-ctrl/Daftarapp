@@ -51,10 +51,13 @@ data class TodayUiState(
     val suggestions: List<String> = emptyList(),
 
     /** Tanlangan yozuvlar (multi-delete uchun) */
-    val selected: Set<Long> = emptySet()
+    val selected: Set<Long> = emptySet(),
+
+    /** Input "x" o'chirish komandasimi (x / 12.03 x + ismlar) */
+    val isDeleteCommand: Boolean = false
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
-    val canSend: Boolean get() = parsed.isNotEmpty() && !isSending
+    val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand) && !isSending
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -71,6 +74,9 @@ class TodayViewModel @Inject constructor(
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
 
     private var suggestJob: Job? = null
+
+    // "12.03 x" yoki "x 12.03" formatini tanish
+    private val DELETE_X_RE = Regex("""^(\d{1,2}\.\d{1,2})\s+x$|^x\s+(\d{1,2}\.\d{1,2})$""")
 
     init {
         // Filter o'zgarganida — DB observer'i ham o'zgaradi
@@ -111,7 +117,13 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(input = text, justSentSummary = null) }
         // Parser preview
         if (text.isBlank()) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null) }
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false) }
+            updateSuggestions("")
+            return
+        }
+        // X-o'chirish komandasi tekshirish ("x" yoki "12.03 x" + ismlar)
+        if (isDeleteCommandText(text)) {
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true) }
             updateSuggestions("")
             return
         }
@@ -122,6 +134,7 @@ class TodayViewModel @Inject constructor(
         _state.update {
             it.copy(
                 parsed = parsedList,
+                isDeleteCommand = false,
                 errorMessage = if (parsedList.isEmpty()) firstError?.error?.message else null
             )
         }
@@ -155,6 +168,11 @@ class TodayViewModel @Inject constructor(
 
     fun send() {
         val s = state.value
+        // X-o'chirish komandasi bo'lsa
+        if (s.isDeleteCommand) {
+            handleDeleteCommand(s.input)
+            return
+        }
         if (s.parsed.isEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isSending = true) }
@@ -169,6 +187,7 @@ class TodayViewModel @Inject constructor(
                         isSending = false,
                         input = "",
                         parsed = emptyList(),
+                        isDeleteCommand = false,
                         errorMessage = null,
                         suggestions = emptyList(),
                         justSentSummary = "✅ $savedCount ta yozuv saqlandi"
@@ -176,6 +195,67 @@ class TodayViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isSending = false, errorMessage = "Xato: ${e.message}") }
+            }
+        }
+    }
+
+    // ────────── X bilan o'chirish (matn komandasi) ──────────
+
+    /** Birinchi qator "x" yoki "12.03 x" / "x 12.03", keyin ismlar bo'lsa true */
+    private fun isDeleteCommandText(text: String): Boolean {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.size < 2) return false
+        val first = lines[0].lowercase()
+        return first == "x" || DELETE_X_RE.matches(first)
+    }
+
+    private fun handleDeleteCommand(text: String) {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.size < 2) return
+        val first = lines[0].lowercase()
+        // Sanani aniqlash
+        val date: LocalDate = run {
+            val m = DELETE_X_RE.find(first)
+            if (m != null) {
+                val dm = m.groupValues[1].ifBlank { m.groupValues[2] }
+                try {
+                    val parts = dm.split(".")
+                    val d = parts[0].toInt()
+                    val mo = parts[1].toInt()
+                    LocalDate.now().withMonth(mo).withDayOfMonth(d)
+                } catch (e: Exception) {
+                    LocalDate.now()
+                }
+            } else LocalDate.now()
+        }
+        val names = lines.drop(1)
+        viewModelScope.launch {
+            _state.update { it.copy(isSending = true) }
+            var count = 0
+            try {
+                val start = date.atStartOfDay()
+                val end = date.plusDays(1).atStartOfDay()
+                val dayTxs = repo.getRange(userId, start, end)
+                for (rawName in names) {
+                    val cn = DaftarParser.normalizeName(rawName)
+                    val ids = dayTxs.filter { it.clientName.lowercase() == cn }.map { it.id }
+                    if (ids.isNotEmpty()) {
+                        repo.deleteByIds(ids)
+                        count += ids.size
+                    }
+                }
+                _state.update {
+                    it.copy(
+                        isSending = false,
+                        input = "",
+                        parsed = emptyList(),
+                        isDeleteCommand = false,
+                        suggestions = emptyList(),
+                        justSentSummary = "🗑 $count ta yozuv o'chirildi (${date.dayOfMonth}.${date.monthValue})"
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isSending = false, errorMessage = "O'chirishda xato: ${e.message}") }
             }
         }
     }

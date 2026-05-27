@@ -140,7 +140,9 @@ object DaftarParser {
                     }
                 }
                 // T yoki T? boshida (yuk ko'rilmasdan) — bu yuk yo'q, faqat narx
-                if (tl in setOf("t", "tk") || tl == "t1" || tl.startsWith("t?")) {
+                if (tl in setOf("t", "tk") || tl == "t1" ||
+                    (tl.startsWith("t1") && tl.length >= 3 && tl[2] in NUM_TYPES) ||
+                    tl.startsWith("t?")) {
                     return i
                 }
                 continue
@@ -149,6 +151,7 @@ object DaftarParser {
             // Yuk ko'rilganidan keyin narx markerlari
             if (tl in setOf("n", "narx")) return i
             if (tl in setOf("t", "tk")) return i
+            if (tl == "t1" || (tl.startsWith("t1") && tl.length >= 3 && tl[2] in NUM_TYPES)) return i
             if (tl.startsWith("t?")) return i
 
             // na20, nb20 (n bilan boshlangan birikma)
@@ -237,7 +240,37 @@ object DaftarParser {
                 continue
             }
 
-            // "t?" yoki "t?a20" — bir martalik T narx
+            // "t1" yoki "t1a20" — bir martalik T narx (bot.py sintaksisi)
+            if (token == "t1" || (token.startsWith("t1") && token.length >= 3 && token[2] in NUM_TYPES)) {
+                if (token == "t1") {
+                    i++
+                    while (i < narxParts.size) {
+                        val t2 = narxParts[i].lowercase()
+                        if (t2 in setOf("n", "narx", "t", "tk")) break
+                        val parsed = parseNarxToken(t2, narxParts, i)
+                        if (parsed != null && parsed.first.code in setOf("a","b","c","d","k")) {
+                            tOneTime[parsed.first] = parsed.second
+                            i += parsed.third
+                        } else {
+                            i++
+                        }
+                    }
+                } else {
+                    // t1a20 formati
+                    val rest = token.substring(2)
+                    if (rest.isNotEmpty() && rest[0] in NUM_TYPES) {
+                        val amt = rest.substring(1).replace(",", ".").toDoubleOrNull()
+                        val type = TxType.fromCode(rest[0].toString())
+                        if (amt != null && type != null) {
+                            tOneTime[type] = amt
+                        }
+                    }
+                    i++
+                }
+                continue
+            }
+
+            // "t?" yoki "t?a20" — bir martalik T narx (eski sintaksis, mos)
             if (token.startsWith("t?")) {
                 if (token == "t?") {
                     i++

@@ -31,6 +31,9 @@ import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -213,6 +217,8 @@ private fun ChatTopBar(
 ) {
     var filterOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var yuklarOpen by remember { mutableStateOf(false) }
+    var hisobotOpen by remember { mutableStateOf(false) }
 
     CenterAlignedTopAppBar(
         title = { Text("Daftar", fontWeight = FontWeight.SemiBold) },
@@ -242,34 +248,67 @@ private fun ChatTopBar(
                     Icon(Icons.Outlined.MoreVert, contentDescription = "Menyu")
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    // ── YUKLAR (bosganda A B C D K) ──
+                    DropdownMenuItem(
+                        text = { Text("📦 Yuklar") },
+                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
+                        trailingIcon = { Icon(if (yuklarOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) },
+                        onClick = { yuklarOpen = !yuklarOpen }
+                    )
+                    if (yuklarOpen) {
+                        listOf("A", "B", "C", "D", "K").forEach { t ->
+                            DropdownMenuItem(
+                                text = { Text("     $t hisobot") },
+                                onClick = { menuOpen = false; onReports() }
+                            )
+                        }
+                    }
+                    // ── MIJOZ ──
                     DropdownMenuItem(
                         text = { Text("👥 Mijozlar") },
                         leadingIcon = { Icon(Icons.Outlined.People, null) },
                         onClick = { menuOpen = false; onClients() }
                     )
                     DropdownMenuItem(
-                        text = { Text("📊 Hisobotlar") },
-                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        onClick = { menuOpen = false; onReports() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("🔍 Qidirish") },
+                        text = { Text("🔍 Qidirish (Al)") },
                         leadingIcon = { Icon(Icons.Outlined.Search, null) },
                         onClick = { menuOpen = false; onSearch() }
                     )
                     HorizontalDivider()
+                    // ── HISOBOTLAR (T narx / N narx, oylik/yillik) ──
                     DropdownMenuItem(
-                        text = { Text("🚛 Yuk narxi (T)") },
+                        text = { Text("📊 Hisobotlar") },
+                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
+                        trailingIcon = { Icon(if (hisobotOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) },
+                        onClick = { hisobotOpen = !hisobotOpen }
+                    )
+                    if (hisobotOpen) {
+                        DropdownMenuItem(text = { Text("     💰 T narx hisobot") }, onClick = { menuOpen = false; onReports() })
+                        DropdownMenuItem(text = { Text("     🏷 N narx hisobot") }, onClick = { menuOpen = false; onReports() })
+                        DropdownMenuItem(text = { Text("     📅 Oylik / Yillik") }, onClick = { menuOpen = false; onReports() })
+                    }
+                    // ── NARX ──
+                    DropdownMenuItem(
+                        text = { Text("🚛 Narx (T)") },
                         leadingIcon = { Icon(Icons.Outlined.LocalShipping, null) },
                         onClick = { menuOpen = false; onYukNarx() }
                     )
+                    // ── SOF FOYDA ──
+                    DropdownMenuItem(
+                        text = { Text("📈 Sof foyda") },
+                        leadingIcon = { Icon(Icons.Outlined.TrendingUp, null) },
+                        onClick = { menuOpen = false; onReports() }
+                    )
+                    // ── RASXOD ──
                     DropdownMenuItem(
                         text = { Text("💸 Rasxod") },
                         leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
                         onClick = { menuOpen = false; onRasxod() }
                     )
+                    HorizontalDivider()
+                    // ── YORDAM (edit / alias) ──
                     DropdownMenuItem(
-                        text = { Text("🔁 Alias / Rename") },
+                        text = { Text("🔁 Alias / Nomini o'zgartirish") },
                         leadingIcon = { Icon(Icons.Outlined.AutoFixHigh, null) },
                         onClick = { menuOpen = false; onAlias() }
                     )
@@ -279,6 +318,7 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onKarzina() }
                     )
                     HorizontalDivider()
+                    // ── SOZLAMA ──
                     DropdownMenuItem(
                         text = { Text("⚙️ Sozlamalar") },
                         leadingIcon = { Icon(Icons.Outlined.Settings, null) },
@@ -482,6 +522,25 @@ private fun InputBar(
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // Tez kiritish tugmalari: A B C D K P Q (bosganda matnga qo'shiladi)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf("a", "b", "c", "d", "k", "p", "q").forEach { code ->
+                    AssistChip(
+                        onClick = {
+                            val sep = if (input.isEmpty() || input.endsWith(" ")) "" else " "
+                            onChange(input + sep + code)
+                        },
+                        label = { Text(code.uppercase()) }
+                    )
+                }
+            }
+
             // Autocomplete chips
             if (suggestions.isNotEmpty()) {
                 Row(
