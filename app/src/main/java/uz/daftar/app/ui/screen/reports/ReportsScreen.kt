@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.reports
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -102,7 +103,7 @@ fun ReportsScreen(
                     CircularProgressIndicator()
                 }
                 state.error != null -> Text("Xato: ${state.error}", color = MaterialTheme.colorScheme.error)
-                state.report != null -> ReportView(state.report!!)
+                state.report != null -> ReportView(state.report!!, state.topDebtors, state.inactiveClients)
                 else -> Text("Hisobot yo'q")
             }
         }
@@ -134,7 +135,11 @@ fun ReportsScreen(
 }
 
 @Composable
-private fun ReportView(rep: PeriodReport) {
+private fun ReportView(
+    rep: PeriodReport,
+    topDebtors: List<uz.daftar.app.domain.usecase.ClientSummary>,
+    inactiveClients: List<uz.daftar.app.domain.usecase.ClientSummary>
+) {
     Column {
         // Header
         Card(
@@ -224,6 +229,101 @@ private fun ReportView(rep: PeriodReport) {
             if (rep.profit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             bold = true
         )
+
+        Spacer(Modifier.height(16.dp))
+
+        // ───── Yuk oqimi % ─────
+        val totalAmount = rep.totals.values.sum()
+        if (totalAmount > 0) {
+            Text("📊 Yuk oqimi (%)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                        val amt = rep.totals[type] ?: 0.0
+                        if (amt <= 0) continue
+                        val pct = ((amt / totalAmount) * 100).toInt()
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(type.label, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp))
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(10.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(fraction = (pct / 100f).coerceAtMost(1f))
+                                        .height(10.dp)
+                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp))
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text("$pct%", modifier = Modifier.width(48.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // ───── Top-5 qarzdor mijozlar ─────
+        if (topDebtors.isNotEmpty()) {
+            Text("💳 Top-5 qarzdor", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    topDebtors.forEachIndexed { idx, c ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("${idx + 1}.", modifier = Modifier.width(28.dp), fontWeight = FontWeight.SemiBold)
+                            val cap = c.name.replaceFirstChar {
+                                if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString()
+                            }
+                            Text(cap, modifier = Modifier.weight(1f))
+                            Text(
+                                "${c.debt.toDouble().formatMoney()} so'm",
+                                color = MaterialTheme.colorScheme.error,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // ───── Bashorat: 30 kun faolsiz mijozlar ─────
+        if (inactiveClients.isNotEmpty()) {
+            Text("⚠️ Bashorat: 30+ kun faolsiz mijozlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    inactiveClients.take(5).forEach { c ->
+                        val cap = c.name.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString()
+                        }
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            Text(cap, modifier = Modifier.weight(1f))
+                            Text(
+                                c.lastYukDate?.take(10) ?: "—",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    if (inactiveClients.size > 5) {
+                        Text("… yana ${inactiveClients.size - 5} ta", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
     }
 }
 

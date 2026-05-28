@@ -49,6 +49,7 @@ fun DaftarNavHost() {
                 onClients = { nav.navigate(Routes.CLIENTS) },
                 onReports = { nav.navigate(Routes.REPORTS) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
+                onEditTx = { txId -> nav.navigate("${Routes.EDIT_TX}/$txId") },
                 onSearch = { nav.navigate(Routes.SEARCH) },
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
                 onAlias = { nav.navigate(Routes.ALIAS) },

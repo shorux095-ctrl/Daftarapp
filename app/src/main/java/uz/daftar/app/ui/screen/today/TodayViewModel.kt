@@ -17,10 +17,12 @@ import kotlinx.coroutines.launch
 import uz.daftar.app.core.parser.DaftarParser
 import uz.daftar.app.core.parser.ParseResult
 import uz.daftar.app.core.parser.ParsedEntry
+import uz.daftar.app.core.template.TemplateStore
 import uz.daftar.app.data.repository.TransactionRepository
 import uz.daftar.app.domain.model.Transaction
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.AddTransactionUseCase
+import uz.daftar.app.domain.usecase.CalculateDebtUseCase
 import uz.daftar.app.domain.usecase.DeleteTransactionUseCase
 import java.time.LocalDate
 import javax.inject.Inject
@@ -53,6 +55,12 @@ data class TodayUiState(
     /** Tanlangan yozuvlar (multi-delete uchun) */
     val selected: Set<Long> = emptySet(),
 
+    /** Har mijozning joriy qarzi (bubble'da ko'rsatish uchun) */
+    val debtByClient: Map<String, Long> = emptyMap(),
+
+    /** Tezkor shablonlar */
+    val templates: List<String> = emptyList(),
+
     /** Input "x" o'chirish komandasimi (x / 12.03 x + ismlar) */
     val isDeleteCommand: Boolean = false
 ) {
@@ -65,7 +73,9 @@ data class TodayUiState(
 class TodayViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val addTx: AddTransactionUseCase,
-    private val deleteTx: DeleteTransactionUseCase
+    private val deleteTx: DeleteTransactionUseCase,
+    private val calcDebt: CalculateDebtUseCase,
+    private val templateStore: TemplateStore
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -79,6 +89,12 @@ class TodayViewModel @Inject constructor(
     private val DELETE_X_RE = Regex("""^(\d{1,2}\.\d{1,2})\s+x$|^x\s+(\d{1,2}\.\d{1,2})$""")
 
     init {
+        // Tezkor shablonlarni kuzatish
+        viewModelScope.launch {
+            templateStore.templates.collectLatest { list ->
+                _state.update { it.copy(templates = list) }
+            }
+        }
         // Filter o'zgarganida — DB observer'i ham o'zgaradi
         viewModelScope.launch {
             filterFlow.flatMapLatest { f ->
@@ -93,13 +109,20 @@ class TodayViewModel @Inject constructor(
             }.collectLatest { txs ->
                 val totals = txs.groupBy { it.type }
                     .mapValues { (_, l) -> l.sumOf { it.amount } }
+                // Har mijozning joriy qarzini hisoblash (bot'day ko'rsatish uchun)
+                val clients = txs.map { it.clientName.lowercase() }.distinct()
+                val debts = mutableMapOf<String, Long>()
+                for (c in clients) {
+                    debts[c] = runCatching { calcDebt(userId, c) }.getOrDefault(0L)
+                }
                 _state.update {
                     it.copy(
                         filter = filterFlow.value,
                         isLoading = false,
                         transactions = txs,
                         totalByType = totals,
-                        clientCount = txs.map { tx -> tx.clientName.lowercase() }.distinct().size
+                        debtByClient = debts,
+                        clientCount = clients.size
                     )
                 }
             }
@@ -297,5 +320,38 @@ class TodayViewModel @Inject constructor(
                 _state.update { it.copy(errorMessage = "O'chirishda xato: ${e.message}") }
             }
         }
+    }
+
+    /** Bitta yozuvni o'chirish (swipe uchun) — karzinaga tushadi */
+    fun deleteOne(id: Long) {
+        viewModelScope.launch {
+            try {
+                deleteTx(id)
+                _state.update { it.copy(justSentSummary = "🗑 O'chirildi (karzinaga)") }
+            } catch (e: Exception) {
+                _state.update { it.copy(errorMessage = "O'chirishda xato: ${e.message}") }
+            }
+        }
+    }
+
+    // ───── Tezkor shablon ─────
+    /** Joriy yozuvni shablon sifatida saqlash */
+    fun saveCurrentAsTemplate() {
+        val text = state.value.input.trim()
+        if (text.isEmpty()) return
+        viewModelScope.launch {
+            templateStore.add(text)
+            _state.update { it.copy(justSentSummary = "⭐ Shablon saqlandi") }
+        }
+    }
+
+    /** Shablonni input maydoniga qo'yish */
+    fun applyTemplate(text: String) {
+        onInputChange(text)
+    }
+
+    /** Shablonni o'chirish */
+    fun removeTemplate(text: String) {
+        viewModelScope.launch { templateStore.remove(text) }
     }
 }

@@ -50,6 +50,14 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,10 +83,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.parser.ParsedEntry
 import uz.daftar.app.domain.model.Transaction
 import uz.daftar.app.domain.model.TxType
 import java.time.LocalDate
@@ -92,6 +102,7 @@ fun TodayScreen(
     onClients: () -> Unit,
     onReports: () -> Unit,
     onSettings: () -> Unit,
+    onEditTx: (Long) -> Unit = {},
     onSearch: () -> Unit = onSettings,
     onYukNarx: () -> Unit = onSettings,
     onAlias: () -> Unit = onSettings,
@@ -102,6 +113,11 @@ fun TodayScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
+
+    // Pastki menyu ochiq/yopiq (Telegram'day toggle)
+    var bottomMenuOpen by remember { mutableStateOf(false) }
+    // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
+    var yukTypeDialog by remember { mutableStateOf<String?>(null) }
 
     // Yangi yozuv qo'shilsa, oxiriga scroll
     LaunchedEffect(state.transactions.size) {
@@ -135,22 +151,69 @@ fun TodayScreen(
                     onAlias = onAlias,
                     onRasxod = onRasxod,
                     onKarzina = onKarzina,
-                    onSettings = onSettings
+                    onSettings = onSettings,
+                    onYukType = { yukTypeDialog = it }
                 )
             }
         },
         bottomBar = {
-            InputBar(
-                input = state.input,
-                onChange = vm::onInputChange,
-                suggestions = state.suggestions,
-                onSuggestionClick = vm::applySuggestion,
-                onSend = vm::send,
-                canSend = state.canSend,
-                isSending = state.isSending,
-                errorMessage = state.errorMessage,
-                parsedCount = state.parsed.size
-            )
+            Column {
+                // Pastki menyu paneli (toggle bilan ochiladi/yashirinadi)
+                if (bottomMenuOpen) {
+                    Surface(tonalElevation = 2.dp) {
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Filter.values().forEach { f ->
+                                    FilterChip(
+                                        selected = state.filter == f,
+                                        onClick = { vm.setFilter(f) },
+                                        label = { Text(f.label) }
+                                    )
+                                }
+                            }
+                            // Tezkor shablonlar
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AssistChip(
+                                    onClick = { vm.saveCurrentAsTemplate() },
+                                    label = { Text("⭐ Saqlash") }
+                                )
+                                state.templates.forEach { t ->
+                                    AssistChip(
+                                        onClick = { vm.applyTemplate(t) },
+                                        label = { Text(t) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                InputBar(
+                    input = state.input,
+                    onChange = vm::onInputChange,
+                    suggestions = state.suggestions,
+                    onSuggestionClick = vm::applySuggestion,
+                    onSend = vm::send,
+                    canSend = state.canSend,
+                    isSending = state.isSending,
+                    errorMessage = state.errorMessage,
+                    parsed = state.parsed,
+                    menuOpen = bottomMenuOpen,
+                    onToggleMenu = { bottomMenuOpen = !bottomMenuOpen }
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) { Snackbar(snackbarData = it) } }
     ) { padding ->
@@ -184,18 +247,94 @@ fun TodayScreen(
                     for ((date, txs) in grouped) {
                         item("date-$date") { DateSeparator(date) }
                         items(txs, key = { it.id }) { tx ->
-                            ChatBubble(
-                                tx = tx,
-                                isSelected = tx.id in state.selected,
-                                inSelectionMode = state.isSelectionMode,
-                                onClick = { if (state.isSelectionMode) vm.toggleSelect(tx.id) },
-                                onLongClick = { vm.toggleSelect(tx.id) }
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    when (value) {
+                                        SwipeToDismissBoxValue.EndToStart -> { vm.deleteOne(tx.id); true }   // chapga = o'chir
+                                        SwipeToDismissBoxValue.StartToEnd -> { onEditTx(tx.id); false }       // o'ngga = tahrir
+                                        else -> false
+                                    }
+                                }
                             )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromStartToEnd = !state.isSelectionMode,
+                                enableDismissFromEndToStart = !state.isSelectionMode,
+                                backgroundContent = {
+                                    val dir = dismissState.dismissDirection
+                                    val color = when (dir) {
+                                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                                        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                                        else -> MaterialTheme.colorScheme.surface
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(color, RoundedCornerShape(18.dp))
+                                            .padding(horizontal = 24.dp),
+                                        contentAlignment = if (dir == SwipeToDismissBoxValue.StartToEnd)
+                                            Alignment.CenterStart else Alignment.CenterEnd
+                                    ) {
+                                        Text(
+                                            if (dir == SwipeToDismissBoxValue.StartToEnd) "✏️ Tahrir" else "🗑 O'chir",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                    }
+                                }
+                            ) {
+                                ChatBubble(
+                                    tx = tx,
+                                    clientDebt = state.debtByClient[tx.clientName.lowercase()],
+                                    isSelected = tx.id in state.selected,
+                                    inSelectionMode = state.isSelectionMode,
+                                    onClick = { if (state.isSelectionMode) vm.toggleSelect(tx.id) },
+                                    onLongClick = { vm.toggleSelect(tx.id) }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Yuk turi dialog — A/B/C/D/K bosilganda: bugun qancha, kimga
+    yukTypeDialog?.let { letter ->
+        val matching = state.transactions.filter { it.type.code.equals(letter, ignoreCase = true) }
+        val total = matching.sumOf { it.amount }
+        val byClient = matching.groupBy { it.clientName }
+            .mapValues { (_, l) -> l.sumOf { it.amount } }
+        AlertDialog(
+            onDismissRequest = { yukTypeDialog = null },
+            title = { Text("📦 $letter — bugun") },
+            text = {
+                Column {
+                    Text(
+                        "Jami: ${total.formatMoney()}",
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (byClient.isEmpty()) {
+                        Text("Bugun $letter yo'q")
+                    } else {
+                        byClient.entries.sortedByDescending { it.value }.forEach { (name, amt) ->
+                            val cap = name.replaceFirstChar {
+                                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+                            }
+                            Text(
+                                "• $cap: ${amt.formatMoney()}",
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { yukTypeDialog = null }) { Text("Yopish") }
+            }
+        )
     }
 }
 
@@ -213,7 +352,8 @@ private fun ChatTopBar(
     onAlias: () -> Unit,
     onRasxod: () -> Unit,
     onKarzina: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -258,8 +398,8 @@ private fun ChatTopBar(
                     if (yuklarOpen) {
                         listOf("A", "B", "C", "D", "K").forEach { t ->
                             DropdownMenuItem(
-                                text = { Text("     $t hisobot") },
-                                onClick = { menuOpen = false; onReports() }
+                                text = { Text("     $t — bugun") },
+                                onClick = { menuOpen = false; yuklarOpen = false; onYukType(t) }
                             )
                         }
                     }
@@ -434,6 +574,7 @@ private fun DateSeparator(date: LocalDate) {
 @Composable
 private fun ChatBubble(
     tx: Transaction,
+    clientDebt: Long?,
     isSelected: Boolean,
     inSelectionMode: Boolean,
     onClick: () -> Unit,
@@ -489,6 +630,25 @@ private fun ChatBubble(
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace
                 )
+                // Qarz (bot'day) — faqat yuk/q yozuvlarida ko'rsatamiz
+                if (clientDebt != null && tx.type != TxType.P) {
+                    Spacer(Modifier.height(2.dp))
+                    if (clientDebt > 0) {
+                        Text(
+                            text = "💳 Qarz: ${clientDebt.toDouble().formatMoney()} so'm",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text(
+                            text = "✅ Qarz yo'q",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = timeStr,
@@ -515,8 +675,20 @@ private fun InputBar(
     canSend: Boolean,
     isSending: Boolean,
     errorMessage: String?,
-    parsedCount: Int
+    parsed: List<ParsedEntry>,
+    menuOpen: Boolean,
+    onToggleMenu: () -> Unit
 ) {
+    // Kursorni boshqarish uchun TextFieldValue (tugma bosilganda kursor harfdan KEYIN turishi uchun)
+    var tfv by remember { mutableStateOf(TextFieldValue(input)) }
+    // Raqamli klaviatura rejimi — yuk tugmasi bosilganda yoqiladi (faqat son yozish uchun)
+    var numericMode by remember { mutableStateOf(false) }
+    LaunchedEffect(input) {
+        if (input != tfv.text) {
+            tfv = TextFieldValue(input, selection = TextRange(input.length))
+        }
+        if (input.isEmpty()) numericMode = false  // yangi yozuv → ism uchun harf klaviaturasi
+    }
     Surface(
         tonalElevation = 3.dp,
         shadowElevation = 6.dp
@@ -530,15 +702,28 @@ private fun InputBar(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("a", "b", "c", "d", "k", "p", "q").forEach { code ->
+                listOf("a", "b", "c", "d", "k", "p", "q", "n", "t").forEach { code ->
                     AssistChip(
                         onClick = {
-                            val sep = if (input.isEmpty() || input.endsWith(" ")) "" else " "
-                            onChange(input + sep + code)
+                            val cur = tfv.text
+                            val pos = tfv.selection.end.coerceIn(0, cur.length)
+                            // Oldingi belgi probel bo'lmasa — harf oldidan probel qo'shamiz
+                            val needSpace = pos > 0 && cur[pos - 1] != ' '
+                            val ins = (if (needSpace) " " else "") + code
+                            val newText = cur.substring(0, pos) + ins + cur.substring(pos)
+                            val newPos = pos + ins.length  // kursor harfdan KEYIN
+                            tfv = TextFieldValue(newText, selection = TextRange(newPos))
+                            onChange(newText)
+                            numericMode = true  // harfdan keyin → faqat son yozish uchun raqamli klaviatura
                         },
                         label = { Text(code.uppercase()) }
                     )
                 }
+                // Abc/123 — qo'lда harf klaviaturasiga qaytish (ism yozish uchun)
+                AssistChip(
+                    onClick = { numericMode = !numericMode },
+                    label = { Text(if (numericMode) "Abc" else "123") }
+                )
             }
 
             // Autocomplete chips
@@ -577,13 +762,48 @@ private fun InputBar(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
-            } else if (parsedCount > 0) {
-                Text(
-                    "✓ $parsedCount ta yozuv tushunildi",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
+            } else if (parsed.isNotEmpty()) {
+                // Jonli preview — bot'day "tushunildi" kartasi
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            "📝 Tushunildi (${parsed.size} ta):",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        parsed.take(6).forEach { e ->
+                            val name = e.clientName.replaceFirstChar {
+                                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+                            }
+                            val itemsStr = e.items.entries.joinToString("  ") { (t, a) ->
+                                val n = e.clientPrices[t] ?: e.tPrices[t] ?: e.tOneTime[t]
+                                if (n != null) "${t.label}:${a.formatMoney()}[${n.formatMoney()}]"
+                                else "${t.label}:${a.formatMoney()}"
+                            }
+                            Text(
+                                "• $name  $itemsStr",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        if (parsed.size > 6) {
+                            Text(
+                                "… yana ${parsed.size - 6} ta",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
             }
 
             // Input
@@ -593,14 +813,31 @@ private fun InputBar(
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
+                // Pastki menyu toggle (Telegram'day — bosganda ochiladi/yashirinadi)
+                IconButton(
+                    onClick = onToggleMenu,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Text(
+                        if (menuOpen) "✕" else "☰",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 OutlinedTextField(
-                    value = input,
-                    onValueChange = onChange,
+                    value = tfv,
+                    onValueChange = { newV ->
+                        tfv = newV
+                        onChange(newV.text)
+                    },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("ali a10 n a20") },
                     minLines = 1,
                     maxLines = 4,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = if (numericMode) KeyboardType.Number else KeyboardType.Text
+                    ),
                     shape = RoundedCornerShape(20.dp)
                 )
                 Spacer(Modifier.width(6.dp))
