@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -83,28 +84,65 @@ fun ClientHistoryScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             DebtCard(debt = state.debt, txCount = state.transactions.size)
 
+            // Oy navigatsiyasi ⬅️ May 2026 ➡️
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { vm.prevMonth() }) { Text("⬅️", style = MaterialTheme.typography.titleLarge) }
+                Text(
+                    "${MONTHS_UZ[state.selectedMonth.monthValue - 1]} ${state.selectedMonth.year}",
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = { vm.nextMonth() }) { Text("➡️", style = MaterialTheme.typography.titleLarge) }
+            }
+
+            val monthPrefix = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
+            val monthTxs = state.transactions.filter { it.date.startsWith(monthPrefix) }
+
             when {
                 state.isLoading -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) { CircularProgressIndicator() }
 
-                state.transactions.isEmpty() -> Box(
+                monthTxs.isEmpty() -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Bu oyda yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
                 ) {
-                    items(items = state.transactions, key = { it.id }) { tx ->
-                        TxItemCard(
-                            tx = tx,
-                            onClick = { onEditTx(tx.id) },
-                            onLongClick = { toDelete = tx }
-                        )
+                    // Kun bo'yicha guruh (eng yangi tepada)
+                    val byDay = monthTxs.groupBy { it.date.take(10) }
+                        .toSortedMap(compareByDescending { it })
+                    byDay.forEach { (day, dayTxs) ->
+                        item(key = "day-$day") {
+                            Text(
+                                "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+                            )
+                        }
+                        items(dayTxs, key = { it.id }) { tx ->
+                            HistoryRow(
+                                tx = tx,
+                                unitPrice = tx.tOverride ?: state.unitPrices[TxType.fromCode(tx.type)],
+                                onClick = { onEditTx(tx.id) },
+                                onLongClick = { toDelete = tx }
+                            )
+                        }
+                    }
+                    // Oylik JAMI
+                    item(key = "summary") {
+                        MonthSummaryCard(monthTxs, state.unitPrices, state.debt)
                     }
                 }
             }
@@ -165,44 +203,95 @@ private fun DebtCard(debt: Long, txCount: Int) {
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TxItemCard(tx: TransactionEntity, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun HistoryRow(
+    tx: TransactionEntity,
+    unitPrice: Double?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     val type = TxType.fromCode(tx.type)
     val isPayment = type == TxType.P
-    Card(
+    val text = when {
+        isPayment -> "P(pul): ${tx.amount.formatMoney()}"
+        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
+        else -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()}"
+    }
+    val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
+    Row(
         modifier = Modifier
-            .padding(vertical = 4.dp)
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        shape = RoundedCornerShape(12.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(vertical = 5.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    tx.date.take(10),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "${tx.type.uppercase()}: ${tx.amount.formatMoney()}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isPayment) PaidColor else MaterialTheme.colorScheme.onSurface
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isPayment) PaidColor else MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            time,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun MonthSummaryCard(
+    txs: List<TransactionEntity>,
+    unitPrices: Map<TxType, Double>,
+    debt: Long
+) {
+    val byType = txs.groupBy { it.type }.mapValues { (_, l) -> l.sumOf { it.amount } }
+    val payTotal = txs.filter { it.type.lowercase() == "p" }.sumOf { it.amount }
+    var revenue = 0.0
+    for (tx in txs) {
+        val t = TxType.fromCode(tx.type) ?: continue
+        if (t in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+            val p = tx.tOverride ?: unitPrices[t]
+            if (p != null) revenue += tx.amount * p
+        }
+    }
+    Card(
+        modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("📊 JAMI", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(4.dp))
+            for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                val amt = byType[t.code] ?: 0.0
+                if (amt > 0) Text(
+                    "${t.label}: ${amt.formatMoney()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace
                 )
             }
-            tx.tOverride?.let {
-                Text(
-                    "T?: ${it.formatMoney()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-            }
+            if (payTotal > 0) Text(
+                "P(pul): ${payTotal.formatMoney()}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                "J: ${revenue.formatMoney()} so'm",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (debt > 0) "💳 Qarz: ${debt.formatMoney()} so'm" else "✅ Qarz yo'q",
+                fontWeight = FontWeight.Bold,
+                color = if (debt > 0) DebtColor else PaidColor
+            )
         }
     }
 }
+
+private val MONTHS_UZ = listOf(
+    "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+    "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
+)

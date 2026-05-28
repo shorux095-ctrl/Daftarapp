@@ -47,14 +47,16 @@ import java.util.Locale
 fun ClientsScreen(
     onBack: () -> Unit,
     onClientClick: (String) -> Unit = {},
+    debtorsOnly: Boolean = false,
     vm: ClientsViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val shown = if (debtorsOnly) state.filtered.filter { it.debt > 0 } else state.filtered
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("👥 Mijozlar (${state.clients.size})") },
+                title = { Text(if (debtorsOnly) "💳 Qarzdorlar (${shown.size})" else "👥 Mijozlar (${state.clients.size})") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
@@ -90,11 +92,11 @@ fun ClientsScreen(
 
                 state.clients.isEmpty() -> EmptyClients()
 
-                state.filtered.isEmpty() -> Box(
+                shown.isEmpty() -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Topilmadi", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (debtorsOnly) "Qarzdor yo'q ✅" else "Topilmadi", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 else -> {
@@ -103,7 +105,7 @@ fun ClientsScreen(
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
                     ) {
-                        items(items = state.filtered, key = { it.name }) { c ->
+                        items(items = shown, key = { it.name }) { c ->
                             ClientCard(c, onClick = { onClientClick(c.name) })
                         }
                     }

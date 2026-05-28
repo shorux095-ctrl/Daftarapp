@@ -72,7 +72,6 @@ object DaftarParser {
         }
 
         if (ismParts.isEmpty()) return ParseResult.Failure(ParseError.NoClientName)
-        if (items.isEmpty()) return ParseResult.Failure(ParseError.NoItems)
 
         val clientName = normalizeName(ismParts.joinToString(" "))
 
@@ -81,6 +80,11 @@ object DaftarParser {
         val tPrices = mutableMapOf<TxType, Double>()
         val tOneTime = mutableMapOf<TxType, Double>()
         parseNarxParts(narxParts, clientPrices, tPrices, tOneTime)
+
+        // Yuk ham, narx ham bo'lmasa — xato. Faqat narx bo'lsa (n c4.3) — ruxsat.
+        if (items.isEmpty() && clientPrices.isEmpty() && tPrices.isEmpty() && tOneTime.isEmpty()) {
+            return ParseResult.Failure(ParseError.NoItems)
+        }
 
         return ParseResult.Success(
             ParsedEntry(
@@ -145,6 +149,8 @@ object DaftarParser {
                     tl.startsWith("t?")) {
                     return i
                 }
+                // "n"/"narx" yuk ko'rilmasdan ham — faqat narx o'rnatish (masalan "ali n c4.3")
+                if (tl in setOf("n", "narx")) return i
                 continue
             }
 

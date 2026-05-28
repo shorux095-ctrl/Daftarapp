@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.daftar.app.data.db.entity.TransactionEntity
+import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.DeleteTransactionUseCase
 import uz.daftar.app.domain.usecase.GetClientHistoryUseCase
+import uz.daftar.app.domain.usecase.GetClientUnitPricesUseCase
+import java.time.YearMonth
 import javax.inject.Inject
 
 data class ClientHistoryState(
@@ -19,6 +22,8 @@ data class ClientHistoryState(
     val clientName: String = "",
     val debt: Long = 0,
     val transactions: List<TransactionEntity> = emptyList(),
+    val unitPrices: Map<TxType, Double> = emptyMap(),
+    val selectedMonth: YearMonth = YearMonth.now(),
     val error: String? = null
 )
 
@@ -26,6 +31,7 @@ data class ClientHistoryState(
 class ClientHistoryViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val getHistory: GetClientHistoryUseCase,
+    private val getUnitPrices: GetClientUnitPricesUseCase,
     private val deleteTx: DeleteTransactionUseCase
 ) : ViewModel() {
 
@@ -42,11 +48,13 @@ class ClientHistoryViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             try {
                 val h = getHistory(userId, clientName)
+                val prices = runCatching { getUnitPrices(userId, clientName) }.getOrDefault(emptyMap())
                 _state.update {
                     it.copy(
                         isLoading = false,
                         debt = h.debt,
-                        transactions = h.transactions.sortedByDescending { tx -> tx.date }
+                        transactions = h.transactions.sortedByDescending { tx -> tx.date },
+                        unitPrices = prices
                     )
                 }
             } catch (e: Exception) {
@@ -55,11 +63,19 @@ class ClientHistoryViewModel @Inject constructor(
         }
     }
 
+    fun prevMonth() {
+        _state.update { it.copy(selectedMonth = it.selectedMonth.minusMonths(1)) }
+    }
+
+    fun nextMonth() {
+        _state.update { it.copy(selectedMonth = it.selectedMonth.plusMonths(1)) }
+    }
+
     fun deleteTransaction(id: Long) {
         viewModelScope.launch {
             try {
                 deleteTx(id)
-                load()  // qayta yuklash
+                load()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }

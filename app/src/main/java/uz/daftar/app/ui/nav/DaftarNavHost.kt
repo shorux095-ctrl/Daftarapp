@@ -31,6 +31,7 @@ object Routes {
     const val SEARCH = "search"
     const val YUK_NARX = "yuk_narx"
     const val CLIENT_HISTORY = "client_history"
+    const val QARZ = "qarz"
     const val EDIT_TX = "edit_tx"
     const val RASXOD = "rasxod"
     const val KARZINA = "karzina"
@@ -54,7 +55,8 @@ fun DaftarNavHost() {
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
                 onAlias = { nav.navigate(Routes.ALIAS) },
                 onRasxod = { nav.navigate(Routes.RASXOD) },
-                onKarzina = { nav.navigate(Routes.KARZINA) }
+                onKarzina = { nav.navigate(Routes.KARZINA) },
+                onQarz = { nav.navigate(Routes.QARZ) }
             )
         }
 
@@ -68,6 +70,16 @@ fun DaftarNavHost() {
                 onClientClick = { name ->
                     nav.navigate("${Routes.CLIENT_HISTORY}/$name")
                 }
+            )
+        }
+
+        composable(Routes.QARZ) {
+            ClientsScreen(
+                onBack = { nav.popBackStack() },
+                onClientClick = { name ->
+                    nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                },
+                debtorsOnly = true
             )
         }
 

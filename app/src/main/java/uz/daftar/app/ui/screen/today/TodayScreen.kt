@@ -109,6 +109,7 @@ fun TodayScreen(
     onAlias: () -> Unit = onSettings,
     onRasxod: () -> Unit = onSettings,
     onKarzina: () -> Unit = onSettings,
+    onQarz: () -> Unit = onClients,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -147,6 +148,7 @@ fun TodayScreen(
                     filter = state.filter,
                     onFilterChange = vm::setFilter,
                     onClients = onClients,
+                    onQarz = onQarz,
                     onReports = onReports,
                     onSearch = onSearch,
                     onYukNarx = onYukNarx,
@@ -349,6 +351,7 @@ private fun ChatTopBar(
     filter: Filter,
     onFilterChange: (Filter) -> Unit,
     onClients: () -> Unit,
+    onQarz: () -> Unit,
     onReports: () -> Unit,
     onSearch: () -> Unit,
     onYukNarx: () -> Unit,
@@ -411,6 +414,10 @@ private fun ChatTopBar(
                         text = { Text("👥 Mijozlar") },
                         leadingIcon = { Icon(Icons.Outlined.People, null) },
                         onClick = { menuOpen = false; onClients() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("💳 Qarzdorlar") },
+                        onClick = { menuOpen = false; onQarz() }
                     )
                     DropdownMenuItem(
                         text = { Text("🔍 Qidirish (Al)") },
@@ -630,10 +637,11 @@ private fun ChatBubble(
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "${tx.type.label}: ${tx.amount.formatMoney()}" + when {
-                        unitPrice != null -> "  [${unitPrice.formatMoney()}]"
-                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  (narx yo'q)"
-                        else -> ""
+                    text = when {
+                        tx.type == TxType.P -> "P: ${tx.amount.formatMoney()}"
+                        unitPrice != null -> "${tx.type.label}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()}"
+                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "${tx.type.label}: ${tx.amount.formatMoney()}  (narx yo'q)"
+                        else -> "${tx.type.label}: ${tx.amount.formatMoney()}"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace
