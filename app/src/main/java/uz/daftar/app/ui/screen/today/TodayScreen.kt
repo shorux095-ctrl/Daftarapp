@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -133,6 +134,7 @@ fun TodayScreen(
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             if (state.isSelectionMode) {
                 SelectionTopBar(
@@ -285,6 +287,7 @@ fun TodayScreen(
                                 ChatBubble(
                                     tx = tx,
                                     clientDebt = state.debtByClient[tx.clientName.lowercase()],
+                                    unitPrice = tx.tOverride ?: state.priceByClient[tx.clientName.lowercase()]?.get(tx.type),
                                     isSelected = tx.id in state.selected,
                                     inSelectionMode = state.isSelectionMode,
                                     onClick = { if (state.isSelectionMode) vm.toggleSelect(tx.id) },
@@ -575,6 +578,7 @@ private fun DateSeparator(date: LocalDate) {
 private fun ChatBubble(
     tx: Transaction,
     clientDebt: Long?,
+    unitPrice: Double?,
     isSelected: Boolean,
     inSelectionMode: Boolean,
     onClick: () -> Unit,
@@ -626,7 +630,11 @@ private fun ChatBubble(
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "${tx.type.label}: ${tx.amount.formatMoney()}",
+                    text = "${tx.type.label}: ${tx.amount.formatMoney()}" + when {
+                        unitPrice != null -> "  [${unitPrice.formatMoney()}]"
+                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  (narx yo'q)"
+                        else -> ""
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace
                 )
@@ -714,7 +722,8 @@ private fun InputBar(
                             val newPos = pos + ins.length  // kursor harfdan KEYIN
                             tfv = TextFieldValue(newText, selection = TextRange(newPos))
                             onChange(newText)
-                            numericMode = true  // harfdan keyin → faqat son yozish uchun raqamli klaviatura
+                            // n/t (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
+                            if (code !in listOf("n", "t")) numericMode = true
                         },
                         label = { Text(code.uppercase()) }
                     )
@@ -836,7 +845,7 @@ private fun InputBar(
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
-                        keyboardType = if (numericMode) KeyboardType.Number else KeyboardType.Text
+                        keyboardType = if (numericMode) KeyboardType.Decimal else KeyboardType.Text
                     ),
                     shape = RoundedCornerShape(20.dp)
                 )

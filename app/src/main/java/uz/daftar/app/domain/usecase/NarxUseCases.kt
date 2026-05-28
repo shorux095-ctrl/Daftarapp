@@ -76,3 +76,21 @@ class SetClientNarxUseCase @Inject constructor(
         private val ISO: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     }
 }
+
+/**
+ * Mijozning hozirgi (eng oxirgi) narxlari price_history'dan — bubble'da [4.5] ko'rsatish uchun.
+ * Qarz hisobi bilan bir xil manbadan (price_history) olinadi.
+ */
+class GetClientUnitPricesUseCase @Inject constructor(
+    private val priceDao: PriceHistoryDao
+) {
+    suspend operator fun invoke(userId: Long, clientName: String): Map<TxType, Double> {
+        val all = priceDao.getAllForClient(userId, clientName.lowercase())
+        val result = mutableMapOf<TxType, Double>()
+        for (p in all) {
+            val type = TxType.fromCode(p.priceType) ?: continue
+            result[type] = p.price  // ASC tartib — eng oxirgisi eng yangi narx
+        }
+        return result
+    }
+}

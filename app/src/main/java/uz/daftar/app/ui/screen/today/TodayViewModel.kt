@@ -23,6 +23,7 @@ import uz.daftar.app.domain.model.Transaction
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.AddTransactionUseCase
 import uz.daftar.app.domain.usecase.CalculateDebtUseCase
+import uz.daftar.app.domain.usecase.GetClientUnitPricesUseCase
 import uz.daftar.app.domain.usecase.DeleteTransactionUseCase
 import java.time.LocalDate
 import javax.inject.Inject
@@ -58,6 +59,9 @@ data class TodayUiState(
     /** Har mijozning joriy qarzi (bubble'da ko'rsatish uchun) */
     val debtByClient: Map<String, Long> = emptyMap(),
 
+    /** Har mijozning narxlari (bubble'da [4.5] ko'rsatish uchun) */
+    val priceByClient: Map<String, Map<TxType, Double>> = emptyMap(),
+
     /** Tezkor shablonlar */
     val templates: List<String> = emptyList(),
 
@@ -75,7 +79,8 @@ class TodayViewModel @Inject constructor(
     private val addTx: AddTransactionUseCase,
     private val deleteTx: DeleteTransactionUseCase,
     private val calcDebt: CalculateDebtUseCase,
-    private val templateStore: TemplateStore
+    private val templateStore: TemplateStore,
+    private val getUnitPrices: GetClientUnitPricesUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -112,8 +117,10 @@ class TodayViewModel @Inject constructor(
                 // Har mijozning joriy qarzini hisoblash (bot'day ko'rsatish uchun)
                 val clients = txs.map { it.clientName.lowercase() }.distinct()
                 val debts = mutableMapOf<String, Long>()
+                val prices = mutableMapOf<String, Map<TxType, Double>>()
                 for (c in clients) {
                     debts[c] = runCatching { calcDebt(userId, c) }.getOrDefault(0L)
+                    prices[c] = runCatching { getUnitPrices(userId, c) }.getOrDefault(emptyMap())
                 }
                 _state.update {
                     it.copy(
@@ -122,6 +129,7 @@ class TodayViewModel @Inject constructor(
                         transactions = txs,
                         totalByType = totals,
                         debtByClient = debts,
+                        priceByClient = prices,
                         clientCount = clients.size
                     )
                 }
