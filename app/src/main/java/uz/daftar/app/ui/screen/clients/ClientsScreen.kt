@@ -100,13 +100,76 @@ fun ClientsScreen(
                 }
 
                 else -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        items(items = shown, key = { it.name }) { c ->
-                            ClientCard(c, onClick = { onClientClick(c.name) })
+                    if (debtorsOnly) {
+                        val debtors = state.filtered.filter { it.debt > 0 }.sortedByDescending { it.debt }
+                        val overpaid = state.filtered.filter { it.debt < 0 }.sortedBy { it.debt }
+                        val totalDebt = debtors.sumOf { it.debt }
+                        val totalOverpaid = -overpaid.sumOf { it.debt }  // ijobiy qiymat
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            items(items = debtors, key = { "d-${it.name}" }) { c ->
+                                ClientCard(c, onClick = { onClientClick(c.name) })
+                            }
+                            if (overpaid.isNotEmpty()) {
+                                item(key = "overpaid-header") {
+                                    Text(
+                                        "💚 Ortiqcha to'lovlar",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                                    )
+                                }
+                                items(items = overpaid, key = { "o-${it.name}" }) { c ->
+                                    ClientCard(c, onClick = { onClientClick(c.name) })
+                                }
+                            }
+                            item(key = "summary") {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text(
+                                            "🔢 JAMI",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            "Qarz: ${totalDebt.formatMoney()} so'm",
+                                            color = uz.daftar.app.core.theme.DebtColor,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                                        )
+                                        if (overpaid.isNotEmpty()) {
+                                            Text(
+                                                "Ortiqcha: ${totalOverpaid.formatMoney()} so'm",
+                                                color = uz.daftar.app.core.theme.PaidColor
+                                            )
+                                            Text(
+                                                "Sof: ${(totalDebt - totalOverpaid).formatMoney()} so'm",
+                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            items(items = shown, key = { it.name }) { c ->
+                                ClientCard(c, onClick = { onClientClick(c.name) })
+                            }
                         }
                     }
                 }

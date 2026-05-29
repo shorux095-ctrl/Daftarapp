@@ -134,7 +134,8 @@ fun ClientHistoryScreen(
                         items(dayTxs, key = { it.id }) { tx ->
                             HistoryRow(
                                 tx = tx,
-                                unitPrice = tx.tOverride ?: state.unitPrices[TxType.fromCode(tx.type)],
+                                unitPrice = state.priceByTx[tx.id],
+                                balanceAfter = state.balanceAfterPayment[tx.id],
                                 onClick = { onEditTx(tx.id) },
                                 onLongClick = { toDelete = tx }
                             )
@@ -142,7 +143,7 @@ fun ClientHistoryScreen(
                     }
                     // Oylik JAMI
                     item(key = "summary") {
-                        MonthSummaryCard(monthTxs, state.unitPrices, state.debt)
+                        MonthSummaryCard(monthTxs, state.priceByTx, state.debt)
                     }
                 }
             }
@@ -206,16 +207,25 @@ private fun DebtCard(debt: Long, txCount: Int) {
 private fun HistoryRow(
     tx: TransactionEntity,
     unitPrice: Double?,
+    balanceAfter: Long?,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val type = TxType.fromCode(tx.type)
     val isPayment = type == TxType.P
-    val text = when {
+    val mainText = when {
         isPayment -> "P(pul): ${tx.amount.formatMoney()}"
         unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
         else -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()}"
     }
+    // To'lov uchun: → 💳 Qoldi / ✅ 0 / 💚 Ortiq
+    val balanceText: String? = if (isPayment && balanceAfter != null) {
+        when {
+            balanceAfter > 0 -> "→ 💳 Qoldi: ${balanceAfter.formatMoney()}"
+            balanceAfter == 0L -> "→ ✅ 0"
+            else -> "→ 💚 Ortiq: ${(-balanceAfter).formatMoney()}"
+        }
+    } else null
     val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
     Row(
         modifier = Modifier
@@ -224,12 +234,24 @@ private fun HistoryRow(
             .padding(vertical = 5.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isPayment) PaidColor else MaterialTheme.colorScheme.onSurface
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                mainText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isPayment) PaidColor else MaterialTheme.colorScheme.onSurface
+            )
+            if (balanceText != null) {
+                Text(
+                    balanceText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when {
+                        balanceAfter!! > 0 -> DebtColor
+                        balanceAfter == 0L -> PaidColor
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                )
+            }
+        }
         Text(
             time,
             style = MaterialTheme.typography.labelSmall,
@@ -241,7 +263,7 @@ private fun HistoryRow(
 @Composable
 private fun MonthSummaryCard(
     txs: List<TransactionEntity>,
-    unitPrices: Map<TxType, Double>,
+    priceByTx: Map<Long, Double?>,
     debt: Long
 ) {
     val byType = txs.groupBy { it.type }.mapValues { (_, l) -> l.sumOf { it.amount } }
@@ -250,7 +272,7 @@ private fun MonthSummaryCard(
     for (tx in txs) {
         val t = TxType.fromCode(tx.type) ?: continue
         if (t in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
-            val p = tx.tOverride ?: unitPrices[t]
+            val p = priceByTx[tx.id]
             if (p != null) revenue += tx.amount * p
         }
     }
