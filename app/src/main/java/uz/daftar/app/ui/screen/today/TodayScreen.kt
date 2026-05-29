@@ -51,9 +51,6 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.material3.AlertDialog
@@ -248,52 +245,25 @@ fun TodayScreen(
                     // Sana bo'yicha guruhlash
                     val grouped = state.transactions.groupBy { it.date.toLocalDate() }
                         .toSortedMap()
-                    for ((date, txs) in grouped) {
+                    for ((date, dayTxs) in grouped) {
                         item("date-$date") { DateSeparator(date) }
-                        items(txs, key = { it.id }) { tx ->
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    when (value) {
-                                        SwipeToDismissBoxValue.EndToStart -> { vm.deleteOne(tx.id); true }   // chapga = o'chir
-                                        SwipeToDismissBoxValue.StartToEnd -> { onEditTx(tx.id); false }       // o'ngga = tahrir
-                                        else -> false
-                                    }
-                                }
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = !state.isSelectionMode,
-                                enableDismissFromEndToStart = !state.isSelectionMode,
-                                backgroundContent = {
-                                    val dir = dismissState.dismissDirection
-                                    val color = when (dir) {
-                                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
-                                        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
-                                        else -> MaterialTheme.colorScheme.surface
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(color, RoundedCornerShape(18.dp))
-                                            .padding(horizontal = 24.dp),
-                                        contentAlignment = if (dir == SwipeToDismissBoxValue.StartToEnd)
-                                            Alignment.CenterStart else Alignment.CenterEnd
-                                    ) {
-                                        Text(
-                                            if (dir == SwipeToDismissBoxValue.StartToEnd) "✏️ Tahrir" else "🗑 O'chir",
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
-                                    }
-                                }
-                            ) {
-                                ChatBubble(
-                                    tx = tx,
-                                    clientDebt = state.debtByClient[tx.clientName.lowercase()],
-                                    unitPrice = tx.tOverride ?: state.priceByClient[tx.clientName.lowercase()]?.get(tx.type),
-                                    isSelected = tx.id in state.selected,
+                        // Mijoz bo'yicha guruh (bot uslubidagi ✅ Saqlandi karta)
+                        val byClient = dayTxs.groupBy { it.clientName.lowercase() }
+                        for ((clientLower, clientTxs) in byClient) {
+                            item(key = "${date}-${clientLower}") {
+                                ClientDayCard(
+                                    date = date,
+                                    clientName = clientTxs.first().clientName,
+                                    txs = clientTxs,
+                                    clientPrices = state.priceByClient[clientLower],
+                                    clientDebt = state.debtByClient[clientLower],
+                                    selected = state.selected,
                                     inSelectionMode = state.isSelectionMode,
-                                    onClick = { if (state.isSelectionMode) vm.toggleSelect(tx.id) },
-                                    onLongClick = { vm.toggleSelect(tx.id) }
+                                    onTxClick = { txId ->
+                                        if (state.isSelectionMode) vm.toggleSelect(txId)
+                                        else onEditTx(txId)
+                                    },
+                                    onTxLongClick = { txId -> vm.toggleSelect(txId) }
                                 )
                             }
                         }
@@ -582,97 +552,94 @@ private fun DateSeparator(date: LocalDate) {
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ChatBubble(
-    tx: Transaction,
+private fun ClientDayCard(
+    date: LocalDate,
+    clientName: String,
+    txs: List<Transaction>,
+    clientPrices: Map<TxType, Double>?,
     clientDebt: Long?,
-    unitPrice: Double?,
-    isSelected: Boolean,
+    selected: Set<Long>,
     inSelectionMode: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onTxClick: (Long) -> Unit,
+    onTxLongClick: (Long) -> Unit
 ) {
-    val bg = when {
-        isSelected -> MaterialTheme.colorScheme.primaryContainer
-        tx.type == TxType.P -> MaterialTheme.colorScheme.tertiaryContainer
-        tx.type == TxType.Q -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val timeStr = tx.date.format(DateTimeFormatter.ofPattern("HH:mm"))
-    val capitalized = tx.clientName.replaceFirstChar {
+    val capitalized = clientName.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
     }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
-    ) {
+    val dateStr = date.format(DateTimeFormatter.ofPattern("dd.MM"))
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             shape = RoundedCornerShape(topStart = 18.dp, topEnd = 6.dp, bottomEnd = 18.dp, bottomStart = 18.dp),
-            color = bg,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
-                .widthIn(max = 320.dp)
-                .padding(start = 48.dp)
-                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 6.dp, bottomEnd = 18.dp, bottomStart = 18.dp))
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
+                .widthIn(max = 340.dp)
+                .padding(start = 32.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Text(
+                    "✅ Saqlandi",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "📅 $dateStr",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    capitalized,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                for (tx in txs) {
+                    val isSelected = tx.id in selected
+                    val unitPrice = tx.tOverride ?: clientPrices?.get(tx.type)
+                    val lineText = when {
+                        tx.type == TxType.P -> "  P: ${tx.amount.formatMoney()}"
+                        unitPrice != null -> "  ${tx.type.label}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()}"
+                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  ${tx.type.label}: ${tx.amount.formatMoney()}  (narx yo'q)"
+                        else -> "  ${tx.type.label}: ${tx.amount.formatMoney()}"
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                else androidx.compose.ui.graphics.Color.Transparent
+                            )
+                            .combinedClickable(
+                                onClick = { onTxClick(tx.id) },
+                                onLongClick = { onTxLongClick(tx.id) }
+                            )
+                            .padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            lineText,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                if (clientDebt != null) {
                     Text(
-                        capitalized,
-                        style = MaterialTheme.typography.titleSmall,
+                        when {
+                            clientDebt > 0 -> "💳 Qarz: ${clientDebt.toDouble().formatMoney()} so'm"
+                            clientDebt == 0L -> "✅ Qarz yo'q"
+                            else -> "💚 Ortiq: ${(-clientDebt).toDouble().formatMoney()} so'm"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
+                        color = when {
+                            clientDebt > 0 -> MaterialTheme.colorScheme.error
+                            clientDebt == 0L -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.tertiary
+                        }
                     )
-                    if (inSelectionMode && isSelected) {
-                        Icon(
-                            Icons.Outlined.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = when {
-                        tx.type == TxType.P -> "P: ${tx.amount.formatMoney()}"
-                        unitPrice != null -> "${tx.type.label}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()}"
-                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "${tx.type.label}: ${tx.amount.formatMoney()}  (narx yo'q)"
-                        else -> "${tx.type.label}: ${tx.amount.formatMoney()}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace
-                )
-                // Qarz (bot'day) — faqat yuk/q yozuvlarida ko'rsatamiz
-                if (clientDebt != null && tx.type != TxType.P) {
-                    Spacer(Modifier.height(2.dp))
-                    if (clientDebt > 0) {
-                        Text(
-                            text = "💳 Qarz: ${clientDebt.toDouble().formatMoney()} so'm",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Text(
-                            text = "✅ Qarz yo'q",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = timeStr,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
-                )
             }
         }
     }
