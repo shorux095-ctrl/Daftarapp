@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.theme.DebtColor
 import uz.daftar.app.core.theme.PaidColor
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import java.util.Locale
@@ -122,8 +123,9 @@ fun ClientHistoryScreen(
                 ) {
                     // Kun bo'yicha guruh (eng yangi tepada)
                     val byDay = monthTxs.groupBy { it.date.take(10) }
-                        .toSortedMap(compareByDescending { it })
-                    byDay.forEach { (day, dayTxs) ->
+                        .toSortedMap(compareBy { it })
+                    byDay.forEach { (day, dayTxsRaw) ->
+                        val dayTxs = dayTxsRaw.sortedBy { it.date }
                         item(key = "day-$day") {
                             Text(
                                 "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}",
@@ -216,8 +218,8 @@ private fun HistoryRow(
     val isPayment = type == TxType.P
     val mainText = when {
         isPayment -> "P(pul): ${tx.amount.formatMoney()}"
-        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
-        else -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()}"
+        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} × ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
+        else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
     }
     // To'lov uchun: → 💳 Qoldi / ✅ 0 / 💚 Ortiq
     val balanceText: String? = if (isPayment && balanceAfter != null) {
@@ -288,7 +290,7 @@ private fun MonthSummaryCard(
             for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
                 val amt = byType[t.code] ?: 0.0
                 if (amt > 0) Text(
-                    "${t.label}: ${amt.formatMoney()}",
+                    "${t.label}: ${amt.formatQty()}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace
                 )

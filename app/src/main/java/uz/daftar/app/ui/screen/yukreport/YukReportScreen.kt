@@ -82,10 +82,26 @@ fun YukReportScreen(
                     Text("➡️", fontSize = 20.sp)
                 }
             }
+            // ── Pul / Soni toggle ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = !state.counts,
+                    onClick = vm::showMoney,
+                    label = { Text("💰 Pul (T/N/P)") }
+                )
+                FilterChip(
+                    selected = state.counts,
+                    onClick = vm::showCounts,
+                    label = { Text("📦 Soni (ABCDK)") }
+                )
+            }
 
             // ── Sarlavha ──
             Text(
-                state.report?.title ?: "",
+                (if (state.counts) state.countReport?.title else state.report?.title) ?: "",
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleMedium,
@@ -93,33 +109,52 @@ fun YukReportScreen(
             )
 
             // ── Jadval sarlavhasi ──
-            TableHeader()
+            if (state.counts) CountHeader() else TableHeader()
             HorizontalDivider()
 
-            when {
-                state.isLoading && state.report == null -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator() }
-
-                state.report == null || state.report!!.rows.isEmpty() -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Bu davrда yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                else -> {
-                    val report = state.report!!
-                    LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        items(items = report.rows, key = { it.label }) { row ->
-                            TableRow(row)
+            if (state.counts) {
+                val cr = state.countReport
+                when {
+                    state.isLoading && cr == null -> Box(
+                        modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+                    cr == null || cr.rows.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
+                    ) { Text("Bu davrда yuk yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    else -> {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            items(items = cr.rows, key = { it.label }) { row -> CountRow(row) }
                         }
+                        HorizontalDivider(thickness = 2.dp)
+                        CountTotalRow(cr.totals)
+                        Spacer(Modifier.height(8.dp))
                     }
-                    HorizontalDivider(thickness = 2.dp)
-                    // JAMI
-                    JamiRow(report.jamiT, report.jamiN, report.jamiP, report.jamiFarq)
-                    Spacer(Modifier.height(8.dp))
+                }
+            } else {
+                when {
+                    state.isLoading && state.report == null -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+
+                    state.report == null || state.report!!.rows.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Bu davrда yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    else -> {
+                        val report = state.report!!
+                        LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            items(items = report.rows, key = { it.label }) { row ->
+                                TableRow(row)
+                            }
+                        }
+                        HorizontalDivider(thickness = 2.dp)
+                        JamiRow(report.jamiT, report.jamiN, report.jamiP, report.jamiFarq)
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
             }
         }
@@ -206,4 +241,55 @@ private fun androidx.compose.foundation.layout.RowScope.FarqCell(
         textAlign = TextAlign.End,
         color = if (farq >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     )
+}
+
+@Composable
+private fun CountHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        Cell("Sana", weight = 1.2f, bold = true, align = TextAlign.Start)
+        Cell("A", weight = 1f, bold = true)
+        Cell("B", weight = 1f, bold = true)
+        Cell("C", weight = 1f, bold = true)
+        Cell("D", weight = 1f, bold = true)
+        Cell("K", weight = 1f, bold = true)
+    }
+}
+
+@Composable
+private fun CountRow(row: uz.daftar.app.domain.usecase.YukCountRow) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
+    ) {
+        Cell(row.label, weight = 1.2f, align = TextAlign.Start)
+        for (t in listOf("a", "b", "c", "d", "k")) {
+            val v = row.counts[t] ?: 0.0
+            Cell(if (v > 0) fmtCount(v) else "—", weight = 1f)
+        }
+    }
+}
+
+@Composable
+private fun CountTotalRow(totals: Map<String, Double>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 8.dp, vertical = 10.dp)
+    ) {
+        Cell("∑", weight = 1.2f, bold = true, align = TextAlign.Start)
+        for (t in listOf("a", "b", "c", "d", "k")) {
+            val v = totals[t] ?: 0.0
+            Cell(if (v > 0) fmtCount(v) else "—", weight = 1f, bold = true)
+        }
+    }
+}
+
+private fun fmtCount(v: Double): String {
+    val l = v.toLong()
+    return if (v == l.toDouble()) l.toString() else v.toString()
 }

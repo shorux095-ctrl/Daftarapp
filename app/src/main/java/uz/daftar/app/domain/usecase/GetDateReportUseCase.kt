@@ -11,11 +11,14 @@ import javax.inject.Inject
 /** Bot uslubы "📅 dd.MM" hisoboti ma'lumotlari */
 data class DateReport(
     val date: LocalDate,
+    val title: String = "",
+    val title: String,                          // "30.05" yoki "Hafta 26.05–01.06"
     val clientLines: List<DateReportClientLine>,
-    val totalsByType: Map<TxType, Double>,    // Har yuk turi bo'yicha jami miqdor (A 150, C 2.902, ...)
-    val revenueByType: Map<TxType, Double>,    // Har yuk turi bo'yicha jami daromad (miqdor × narx)
-    val totalRevenue: Double,                   // J — barcha yuk turlari yig'indisi
-    val totalPayments: Double                   // 🅿️ — barcha P (to'lov)lar
+    val totalsByType: Map<TxType, Double>,
+    val revenueByType: Map<TxType, Double>,
+    val totalRevenue: Double,
+    val totalPayments: Double,
+    val useNarx: Boolean = false
 )
 
 data class DateReportClientLine(
@@ -35,10 +38,37 @@ class GetDateReportUseCase @Inject constructor(
     private val yukNarxDao: YukNarxDao,
     private val priceDao: PriceHistoryDao
 ) {
-    suspend operator fun invoke(userId: Long, date: LocalDate): DateReport {
-        val dayStart = "$date 00:00:00"
-        val dayEnd = date.plusDays(1).toString() + " 00:00:00"
-        val txs = txDao.getRange(userId, dayStart, dayEnd).sortedBy { it.date }
+    suspend operator fun invoke(userId: Long, date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false): DateReport {
+        val title = date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))
+        return build(userId, date, date.plusDays(1), title, types, useNarx)
+    }
+
+    /** Sana oralig'i uchun (masalan haftalik: dushanba–yakshanba) */
+    suspend fun range(
+        userId: Long,
+        startInclusive: LocalDate,
+        endInclusive: LocalDate,
+        types: Set<String>? = null,
+        useNarx: Boolean = false
+    ): DateReport {
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM")
+        val title = "${startInclusive.format(fmt)}–${endInclusive.format(fmt)}"
+        return build(userId, startInclusive, endInclusive.plusDays(1), title, types, useNarx)
+    }
+
+    private suspend fun build(
+        userId: Long,
+        startInclusive: LocalDate,
+        endExclusive: LocalDate,
+        title: String,
+        types: Set<String>?,
+        useNarx: Boolean
+    ): DateReport {
+        val dayStart = "$startInclusive 00:00:00"
+        val dayEnd = "$endExclusive 00:00:00"
+        val allTxs = txDao.getRange(userId, dayStart, dayEnd).sortedBy { it.date }
+        val txs = if (types.isNullOrEmpty()) allTxs
+                  else allTxs.filter { it.type.lowercase() in types }
 
         // Har mijoz uchun N narxlarini olish (sana boshi bilan)
         val clientLowers = txs.map { it.clientName.lowercase() }.distinct()
@@ -59,10 +89,14 @@ class GetDateReportUseCase @Inject constructor(
         }
 
         fun effectivePrice(tx: TransactionEntity): Double? {
-            tx.tOverride?.let { return it }
             val t = tx.type.lowercase()
-            nPricesByClient[tx.clientName.lowercase()]?.get(t)?.let { return it }
-            return tPrices[t]
+            return if (useNarx) {
+                // N narx (sotilgan narx): mijoz N narxи → global T
+                nPricesByClient[tx.clientName.lowercase()]?.get(t) ?: tPrices[t]
+            } else {
+                // T narx (J): bir martalik T override → global T
+                tx.tOverride ?: tPrices[t]
+            }
         }
 
         // Mijozlarni paydo bo'lish tartibida guruhlash
@@ -112,12 +146,14 @@ class GetDateReportUseCase @Inject constructor(
         }
 
         return DateReport(
-            date = date,
+            date = startInclusive,
+            title = title,
             clientLines = clientLines,
             totalsByType = totalsByType,
             revenueByType = revenueByType,
             totalRevenue = totalRevenue,
-            totalPayments = totalPayments
+            totalPayments = totalPayments,
+            useNarx = useNarx
         )
     }
 }

@@ -68,6 +68,8 @@ data class TodayUiState(
 
     /** Har mijozning joriy qarzi (bubble'da ko'rsatish uchun) */
     val debtByClient: Map<String, Long> = emptyMap(),
+    /** Har "save" (mijoz|vaqt) uchun o'sha paytdagi kumulyativ qarz */
+    val debtBySave: Map<String, Long> = emptyMap(),
 
     /** Har mijozning narxlari (bubble'da [4.5] ko'rsatish uchun) */
     val priceByClient: Map<String, Map<TxType, Double>> = emptyMap(),
@@ -143,6 +145,36 @@ class TodayViewModel @Inject constructor(
                     debts[c] = runCatching { calcDebt(userId, c) }.getOrDefault(0L)
                     prices[c] = runCatching { getUnitPrices(userId, c) }.getOrDefault(emptyMap())
                 }
+                // Per-save kumulyativ qarz — joriy jami'дан orqaga yurib hisoblaymiz
+                val debtBySave = mutableMapOf<String, Long>()
+                for (c in clients) {
+                    val ctxs = txs.filter { it.clientName.lowercase() == c }
+                        .sortedBy { it.date }
+                    if (ctxs.isEmpty()) continue
+                    val pm = prices[c] ?: emptyMap()
+                    fun effect(tx: uz.daftar.app.domain.model.Transaction): Double {
+                        return when (tx.type) {
+                            TxType.P -> -tx.amount
+                            TxType.Q -> tx.amount
+                            else -> {
+                                val price = tx.tOverride ?: pm[tx.type]
+                                if (price != null) tx.amount * price else 0.0
+                            }
+                        }
+                    }
+                    var cum = (debts[c] ?: 0L).toDouble()
+                    val cumAfter = DoubleArray(ctxs.size)
+                    for (i in ctxs.indices.reversed()) {
+                        cumAfter[i] = cum
+                        cum -= effect(ctxs[i])
+                    }
+                    for (i in ctxs.indices) {
+                        val isLastOfSave = (i == ctxs.size - 1) || (ctxs[i].date != ctxs[i + 1].date)
+                        if (isLastOfSave) {
+                            debtBySave["$c|${ctxs[i].date}"] = Math.round(cumAfter[i])
+                        }
+                    }
+                }
                 _state.update {
                     it.copy(
                         filter = filterFlow.value,
@@ -150,6 +182,7 @@ class TodayViewModel @Inject constructor(
                         transactions = txs,
                         totalByType = totals,
                         debtByClient = debts,
+                        debtBySave = debtBySave,
                         priceByClient = prices,
                         clientCount = clients.size
                     )
@@ -179,32 +212,43 @@ class TodayViewModel @Inject constructor(
             updateSuggestions("")
             return
         }
-        // "bugun" / "kecha" / "DD.MM" yoki "DD.MM.YY" — sana hisoboti
+        // "bugun" / "kecha" / "DD.MM" + ixtiyoriy tur filtri ("30.05 a b c")
         val trimmedLow = text.trim().lowercase()
-        val dateForReport: LocalDate? = when {
-            trimmedLow == "bugun" -> LocalDate.now()
-            trimmedLow == "kecha" -> LocalDate.now().minusDays(1)
+        val tokens = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val baseDate: LocalDate? = if (tokens.isEmpty()) null else when (tokens[0]) {
+            "bugun" -> LocalDate.now()
+            "kecha" -> LocalDate.now().minusDays(1)
             else -> {
-                val m = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""").matchEntire(trimmedLow)
-                if (m != null) {
-                    runCatching {
-                        val d = m.groupValues[1].toInt()
-                        val mo = m.groupValues[2].toInt()
-                        val yr = m.groupValues[3]
-                        val year = when {
-                            yr.isEmpty() -> LocalDate.now().year
-                            yr.length == 2 -> 2000 + yr.toInt()
-                            else -> yr.toInt()
-                        }
-                        LocalDate.of(year, mo, d)
-                    }.getOrNull()
-                } else null
+                val m = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""").matchEntire(tokens[0])
+                if (m != null) runCatching {
+                    val d = m.groupValues[1].toInt()
+                    val mo = m.groupValues[2].toInt()
+                    val yr = m.groupValues[3]
+                    val year = when {
+                        yr.isEmpty() -> LocalDate.now().year
+                        yr.length == 2 -> 2000 + yr.toInt()
+                        else -> yr.toInt()
+                    }
+                    LocalDate.of(year, mo, d)
+                }.getOrNull() else null
             }
         }
-        if (dateForReport != null) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList()) }
-            loadDateReport(dateForReport)
-            return
+        if (baseDate != null) {
+            val rest = tokens.drop(1)
+            // "n" — N narx (sotilgan) rejimi; qolganlari tur filtri
+            val useNarx = rest.contains("n")
+            val filterLetters = rest.filter { it != "n" }
+            // Qolgan tokenlar faqat YAKKA harf (a/b/c/d/k/p/q) yoki "n" bo'lsa — hisobot
+            val isReport = rest.isEmpty() || rest.all {
+                it == "n" || (it.length == 1 && it[0] in "abcdkpq")
+            }
+            if (isReport) {
+                val types = if (filterLetters.isEmpty()) null else filterLetters.toSet()
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList()) }
+                loadDateReport(baseDate, types, useNarx)
+                return
+            }
+            // Aks holda ("30.05 a10") — bu oddiy yozuv, pastga o'tadi
         }
         // Multi-line — har qator alohida parsing
         val results = text.lines().filter { it.isNotBlank() }.map { DaftarParser.parse(it) }
@@ -227,12 +271,36 @@ class TodayViewModel @Inject constructor(
         loadPreviewIfName(text)
     }
 
+    /** Tugmadan chaqiriladi — inputni tozalab, sana hisobotini ko'rsatadi */
+    fun showDateReportButton(date: LocalDate, useNarx: Boolean = false) {
+        _state.update {
+            it.copy(input = "", parsed = emptyList(), previews = emptyList(), errorMessage = null, isDeleteCommand = false)
+        }
+        loadDateReport(date, null, useNarx)
+    }
+
+    /** Haftalik hisobot — joriy haftaning dushanbasidan yakshanbasigacha (T narx) */
+    fun showWeekReport() {
+        val today = LocalDate.now()
+        val monday = today.with(java.time.DayOfWeek.MONDAY)
+        val sunday = monday.plusDays(6)
+        _state.update {
+            it.copy(input = "", parsed = emptyList(), previews = emptyList(), errorMessage = null, isDeleteCommand = false)
+        }
+        loadDateReport(monday, null, false, sunday)
+    }
+
+    /** Sana hisobotини yopish */
+    fun clearDateReport() {
+        _state.update { it.copy(dateReport = null) }
+    }
+
     private var reportJob: Job? = null
-    private fun loadDateReport(date: LocalDate) {
+    private fun loadDateReport(date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false, endDate: LocalDate = date) {
         reportJob?.cancel()
         reportJob = viewModelScope.launch {
             try {
-                val report = getDateReport(userId, date)
+                val report = getDateReport(userId, date, types, useNarx, endDate)
                 _state.update { it.copy(dateReport = report) }
             } catch (e: Exception) {
                 _state.update { it.copy(dateReport = null, errorMessage = e.message) }

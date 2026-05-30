@@ -114,6 +114,43 @@ object DaftarParser {
      * Bitta tokenни inline narx markeri sifatida talqin qilishga uringan.
      * Muvaffaqiyatли: iste'mol qilingan token sonini qaytaradi (1 yoki 2). Aks holda 0.
      */
+    /**
+     * Narx markeridan (n/t/t?) keyin ketma-ket BIR NECHTA narx tokenini iste'mol qiladi.
+     * Masalan: "n c20 a20" → C=20, A=20.  "n 20" → oxirgi yuk turi uchun.
+     * Iste'mol qilingan tokenlar soni (marker + narxlar) qaytariladi.
+     */
+    private inline fun consumeMultiNarx(
+        parts: List<String>,
+        i: Int,
+        lastCargoType: TxType?,
+        assign: (TxType, Double) -> Unit
+    ): Int {
+        var j = i + 1
+        var matched = false
+        while (j < parts.size) {
+            val nxt = parts[j].lowercase()
+            val pn = parseNarxToken(nxt, parts, j)
+            if (pn != null) {
+                assign(pn.first, pn.second)
+                j += pn.third
+                matched = true
+            } else {
+                // "n 20" — faqat birinchi token raqam bo'lsa, oxirgi yuk turiga
+                if (!matched && lastCargoType != null) {
+                    val amt = nxt.replace(",", ".").toDoubleOrNull()
+                    if (amt != null) {
+                        assign(lastCargoType, amt)
+                        j += 1
+                        matched = true
+                        continue
+                    }
+                }
+                break
+            }
+        }
+        return j - i
+    }
+
     private fun tryParseNarxInline(
         pl: String,
         parts: List<String>,
@@ -123,57 +160,23 @@ object DaftarParser {
         tOneTime: MutableMap<TxType, Double>,
         lastCargoType: TxType?
     ): Int {
-        // "n" yoki "narx" — keyingi token N narx
+        // "n" yoki "narx" — keyingi BIR NECHTA token N narx ("n c20 a20" → C=20, A=20)
         if (pl == "n" || pl == "narx") {
-            if (i + 1 < parts.size) {
-                val nxt = parts[i + 1].lowercase()
-                val pn = parseNarxToken(nxt, parts, i + 1)
-                if (pn != null) {
-                    clientPrices[pn.first] = pn.second
-                    return 1 + pn.third
-                }
-                // "n 20" — oxirgi yuk turi uchun N narx
-                val amt = nxt.replace(",", ".").toDoubleOrNull()
-                if (amt != null && lastCargoType != null) {
-                    clientPrices[lastCargoType] = amt
-                    return 2
-                }
+            return consumeMultiNarx(parts, i, lastCargoType) { type, price ->
+                clientPrices[type] = price
             }
-            return 1
         }
-        // "t" yoki "tk" — keyingi token T narx
+        // "t" yoki "tk" — keyingi bir nechta token T narx
         if (pl == "t" || pl == "tk") {
-            if (i + 1 < parts.size) {
-                val nxt = parts[i + 1].lowercase()
-                val pn = parseNarxToken(nxt, parts, i + 1)
-                if (pn != null) {
-                    tPrices[pn.first] = pn.second
-                    return 1 + pn.third
-                }
-                val amt = nxt.replace(",", ".").toDoubleOrNull()
-                if (amt != null && lastCargoType != null) {
-                    tPrices[lastCargoType] = amt
-                    return 2
-                }
+            return consumeMultiNarx(parts, i, lastCargoType) { type, price ->
+                tPrices[type] = price
             }
-            return 1
         }
-        // "t?" yoki "t1" yakka — bir martalik T
+        // "t?" yoki "t1" — bir martalik T (bir nechta)
         if (pl == "t?" || pl == "t1") {
-            if (i + 1 < parts.size) {
-                val nxt = parts[i + 1].lowercase()
-                val pn = parseNarxToken(nxt, parts, i + 1)
-                if (pn != null) {
-                    tOneTime[pn.first] = pn.second
-                    return 1 + pn.third
-                }
-                val amt = nxt.replace(",", ".").toDoubleOrNull()
-                if (amt != null && lastCargoType != null) {
-                    tOneTime[lastCargoType] = amt
-                    return 2
-                }
+            return consumeMultiNarx(parts, i, lastCargoType) { type, price ->
+                tOneTime[type] = price
             }
-            return 1
         }
         // "na20" / "nb30" — N yakka token
         if (pl.length >= 3 && pl[0] == 'n' && pl[1] in NUM_TYPES) {

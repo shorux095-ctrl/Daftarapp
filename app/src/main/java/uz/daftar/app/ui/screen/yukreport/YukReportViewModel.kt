@@ -20,9 +20,11 @@ import javax.inject.Inject
 data class YukReportState(
     val isLoading: Boolean = true,
     val yearly: Boolean = false,
+    val counts: Boolean = false,
     val month: YearMonth = YearMonth.now(),
     val year: Int = LocalDate.now().year,
-    val report: YukReport? = null
+    val report: YukReport? = null,
+    val countReport: uz.daftar.app.domain.usecase.YukCountReport? = null
 )
 
 @HiltViewModel
@@ -32,6 +34,7 @@ class YukReportViewModel @Inject constructor(
 
     private val userId: Long = 1L
     private val cache = mutableMapOf<String, YukReport>()
+    private val countCache = mutableMapOf<String, uz.daftar.app.domain.usecase.YukCountReport>()
 
     private val _state = MutableStateFlow(YukReportState())
     val state: StateFlow<YukReportState> = _state.asStateFlow()
@@ -42,8 +45,29 @@ class YukReportViewModel @Inject constructor(
 
     private fun load() {
         val s = _state.value
+        if (s.counts) {
+            val key = if (s.yearly) "y${s.year}" else "m${s.month}"
+            countCache[key]?.let { cached ->
+                _state.update { it.copy(countReport = cached, isLoading = false) }
+                return
+            }
+            job?.cancel()
+            job = viewModelScope.launch {
+                _state.update { it.copy(isLoading = true) }
+                val r = withContext(Dispatchers.Default) {
+                    if (s.yearly) getReport.countsYearly(userId, s.year)
+                    else getReport.countsMonthly(userId, s.month)
+                }
+                countCache[key] = r
+                val now = _state.value
+                if (now.counts == s.counts && now.yearly == s.yearly &&
+                    (if (s.yearly) now.year == s.year else now.month == s.month)) {
+                    _state.update { it.copy(countReport = r, isLoading = false) }
+                }
+            }
+            return
+        }
         val key = if (s.yearly) "y${s.year}" else "m${s.month}"
-        // Cache'дa bo'lsa — darrov ko'rsatamiz (tez, qotmaydi)
         cache[key]?.let { cached ->
             _state.update { it.copy(report = cached, isLoading = false) }
             return
@@ -56,14 +80,24 @@ class YukReportViewModel @Inject constructor(
                 else getReport.monthly(userId, s.month)
             }
             cache[key] = r
-            // Faqat hozirgi tanlov hali ham shu bo'lsa yangilaymiz
             val now = _state.value
-            val stillSame = if (now.yearly) (now.yearly == s.yearly && now.year == s.year)
-                            else (now.yearly == s.yearly && now.month == s.month)
-            if (stillSame) {
+            if (!now.counts && now.yearly == s.yearly &&
+                (if (s.yearly) now.year == s.year else now.month == s.month)) {
                 _state.update { it.copy(report = r, isLoading = false) }
             }
         }
+    }
+
+    fun showMoney() {
+        if (!_state.value.counts) return
+        _state.update { it.copy(counts = false) }
+        load()
+    }
+
+    fun showCounts() {
+        if (_state.value.counts) return
+        _state.update { it.copy(counts = true) }
+        load()
     }
 
     fun prev() {

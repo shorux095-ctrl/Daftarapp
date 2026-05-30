@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
+import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Send
@@ -56,7 +57,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.core.parser.ParsedEntry
 import uz.daftar.app.domain.model.Transaction
 import uz.daftar.app.domain.model.TxType
@@ -107,6 +108,7 @@ fun TodayScreen(
     onSearch: () -> Unit = onSettings,
     onYukNarx: () -> Unit = onSettings,
     onYukReport: () -> Unit = onSettings,
+    onNReport: () -> Unit = {},
     onAlias: () -> Unit = onSettings,
     onRasxod: () -> Unit = onSettings,
     onKarzina: () -> Unit = onSettings,
@@ -154,6 +156,7 @@ fun TodayScreen(
                     onSearch = onSearch,
                     onYukNarx = onYukNarx,
                     onYukReport = onYukReport,
+                    onNReport = { vm.showDateReportButton(java.time.LocalDate.now(), useNarx = true) },
                     onAlias = onAlias,
                     onRasxod = onRasxod,
                     onKarzina = onKarzina,
@@ -168,6 +171,7 @@ fun TodayScreen(
                 if (bottomMenuOpen) {
                     Surface(tonalElevation = 2.dp) {
                         Column {
+                            // Hisobotlar — bosganda oynaga to'liq ochiladi (T narx)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -175,13 +179,22 @@ fun TodayScreen(
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Filter.values().forEach { f ->
-                                    FilterChip(
-                                        selected = state.filter == f,
-                                        onClick = { vm.setFilter(f) },
-                                        label = { Text(f.label) }
-                                    )
-                                }
+                                AssistChip(
+                                    onClick = { vm.showDateReportButton(java.time.LocalDate.now()) },
+                                    label = { Text("📅 Bugun") }
+                                )
+                                AssistChip(
+                                    onClick = { vm.showDateReportButton(java.time.LocalDate.now().minusDays(1)) },
+                                    label = { Text("📅 Kecha") }
+                                )
+                                AssistChip(
+                                    onClick = { vm.showWeekReport() },
+                                    label = { Text("📆 Hafta") }
+                                )
+                                AssistChip(
+                                    onClick = { onYukReport() },
+                                    label = { Text("📦 Yuk") }
+                                )
                             }
                             // Tezkor shablonlar
                             Row(
@@ -225,7 +238,7 @@ fun TodayScreen(
                 }
                 // ───── Sana hisoboti (bugun/kecha/15.05) ─────
                 state.dateReport?.let { report ->
-                    DateReportCard(report = report)
+                    DateReportCard(report = report, onClose = { vm.clearDateReport() })
                 }
                 InputBar(
                     input = state.input,
@@ -268,21 +281,27 @@ fun TodayScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Sana bo'yicha guruhlash
+                    // Sana bo'yicha guruhlash (sana boshi tepada, oxiri pastda — ascending)
                     val grouped = state.transactions.groupBy { it.date.toLocalDate() }
                         .toSortedMap()
                     for ((date, dayTxs) in grouped) {
                         item("date-$date") { DateSeparator(date) }
-                        // Mijoz bo'yicha guruh (bot uslubidagi ✅ Saqlandi karta)
-                        val byClient = dayTxs.groupBy { it.clientName.lowercase() }
-                        for ((clientLower, clientTxs) in byClient) {
-                            item(key = "${date}-${clientLower}") {
+                        // Har "save" (mijoz + aniq vaqt) alohida karta — vaqt bo'yicha
+                        val saves = dayTxs
+                            .groupBy { it.clientName.lowercase() to it.date }
+                            .entries
+                            .sortedBy { it.value.first().date }
+                        for (entry in saves) {
+                            val clientLower = entry.key.first
+                            val saveTxs = entry.value
+                            item(key = "save-${clientLower}-${entry.key.second}") {
                                 ClientDayCard(
                                     date = date,
-                                    clientName = clientTxs.first().clientName,
-                                    txs = clientTxs,
+                                    clientName = saveTxs.first().clientName,
+                                    txs = saveTxs,
                                     clientPrices = state.priceByClient[clientLower],
-                                    clientDebt = state.debtByClient[clientLower],
+                                    clientDebt = state.debtBySave["$clientLower|${entry.key.second}"]
+                                        ?: state.debtByClient[clientLower],
                                     selected = state.selected,
                                     inSelectionMode = state.isSelectionMode,
                                     onTxClick = { txId ->
@@ -352,6 +371,7 @@ private fun ChatTopBar(
     onSearch: () -> Unit,
     onYukNarx: () -> Unit,
     onYukReport: () -> Unit,
+    onNReport: () -> Unit,
     onAlias: () -> Unit,
     onRasxod: () -> Unit,
     onKarzina: () -> Unit,
@@ -411,6 +431,11 @@ private fun ChatTopBar(
                         text = { Text("📦 Yuk hisoboti") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
                         onClick = { menuOpen = false; onYukReport() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("🔢 Hisobot (N narx)") },
+                        leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
+                        onClick = { menuOpen = false; onNReport() }
                     )
                     // ── MIJOZ ──
                     DropdownMenuItem(
@@ -527,7 +552,7 @@ private fun SummaryBar(totals: Map<TxType, Double>, clientCount: Int, filter: Fi
             val v = totals[t]
             if (v != null && v > 0) {
                 Text(
-                    "${t.label}:${v.formatMoney()}",
+                    "${t.label}:${v.formatQty()}",
                     style = MaterialTheme.typography.labelMedium,
                     color = if (t == TxType.P) MaterialTheme.colorScheme.tertiary
                             else MaterialTheme.colorScheme.primary,
@@ -631,8 +656,8 @@ private fun ClientDayCard(
                     val unitPrice = tx.tOverride ?: clientPrices?.get(tx.type)
                     val lineText = when {
                         tx.type == TxType.P -> "  P: ${tx.amount.formatMoney()}"
-                        unitPrice != null -> "  ${tx.type.label}: ${tx.amount.formatMoney()} × ${unitPrice.formatMoney()} = ${(tx.amount * unitPrice).formatMoney()}"
-                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  ${tx.type.label}: ${tx.amount.formatMoney()}  (narx yo'q)"
+                        unitPrice != null -> "  ${tx.type.label}: ${tx.amount.formatQty()} × ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()}"
+                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  ${tx.type.label}: ${tx.amount.formatQty()}  (narx yo'q)"
                         else -> "  ${tx.type.label}: ${tx.amount.formatMoney()}"
                     }
                     Row(
@@ -802,8 +827,8 @@ private fun InputBar(
                             }
                             val itemsStr = e.items.entries.joinToString("  ") { (t, a) ->
                                 val n = e.clientPrices[t] ?: e.tPrices[t] ?: e.tOneTime[t]
-                                if (n != null) "${t.label}:${a.formatMoney()}[${n.formatMoney()}]"
-                                else "${t.label}:${a.formatMoney()}"
+                                if (n != null) "${t.label}:${a.formatQty()}[${n.formatQty()}]"
+                                else "${t.label}:${a.formatQty()}"
                             }
                             Text(
                                 "• $name  $itemsStr",
@@ -848,7 +873,7 @@ private fun InputBar(
                         onChange(newV.text)
                     },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("ali a10 n a20") },
+                    placeholder = { Text("Yozuv...") },
                     minLines = 1,
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(
@@ -972,8 +997,9 @@ private fun PreviewHistoryCard(
                         .verticalScroll(scrollState)
                 ) {
                     val byDay = monthTxs.groupBy { it.date.take(10) }
-                        .toSortedMap(compareByDescending { it })
-                    for ((day, dayTxs) in byDay) {
+                        .toSortedMap(compareBy { it })
+                    for ((day, dayTxsRaw) in byDay) {
+                        val dayTxs = dayTxsRaw.sortedBy { it.date }
                         Text(
                             "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}",
                             style = MaterialTheme.typography.labelMedium,
@@ -986,8 +1012,8 @@ private fun PreviewHistoryCard(
                             val up = priceByTx[tx.id]
                             val main = when {
                                 isPayment -> "P(pul): ${tx.amount.formatMoney()}"
-                                up != null -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()} × ${up.formatMoney()} = ${(tx.amount * up).formatMoney()} so'm"
-                                else -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()}"
+                                up != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} × ${up.formatQty()} = ${(tx.amount * up).formatMoney()} so'm"
+                                else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
                             }
                             val ba = balanceAfter[tx.id]
                             val bal = if (isPayment && ba != null) {
@@ -1013,7 +1039,7 @@ private fun PreviewHistoryCard(
                 for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
                     val amt = byType[t.code] ?: 0.0
                     if (amt > 0) Text(
-                        "  ${t.label}: ${amt.formatMoney()}",
+                        "  ${t.label}: ${amt.formatQty()}",
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
@@ -1062,8 +1088,8 @@ private fun PreviewHistoryCard(
 }
 
 @Composable
-private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport) {
-    val dateStr = report.date.format(DateTimeFormatter.ofPattern("dd.MM"))
+private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport, onClose: () -> Unit = {}) {
+    val dateStr = report.title.ifEmpty { report.date.format(DateTimeFormatter.ofPattern("dd.MM")) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1072,12 +1098,18 @@ private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Sarlavha
-            Text(
-                "📅 $dateStr",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            // Sarlavha + yopish
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "📅 $dateStr",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Yopish")
+                }
+            }
             Spacer(Modifier.height(8.dp))
 
             if (report.clientLines.isEmpty()) {
@@ -1107,8 +1139,11 @@ private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport) {
                                 TxType.P -> append("P:${e.amount.formatMoney()}")
                                 TxType.Q -> append("Q:${e.amount.formatMoney()}")
                                 else -> {
-                                    append("${e.type.code.uppercase()}:${e.amount.formatMoney()}")
-                                    e.price?.let { append("   [${it.formatMoney()}]") }
+                                    append("${e.type.code.uppercase()}:${e.amount.formatQty()}")
+                                    e.price?.let {
+                                        if (report.useNarx) append("(n:${it.formatQty()})")
+                                        else append("   [${it.formatQty()}]")
+                                    }
                                 }
                             }
                         }
@@ -1138,25 +1173,46 @@ private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport) {
                 if (total <= 0.0) continue
                 val rev = report.revenueByType[type] ?: 0.0
                 Text(
-                    "${type.code.uppercase()} ${total.formatMoney()}  = ${rev.formatMoney()} so'm",
+                    "${type.code.uppercase()} ${total.formatQty()}  = ${rev.formatMoney()} so'm",
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace
                 )
             }
-            Text(
-                "J: ${report.totalRevenue.formatMoney()}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (report.totalPayments > 0) {
+            if (report.useNarx) {
+                // N rejimi: 🅿️ keyin 🔢 JAMI pul
+                if (report.totalPayments > 0) {
+                    Text(
+                        "🅿️ ${report.totalPayments.formatMoney()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "🅿️ ${report.totalPayments.formatMoney()} so'm",
+                    "🔢 JAMI pul: ${report.totalRevenue.formatMoney()} so'm",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                // T rejimi: J keyin 🅿️
+                Text(
+                    "J: ${report.totalRevenue.formatMoney()}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.tertiary
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
                 )
+                if (report.totalPayments > 0) {
+                    Text(
+                        "🅿️ ${report.totalPayments.formatMoney()} so'm",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         }
     }

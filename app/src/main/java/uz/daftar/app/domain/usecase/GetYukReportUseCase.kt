@@ -25,6 +25,18 @@ data class YukReport(
     val jamiFarq: Long
 )
 
+/** Yuk soni hisoboti (pulsiz) — A B C D K miqdorlari */
+data class YukCountRow(
+    val label: String,
+    val counts: Map<String, Double>
+)
+
+data class YukCountReport(
+    val title: String,
+    val rows: List<YukCountRow>,
+    val totals: Map<String, Double>
+)
+
 /**
  * "📦 Yuk" hisoboti:
  *   T = yuk × global T narx
@@ -124,21 +136,50 @@ class GetYukReportUseCase @Inject constructor(
         return best ?: list.first().second // retroaktiv
     }
 
-    private fun computeTNP(txs: List<TransactionEntity>, ctx: PriceCtx): Triple<Long, Long, Long> {
-        var t = 0.0; var n = 0.0; var p = 0.0
-        for (tx in txs) {
-            val type = tx.type.lowercase()
-            when {
-                type == "p" -> p += tx.amount
-                type == "q" -> Unit
-                type in cargoTypes -> {
-                    val tPrice = tx.tOverride ?: priceAt(ctx.globalT[type], tx.date)
-                    val nPrice = priceAt(ctx.clientN[tx.clientName.lowercase()]?.get(type), tx.date) ?: tPrice
-                    if (tPrice != null) t += tx.amount * tPrice
-                    if (nPrice != null) n += tx.amount * nPrice
-                }
-            }
+    // ───────── YUK SONI (pulsiz, faqat miqdor) ─────────
+
+    suspend fun countsMonthly(userId: Long, ym: YearMonth): YukCountReport {
+        val start = ym.atDay(1).toString() + " 00:00:00"
+        val end = ym.plusMonths(1).atDay(1).toString() + " 00:00:00"
+        val txs = txDao.getRange(userId, start, end)
+        val rows = mutableListOf<YukCountRow>()
+        val totals = mutableMapOf<String, Double>()
+        for (day in 1..ym.lengthOfMonth()) {
+            val dayStr = ym.atDay(day).toString()
+            val dayTxs = txs.filter { it.date.startsWith(dayStr) }
+            if (dayTxs.isEmpty()) continue
+            val counts = countByType(dayTxs)
+            if (counts.values.all { it == 0.0 }) continue
+            rows.add(YukCountRow("%02d.%02d".format(day, ym.monthValue), counts))
+            for ((k, v) in counts) totals[k] = (totals[k] ?: 0.0) + v
         }
-        return Triple(t.toLong(), n.toLong(), p.toLong())
+        return YukCountReport("${monthsUz[ym.monthValue - 1]} ${ym.year}", rows, totals)
+    }
+
+    suspend fun countsYearly(userId: Long, year: Int): YukCountReport {
+        val start = "$year-01-01 00:00:00"
+        val end = "${year + 1}-01-01 00:00:00"
+        val txs = txDao.getRange(userId, start, end)
+        val rows = mutableListOf<YukCountRow>()
+        val totals = mutableMapOf<String, Double>()
+        for (month in 1..12) {
+            val mStr = "%04d-%02d".format(year, month)
+            val mTxs = txs.filter { it.date.startsWith(mStr) }
+            if (mTxs.isEmpty()) continue
+            val counts = countByType(mTxs)
+            if (counts.values.all { it == 0.0 }) continue
+            rows.add(YukCountRow(monthsUzShort[month - 1], counts))
+            for ((k, v) in counts) totals[k] = (totals[k] ?: 0.0) + v
+        }
+        return YukCountReport("$year-yil", rows, totals)
+    }
+
+    private fun countByType(txs: List<TransactionEntity>): Map<String, Double> {
+        val m = mutableMapOf("a" to 0.0, "b" to 0.0, "c" to 0.0, "d" to 0.0, "k" to 0.0)
+        for (tx in txs) {
+            val t = tx.type.lowercase()
+            if (t in cargoTypes) m[t] = (m[t] ?: 0.0) + tx.amount
+        }
+        return m
     }
 }
