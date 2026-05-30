@@ -39,47 +39,58 @@ object DaftarParser {
         val parts = restText.trim().split(Regex("\\s+"))
         if (parts.isEmpty()) return ParseResult.Failure(ParseError.NoClientName)
 
-        // 3) Narx marker indeksini topish (n / narx / t / t?)
-        val narxIdx = findNarxIdx(parts)
-        val yozuvParts = if (narxIdx == -1) parts else parts.subList(0, narxIdx)
-        val narxParts = if (narxIdx == -1) emptyList() else parts.subList(narxIdx, parts.size)
-
-        // 4) Yozuv qismidan ism va itemlarni ajratish
+        // 3) INLINE PARSING — n/t narx markerlari "split" qilmaydi, faqat keyingi tokenni iste'mol qiladi
+        //    Shunda: ali a20 p200 n 20 q20 t a15 → A:20, P:200, N(A)=20, Q:20, T(A)=15 — hammasi to'g'ri
         val ismParts = mutableListOf<String>()
         val items = mutableMapOf<TxType, Double>()
+        val clientPrices = mutableMapOf<TxType, Double>()
+        val tPrices = mutableMapOf<TxType, Double>()
+        val tOneTime = mutableMapOf<TxType, Double>()
+
         var i = 0
-        while (i < yozuvParts.size) {
-            val p = yozuvParts[i]
+        var nameDone = false
+        var lastCargoType: TxType? = null
+
+        while (i < parts.size) {
+            val p = parts[i]
             val pl = p.lowercase()
 
-            // a10, b5, p100, q50 kabi yuk tokenmi?
-            val yukResult = parseYukToken(pl, yozuvParts, i)
+            // YUK / P / Q token (a10, b5, c4.3, p200, q50)
+            val yukResult = parseYukToken(pl, parts, i)
             if (yukResult != null) {
                 val (type, amount, advance) = yukResult
                 items[type] = (items[type] ?: 0.0) + amount
+                if (type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                    lastCargoType = type
+                }
+                nameDone = true
                 i += advance
                 continue
             }
 
-            // Ism qismimi?
-            if (pl.isNotEmpty() && !pl[0].isDigit()) {
+            // NARX MARKER (n, narx, t, tk, t1, t?, na20, ta25, t?a30, t1a30)
+            val narxAdvance = tryParseNarxInline(
+                pl, parts, i, clientPrices, tPrices, tOneTime, lastCargoType
+            )
+            if (narxAdvance > 0) {
+                nameDone = true
+                i += narxAdvance
+                continue
+            }
+
+            // ISM qismi (yuk yoki marker emas, faqat ism boshlangunaqa)
+            if (!nameDone && pl.isNotEmpty() && !pl[0].isDigit()) {
                 ismParts.add(p)
                 i++
                 continue
             }
-            // Boshqa hech narsaga to'g'ri kelmasa - skip
+
+            // Noma'lum — o'tkazib yuboramiz
             i++
         }
 
         if (ismParts.isEmpty()) return ParseResult.Failure(ParseError.NoClientName)
-
         val clientName = normalizeName(ismParts.joinToString(" "))
-
-        // 5) Narx qismini tahlil qilish (n / t / t?)
-        val clientPrices = mutableMapOf<TxType, Double>()
-        val tPrices = mutableMapOf<TxType, Double>()
-        val tOneTime = mutableMapOf<TxType, Double>()
-        parseNarxParts(narxParts, clientPrices, tPrices, tOneTime)
 
         // Yuk ham, narx ham bo'lmasa — xato. Faqat narx bo'lsa (n c4.3) — ruxsat.
         if (items.isEmpty() && clientPrices.isEmpty() && tPrices.isEmpty() && tOneTime.isEmpty()) {
@@ -97,6 +108,119 @@ object DaftarParser {
                 rawText = input
             )
         )
+    }
+
+    /**
+     * Bitta tokenни inline narx markeri sifatida talqin qilishga uringan.
+     * Muvaffaqiyatли: iste'mol qilingan token sonini qaytaradi (1 yoki 2). Aks holda 0.
+     */
+    private fun tryParseNarxInline(
+        pl: String,
+        parts: List<String>,
+        i: Int,
+        clientPrices: MutableMap<TxType, Double>,
+        tPrices: MutableMap<TxType, Double>,
+        tOneTime: MutableMap<TxType, Double>,
+        lastCargoType: TxType?
+    ): Int {
+        // "n" yoki "narx" — keyingi token N narx
+        if (pl == "n" || pl == "narx") {
+            if (i + 1 < parts.size) {
+                val nxt = parts[i + 1].lowercase()
+                val pn = parseNarxToken(nxt, parts, i + 1)
+                if (pn != null) {
+                    clientPrices[pn.first] = pn.second
+                    return 1 + pn.third
+                }
+                // "n 20" — oxirgi yuk turi uchun N narx
+                val amt = nxt.replace(",", ".").toDoubleOrNull()
+                if (amt != null && lastCargoType != null) {
+                    clientPrices[lastCargoType] = amt
+                    return 2
+                }
+            }
+            return 1
+        }
+        // "t" yoki "tk" — keyingi token T narx
+        if (pl == "t" || pl == "tk") {
+            if (i + 1 < parts.size) {
+                val nxt = parts[i + 1].lowercase()
+                val pn = parseNarxToken(nxt, parts, i + 1)
+                if (pn != null) {
+                    tPrices[pn.first] = pn.second
+                    return 1 + pn.third
+                }
+                val amt = nxt.replace(",", ".").toDoubleOrNull()
+                if (amt != null && lastCargoType != null) {
+                    tPrices[lastCargoType] = amt
+                    return 2
+                }
+            }
+            return 1
+        }
+        // "t?" yoki "t1" yakka — bir martalik T
+        if (pl == "t?" || pl == "t1") {
+            if (i + 1 < parts.size) {
+                val nxt = parts[i + 1].lowercase()
+                val pn = parseNarxToken(nxt, parts, i + 1)
+                if (pn != null) {
+                    tOneTime[pn.first] = pn.second
+                    return 1 + pn.third
+                }
+                val amt = nxt.replace(",", ".").toDoubleOrNull()
+                if (amt != null && lastCargoType != null) {
+                    tOneTime[lastCargoType] = amt
+                    return 2
+                }
+            }
+            return 1
+        }
+        // "na20" / "nb30" — N yakka token
+        if (pl.length >= 3 && pl[0] == 'n' && pl[1] in NUM_TYPES) {
+            val amt = pl.substring(2).replace(",", ".").toDoubleOrNull()
+            if (amt != null) {
+                val type = TxType.fromCode(pl[1].toString())
+                if (type != null) {
+                    clientPrices[type] = amt
+                    return 1
+                }
+            }
+        }
+        // "ta25" / "tb30" — T yakka token  (DIQQAT: "t?aX" va "t1aX" oldinroq aniqlanadi)
+        if (pl.length >= 3 && pl[0] == 't' && pl[1] != '?' && pl[1] != '1' && pl[1] in NUM_TYPES) {
+            val amt = pl.substring(2).replace(",", ".").toDoubleOrNull()
+            if (amt != null) {
+                val type = TxType.fromCode(pl[1].toString())
+                if (type != null) {
+                    tPrices[type] = amt
+                    return 1
+                }
+            }
+        }
+        // "t?a30" — bir martalik T yakka
+        if (pl.length >= 4 && pl.startsWith("t?") && pl[2] in NUM_TYPES) {
+            val amt = pl.substring(3).replace(",", ".").toDoubleOrNull()
+            if (amt != null) {
+                val type = TxType.fromCode(pl[2].toString())
+                if (type != null) {
+                    tOneTime[type] = amt
+                    return 1
+                }
+            }
+        }
+        // "t1a30" — bir martalik T yakka (muqobil)
+        if (pl.length >= 4 && pl.startsWith("t1") && pl[2] in NUM_TYPES) {
+            val amt = pl.substring(3).replace(",", ".").toDoubleOrNull()
+            if (amt != null) {
+                val type = TxType.fromCode(pl[2].toString())
+                if (type != null) {
+                    tOneTime[type] = amt
+                    return 1
+                }
+            }
+        }
+
+        return 0
     }
 
     /** "02.03" yoki "02.03.25" prefiksini topish va ajratish */

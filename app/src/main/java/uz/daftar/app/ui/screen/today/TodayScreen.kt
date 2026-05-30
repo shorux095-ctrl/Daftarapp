@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.imePadding
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -200,6 +203,20 @@ fun TodayScreen(
                             }
                         }
                     }
+                }
+                // ───── Jonli tarix preview (ism yozilsa) ─────
+                val previewName = state.previewName
+                if (previewName != null && state.previewTxs.isNotEmpty()) {
+                    PreviewHistoryCard(
+                        name = previewName,
+                        debt = state.previewDebt,
+                        allTxs = state.previewTxs,
+                        priceByTx = state.previewPriceByTx,
+                        balanceAfter = state.previewBalanceAfter,
+                        month = state.previewMonth,
+                        onPrev = vm::prevPreviewMonth,
+                        onNext = vm::nextPreviewMonth
+                    )
                 }
                 InputBar(
                     input = state.input,
@@ -685,7 +702,7 @@ private fun InputBar(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("a", "b", "c", "d", "k", "p", "q", "n", "t").forEach { code ->
+                listOf("a", "b", "c", "p", "n").forEach { code ->
                     AssistChip(
                         onClick = {
                             val cur = tfv.text
@@ -850,6 +867,178 @@ private fun InputBar(
                                    else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────── Jonli tarix preview (input ostida) ─────────────────────
+
+private val MONTHS_UZ_TODAY = listOf(
+    "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+    "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
+)
+
+@Composable
+private fun PreviewHistoryCard(
+    name: String,
+    debt: Long,
+    allTxs: List<uz.daftar.app.data.db.entity.TransactionEntity>,
+    priceByTx: Map<Long, Double?>,
+    balanceAfter: Map<Long, Long>,
+    month: java.time.YearMonth,
+    onPrev: () -> Unit,
+    onNext: () -> Unit
+) {
+    val monthPrefix = "%04d-%02d".format(month.year, month.monthValue)
+    val monthTxs = allTxs.filter { it.date.startsWith(monthPrefix) }
+    val monthLabel = "${MONTHS_UZ_TODAY[month.monthValue - 1]} ${month.year}"
+
+    // Oylik JAMI
+    val byType = monthTxs.groupBy { it.type }.mapValues { (_, l) -> l.sumOf { it.amount } }
+    val payTotal = monthTxs.filter { it.type.lowercase() == "p" }.sumOf { it.amount }
+    var revenue = 0.0
+    for (tx in monthTxs) {
+        val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
+        if (t in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+            val p = priceByTx[tx.id]
+            if (p != null) revenue += tx.amount * p
+        }
+    }
+    // Oylik qarz (oxirgi tx oxirigacha)
+    val monthDebt: Long = run {
+        var r = 0.0
+        for (tx in monthTxs.sortedBy { it.date }) {
+            when (tx.type.lowercase()) {
+                "p" -> r -= tx.amount
+                "q" -> r += tx.amount
+                else -> { val p = priceByTx[tx.id]; if (p != null) r += tx.amount * p }
+            }
+        }
+        r.toLong()
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Sarlavha
+            Text(
+                "👤 ${name.replaceFirstChar { it.titlecase(Locale.getDefault()) }} — $monthLabel",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "💳 ${MONTHS_UZ_TODAY[month.monthValue - 1]} qarzi: ${monthDebt.toDouble().formatMoney()} so'm",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (monthDebt > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+
+            if (monthTxs.isEmpty()) {
+                Text(
+                    "Bu oyda yozuv yo'q",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                // Maksimal balandlik — uzun bo'lsa scroll
+                val scrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 280.dp)
+                        .verticalScroll(scrollState)
+                ) {
+                    val byDay = monthTxs.groupBy { it.date.take(10) }
+                        .toSortedMap(compareByDescending { it })
+                    for ((day, dayTxs) in byDay) {
+                        Text(
+                            "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+                        )
+                        for (tx in dayTxs) {
+                            val type = uz.daftar.app.domain.model.TxType.fromCode(tx.type)
+                            val isPayment = type == uz.daftar.app.domain.model.TxType.P
+                            val up = priceByTx[tx.id]
+                            val main = when {
+                                isPayment -> "P(pul): ${tx.amount.formatMoney()}"
+                                up != null -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()} × ${up.formatMoney()} = ${(tx.amount * up).formatMoney()} so'm"
+                                else -> "${tx.type.uppercase()}: ${tx.amount.formatMoney()}"
+                            }
+                            val ba = balanceAfter[tx.id]
+                            val bal = if (isPayment && ba != null) {
+                                when {
+                                    ba > 0 -> " → 💳 Qoldi: ${ba.formatMoney()}"
+                                    ba == 0L -> " → ✅ 0"
+                                    else -> " → 💚 Ortiq: ${(-ba).formatMoney()}"
+                                }
+                            } else ""
+                            val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
+                            Text(
+                                "  $main  $time$bal",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isPayment) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                // JAMI
+                Text("📊 JAMI:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                    val amt = byType[t.code] ?: 0.0
+                    if (amt > 0) Text(
+                        "  ${t.label}: ${amt.formatMoney()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                if (payTotal > 0) Text(
+                    "  P(pul): ${payTotal.formatMoney()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    "  J: ${revenue.formatMoney()} so'm",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (debt > 0) "💳 Qarz: ${debt.toDouble().formatMoney()} so'm"
+                    else if (debt == 0L) "✅ Qarz yo'q"
+                    else "💚 Ortiq: ${(-debt).toDouble().formatMoney()} so'm",
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        debt > 0 -> MaterialTheme.colorScheme.error
+                        debt == 0L -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.tertiary
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            // Oylik tugma
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f).padding(end = 4.dp)) {
+                    Text("⬅️ Oldingi")
+                }
+                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
+                    Text("Keyingi ➡️")
                 }
             }
         }
