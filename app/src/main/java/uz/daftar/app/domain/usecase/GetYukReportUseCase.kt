@@ -136,6 +136,24 @@ class GetYukReportUseCase @Inject constructor(
         return best ?: list.first().second // retroaktiv
     }
 
+    private fun computeTNP(txs: List<TransactionEntity>, ctx: PriceCtx): Triple<Long, Long, Long> {
+        var t = 0.0; var n = 0.0; var p = 0.0
+        for (tx in txs) {
+            val type = tx.type.lowercase()
+            when {
+                type == "p" -> p += tx.amount
+                type == "q" -> Unit
+                type in cargoTypes -> {
+                    val tPrice = tx.tOverride ?: priceAt(ctx.globalT[type], tx.date)
+                    val nPrice = priceAt(ctx.clientN[tx.clientName.lowercase()]?.get(type), tx.date) ?: tPrice
+                    if (tPrice != null) t += tx.amount * tPrice
+                    if (nPrice != null) n += tx.amount * nPrice
+                }
+            }
+        }
+        return Triple(t.toLong(), n.toLong(), p.toLong())
+    }
+
     // ───────── YUK SONI (pulsiz, faqat miqdor) ─────────
 
     suspend fun countsMonthly(userId: Long, ym: YearMonth): YukCountReport {

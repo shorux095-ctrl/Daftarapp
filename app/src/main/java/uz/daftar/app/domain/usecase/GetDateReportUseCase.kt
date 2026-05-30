@@ -11,8 +11,7 @@ import javax.inject.Inject
 /** Bot uslubы "📅 dd.MM" hisoboti ma'lumotlari */
 data class DateReport(
     val date: LocalDate,
-    val title: String = "",
-    val title: String,                          // "30.05" yoki "Hafta 26.05–01.06"
+    val title: String,                          // "30.05" yoki "26.05–01.06"
     val clientLines: List<DateReportClientLine>,
     val totalsByType: Map<TxType, Double>,
     val revenueByType: Map<TxType, Double>,

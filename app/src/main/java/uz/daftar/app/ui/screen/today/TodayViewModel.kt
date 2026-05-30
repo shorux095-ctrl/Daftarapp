@@ -300,7 +300,11 @@ class TodayViewModel @Inject constructor(
         reportJob?.cancel()
         reportJob = viewModelScope.launch {
             try {
-                val report = getDateReport(userId, date, types, useNarx, endDate)
+                val report = if (endDate != date) {
+                    getDateReport.range(userId, date, endDate, types, useNarx)
+                } else {
+                    getDateReport(userId, date, types, useNarx)
+                }
                 _state.update { it.copy(dateReport = report) }
             } catch (e: Exception) {
                 _state.update { it.copy(dateReport = null, errorMessage = e.message) }
