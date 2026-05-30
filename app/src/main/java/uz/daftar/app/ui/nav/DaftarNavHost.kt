@@ -128,7 +128,6 @@ fun DaftarNavHost() {
                 onAlias = { nav.navigate(Routes.ALIAS) },
                 onSearch = { nav.navigate(Routes.SEARCH) },
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
-                onYukReport = { nav.navigate(Routes.YUK_REPORT) },
                 onRasxod = { nav.navigate(Routes.RASXOD) },
                 onKarzina = { nav.navigate(Routes.KARZINA) },
                 onReminder = { nav.navigate(Routes.REMINDER) }
