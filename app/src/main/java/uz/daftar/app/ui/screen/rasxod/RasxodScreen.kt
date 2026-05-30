@@ -48,7 +48,8 @@ fun RasxodScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
-                }
+                },
+                actions = { uz.daftar.app.ui.common.HomeButton() }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(snackbarData = it) } }

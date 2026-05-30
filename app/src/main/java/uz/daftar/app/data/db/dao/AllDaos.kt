@@ -76,6 +76,9 @@ interface YukNarxDao {
     """)
     suspend fun getForClientAt(userId: Long, clientName: String, type: String, group: String, at: String): YukNarxEntity?
 
+    @Query("SELECT * FROM yuk_narx WHERE user_id = :userId AND client_name IS NULL AND price_group = 't' AND one_time = 0")
+    suspend fun getAllGlobal(userId: Long): List<YukNarxEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(narx: YukNarxEntity): Long
 }

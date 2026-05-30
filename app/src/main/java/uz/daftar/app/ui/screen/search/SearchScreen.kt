@@ -69,7 +69,8 @@ fun SearchScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
-                }
+                },
+                actions = { uz.daftar.app.ui.common.HomeButton() }
             )
         }
     ) { padding ->

@@ -30,6 +30,7 @@ object Routes {
     const val ALIAS = "alias"
     const val SEARCH = "search"
     const val YUK_NARX = "yuk_narx"
+    const val YUK_REPORT = "yuk_report"
     const val CLIENT_HISTORY = "client_history"
     const val QARZ = "qarz"
     const val EDIT_TX = "edit_tx"
@@ -42,6 +43,11 @@ object Routes {
 @Composable
 fun DaftarNavHost() {
     val nav = rememberNavController()
+    androidx.compose.runtime.CompositionLocalProvider(
+        uz.daftar.app.ui.common.LocalGoHome provides {
+            nav.popBackStack(Routes.TODAY, inclusive = false)
+        }
+    ) {
     NavHost(navController = nav, startDestination = Routes.TODAY) {
 
         composable(Routes.TODAY) {
@@ -53,6 +59,7 @@ fun DaftarNavHost() {
                 onEditTx = { txId -> nav.navigate("${Routes.EDIT_TX}/$txId") },
                 onSearch = { nav.navigate(Routes.SEARCH) },
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
+                onYukReport = { nav.navigate(Routes.YUK_REPORT) },
                 onAlias = { nav.navigate(Routes.ALIAS) },
                 onRasxod = { nav.navigate(Routes.RASXOD) },
                 onKarzina = { nav.navigate(Routes.KARZINA) },
@@ -121,6 +128,7 @@ fun DaftarNavHost() {
                 onAlias = { nav.navigate(Routes.ALIAS) },
                 onSearch = { nav.navigate(Routes.SEARCH) },
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
+                onYukReport = { nav.navigate(Routes.YUK_REPORT) },
                 onRasxod = { nav.navigate(Routes.RASXOD) },
                 onKarzina = { nav.navigate(Routes.KARZINA) },
                 onReminder = { nav.navigate(Routes.REMINDER) }
@@ -130,8 +138,10 @@ fun DaftarNavHost() {
         composable(Routes.ALIAS) { AliasScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.SEARCH) { SearchScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.YUK_NARX) { YukNarxScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.YUK_REPORT) { uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.RASXOD) { RasxodScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.KARZINA) { KarzinaScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.REMINDER) { ReminderLimitScreen(onBack = { nav.popBackStack() }) }
+    }
     }
 }

@@ -77,6 +77,7 @@ fun ClientHistoryScreen(
                             contentDescription = "N narx"
                         )
                     }
+                    uz.daftar.app.ui.common.HomeButton()
                 }
             )
         }

@@ -36,6 +36,16 @@ enum class Filter(val label: String) {
     ALL_WEEK("Hammasi (hafta)")
 }
 
+/** Input'дa ism yozilgandа ko'rinadigan jonli tarix preview kartasi */
+data class ClientPreview(
+    val name: String,
+    val debt: Long,
+    val transactions: List<uz.daftar.app.data.db.entity.TransactionEntity>,
+    val priceByTx: Map<Long, Double?>,
+    val balanceAfter: Map<Long, Long>,
+    val month: java.time.YearMonth = java.time.YearMonth.now()
+)
+
 data class TodayUiState(
     val filter: Filter = Filter.TODAY,
     val isLoading: Boolean = true,
@@ -68,14 +78,12 @@ data class TodayUiState(
     /** Input "x" o'chirish komandasimi (x / 12.03 x + ismlar) */
     val isDeleteCommand: Boolean = false,
 
-    // ───────── Jonli tarix preview (input'дa ism yozilganda) ─────────
-    /** Topilgan mijoz ismi (null bo'lsa preview yo'q) */
-    val previewName: String? = null,
-    val previewDebt: Long = 0L,
-    val previewTxs: List<uz.daftar.app.data.db.entity.TransactionEntity> = emptyList(),
-    val previewPriceByTx: Map<Long, Double?> = emptyMap(),
-    val previewBalanceAfter: Map<Long, Long> = emptyMap(),
-    val previewMonth: java.time.YearMonth = java.time.YearMonth.now()
+    // ───────── Jonli tarix preview (input'дa ism(lar) yozilganda) ─────────
+    /** Topilgan mijozlar ro'yxati — har biri alohida tarix kartasiga ega */
+    val previews: List<ClientPreview> = emptyList(),
+
+    // ───────── Sana hisoboti (input'дa "bugun" / "kecha" / "15.05" yozilganda) ─────────
+    val dateReport: uz.daftar.app.domain.usecase.DateReport? = null
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
     val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand) && !isSending
@@ -91,7 +99,8 @@ class TodayViewModel @Inject constructor(
     private val templateStore: TemplateStore,
     private val getUnitPrices: GetClientUnitPricesUseCase,
     private val getHistory: uz.daftar.app.domain.usecase.GetClientHistoryUseCase,
-    private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao
+    private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao,
+    private val getDateReport: uz.daftar.app.domain.usecase.GetDateReportUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -160,14 +169,41 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(input = text, justSentSummary = null) }
         // Parser preview
         if (text.isBlank()) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, previewName = null, previewTxs = emptyList()) }
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, previews = emptyList(), dateReport = null) }
             updateSuggestions("")
             return
         }
         // X-o'chirish komandasi tekshirish ("x" yoki "12.03 x" + ismlar)
         if (isDeleteCommandText(text)) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previewName = null, previewTxs = emptyList()) }
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previews = emptyList(), dateReport = null) }
             updateSuggestions("")
+            return
+        }
+        // "bugun" / "kecha" / "DD.MM" yoki "DD.MM.YY" — sana hisoboti
+        val trimmedLow = text.trim().lowercase()
+        val dateForReport: LocalDate? = when {
+            trimmedLow == "bugun" -> LocalDate.now()
+            trimmedLow == "kecha" -> LocalDate.now().minusDays(1)
+            else -> {
+                val m = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""").matchEntire(trimmedLow)
+                if (m != null) {
+                    runCatching {
+                        val d = m.groupValues[1].toInt()
+                        val mo = m.groupValues[2].toInt()
+                        val yr = m.groupValues[3]
+                        val year = when {
+                            yr.isEmpty() -> LocalDate.now().year
+                            yr.length == 2 -> 2000 + yr.toInt()
+                            else -> yr.toInt()
+                        }
+                        LocalDate.of(year, mo, d)
+                    }.getOrNull()
+                } else null
+            }
+        }
+        if (dateForReport != null) {
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList()) }
+            loadDateReport(dateForReport)
             return
         }
         // Multi-line — har qator alohida parsing
@@ -178,6 +214,7 @@ class TodayViewModel @Inject constructor(
             it.copy(
                 parsed = parsedList,
                 isDeleteCommand = false,
+                dateReport = null,
                 errorMessage = if (parsedList.isEmpty()) firstError?.error?.message else null
             )
         }
@@ -190,53 +227,82 @@ class TodayViewModel @Inject constructor(
         loadPreviewIfName(text)
     }
 
+    private var reportJob: Job? = null
+    private fun loadDateReport(date: LocalDate) {
+        reportJob?.cancel()
+        reportJob = viewModelScope.launch {
+            try {
+                val report = getDateReport(userId, date)
+                _state.update { it.copy(dateReport = report) }
+            } catch (e: Exception) {
+                _state.update { it.copy(dateReport = null, errorMessage = e.message) }
+            }
+        }
+    }
+
     private fun loadPreviewIfName(text: String) {
         val trimmed = text.trim()
-        val singleLine = !trimmed.contains('\n')
-        // Marker bormi? (a10, b5, p100, n a20, t a15 va h.k.)
-        val hasMarker = Regex("""(^|\s)[abcdkpqnt](\d|\s|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmed)
-        if (!singleLine || hasMarker || trimmed.length < 2) {
-            _state.update { it.copy(previewName = null, previewTxs = emptyList()) }
+        if (trimmed.isEmpty()) {
+            _state.update { it.copy(previews = emptyList()) }
             return
         }
+        val lines = trimmed.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        // Marker bormi? (a10, b5, p100, n a20, t a15)
+        val markerRe = Regex("""(^|\s)[abcdkpqnt](\d|\s|$)""", RegexOption.IGNORE_CASE)
+        // Faqat ism-only qatorlarni olamiz (yuk/narx markeri bo'lmagan, 2+ harf)
+        val nameLines = lines.filter { line ->
+            !markerRe.containsMatchIn(line) &&
+            line.length >= 2 &&
+            line.all { it.isLetter() || it == ' ' || it == '\'' || it == '-' }
+        }
+        if (nameLines.isEmpty()) {
+            _state.update { it.copy(previews = emptyList()) }
+            return
+        }
+
         previewJob?.cancel()
         previewJob = viewModelScope.launch {
             try {
-                val cn = DaftarParser.normalizeName(trimmed)
-                val history = getHistory(userId, cn)
-                if (history.transactions.isEmpty()) {
-                    _state.update { it.copy(previewName = null, previewTxs = emptyList()) }
-                    return@launch
-                }
-                val allPrices = priceDao.getAllForClient(userId, cn)
-                val pricesByType = allPrices.groupBy { it.priceType }
-                val priceByTx = mutableMapOf<Long, Double?>()
-                for (tx in history.transactions) {
-                    priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
-                }
-                // Running balance
-                val asc = history.transactions.sortedBy { it.date }
-                var running = 0.0
-                val balAfter = mutableMapOf<Long, Long>()
-                for (tx in asc) {
-                    val type = tx.type.lowercase()
-                    when (type) {
-                        "p" -> { running -= tx.amount; balAfter[tx.id] = running.toLong() }
-                        "q" -> running += tx.amount
-                        else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
+                // Oldingi previews'dаги oy holatini saqlash (foydalanuvchi ⬅️➡️ bosgan bo'lishi mumkin)
+                val existingMonths: Map<String, java.time.YearMonth> =
+                    _state.value.previews.associate { it.name.lowercase() to it.month }
+
+                val list = mutableListOf<ClientPreview>()
+                for (line in nameLines) {
+                    val cn = DaftarParser.normalizeName(line)
+                    val history = runCatching { getHistory(userId, cn) }.getOrNull() ?: continue
+                    if (history.transactions.isEmpty()) continue
+                    val allPrices = priceDao.getAllForClient(userId, cn)
+                    val pricesByType = allPrices.groupBy { it.priceType }
+                    val priceByTx = mutableMapOf<Long, Double?>()
+                    for (tx in history.transactions) {
+                        priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
                     }
-                }
-                _state.update {
-                    it.copy(
-                        previewName = trimmed,
-                        previewDebt = history.debt,
-                        previewTxs = history.transactions.sortedByDescending { tx -> tx.date },
-                        previewPriceByTx = priceByTx,
-                        previewBalanceAfter = balAfter
+                    val asc = history.transactions.sortedBy { it.date }
+                    var running = 0.0
+                    val balAfter = mutableMapOf<Long, Long>()
+                    for (tx in asc) {
+                        when (tx.type.lowercase()) {
+                            "p" -> { running -= tx.amount; balAfter[tx.id] = running.toLong() }
+                            "q" -> running += tx.amount
+                            else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
+                        }
+                    }
+                    list.add(
+                        ClientPreview(
+                            name = line,
+                            debt = history.debt,
+                            transactions = history.transactions.sortedByDescending { tx -> tx.date },
+                            priceByTx = priceByTx,
+                            balanceAfter = balAfter,
+                            month = existingMonths[cn] ?: java.time.YearMonth.now()
+                        )
                     )
                 }
+                _state.update { it.copy(previews = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(previewName = null, previewTxs = emptyList()) }
+                _state.update { it.copy(previews = emptyList()) }
             }
         }
     }
@@ -250,12 +316,22 @@ class TodayViewModel @Inject constructor(
         return best?.price ?: prices.minByOrNull { it.date }?.price
     }
 
-    fun prevPreviewMonth() {
-        _state.update { it.copy(previewMonth = it.previewMonth.minusMonths(1)) }
+    /** Bitta preview kartasi uchun oldingi oy */
+    fun prevPreviewMonth(name: String) {
+        _state.update { s ->
+            s.copy(previews = s.previews.map {
+                if (it.name == name) it.copy(month = it.month.minusMonths(1)) else it
+            })
+        }
     }
 
-    fun nextPreviewMonth() {
-        _state.update { it.copy(previewMonth = it.previewMonth.plusMonths(1)) }
+    /** Bitta preview kartasi uchun keyingi oy */
+    fun nextPreviewMonth(name: String) {
+        _state.update { s ->
+            s.copy(previews = s.previews.map {
+                if (it.name == name) it.copy(month = it.month.plusMonths(1)) else it
+            })
+        }
     }
 
     private fun updateSuggestions(prefix: String) {

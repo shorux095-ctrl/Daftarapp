@@ -106,6 +106,7 @@ fun TodayScreen(
     onEditTx: (Long) -> Unit = {},
     onSearch: () -> Unit = onSettings,
     onYukNarx: () -> Unit = onSettings,
+    onYukReport: () -> Unit = onSettings,
     onAlias: () -> Unit = onSettings,
     onRasxod: () -> Unit = onSettings,
     onKarzina: () -> Unit = onSettings,
@@ -152,6 +153,7 @@ fun TodayScreen(
                     onReports = onReports,
                     onSearch = onSearch,
                     onYukNarx = onYukNarx,
+                    onYukReport = onYukReport,
                     onAlias = onAlias,
                     onRasxod = onRasxod,
                     onKarzina = onKarzina,
@@ -204,19 +206,26 @@ fun TodayScreen(
                         }
                     }
                 }
-                // ───── Jonli tarix preview (ism yozilsa) ─────
-                val previewName = state.previewName
-                if (previewName != null && state.previewTxs.isNotEmpty()) {
-                    PreviewHistoryCard(
-                        name = previewName,
-                        debt = state.previewDebt,
-                        allTxs = state.previewTxs,
-                        priceByTx = state.previewPriceByTx,
-                        balanceAfter = state.previewBalanceAfter,
-                        month = state.previewMonth,
-                        onPrev = vm::prevPreviewMonth,
-                        onNext = vm::nextPreviewMonth
-                    )
+                // ───── Jonli tarix preview (ism(lar) yozilsa) ─────
+                if (state.previews.isNotEmpty()) {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        for (preview in state.previews) {
+                            PreviewHistoryCard(
+                                name = preview.name,
+                                debt = preview.debt,
+                                allTxs = preview.transactions,
+                                priceByTx = preview.priceByTx,
+                                balanceAfter = preview.balanceAfter,
+                                month = preview.month,
+                                onPrev = { vm.prevPreviewMonth(preview.name) },
+                                onNext = { vm.nextPreviewMonth(preview.name) }
+                            )
+                        }
+                    }
+                }
+                // ───── Sana hisoboti (bugun/kecha/15.05) ─────
+                state.dateReport?.let { report ->
+                    DateReportCard(report = report)
                 }
                 InputBar(
                     input = state.input,
@@ -342,6 +351,7 @@ private fun ChatTopBar(
     onReports: () -> Unit,
     onSearch: () -> Unit,
     onYukNarx: () -> Unit,
+    onYukReport: () -> Unit,
     onAlias: () -> Unit,
     onRasxod: () -> Unit,
     onKarzina: () -> Unit,
@@ -396,6 +406,12 @@ private fun ChatTopBar(
                             )
                         }
                     }
+                    // ── YUK HISOBOTI (T/N/P/Farq jadval) ──
+                    DropdownMenuItem(
+                        text = { Text("📦 Yuk hisoboti") },
+                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
+                        onClick = { menuOpen = false; onYukReport() }
+                    )
                     // ── MIJOZ ──
                     DropdownMenuItem(
                         text = { Text("👥 Mijozlar") },
@@ -1040,6 +1056,107 @@ private fun PreviewHistoryCard(
                 FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                     Text("Keyingi ➡️")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport) {
+    val dateStr = report.date.format(DateTimeFormatter.ofPattern("dd.MM"))
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Sarlavha
+            Text(
+                "📅 $dateStr",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+
+            if (report.clientLines.isEmpty()) {
+                Text(
+                    "Bu sanada yozuv yo'q",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@Column
+            }
+
+            // Raqamlangan mijoz qatorlari (uzun bo'lsa scroll)
+            val scroll = rememberScrollState()
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(scroll)
+            ) {
+                for ((idx, line) in report.clientLines.withIndex()) {
+                    val capitalized = line.clientName.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+                    }
+                    val entriesStr = buildString {
+                        for ((j, e) in line.entries.withIndex()) {
+                            if (j > 0) append("  ")
+                            when (e.type) {
+                                TxType.P -> append("P:${e.amount.formatMoney()}")
+                                TxType.Q -> append("Q:${e.amount.formatMoney()}")
+                                else -> {
+                                    append("${e.type.code.uppercase()}:${e.amount.formatMoney()}")
+                                    e.price?.let { append("   [${it.formatMoney()}]") }
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        "${idx + 1}. $capitalized  $entriesStr",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+
+            // JAMI bloki
+            Text(
+                "JAMI:",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                val total = report.totalsByType[type] ?: 0.0
+                if (total <= 0.0) continue
+                val rev = report.revenueByType[type] ?: 0.0
+                Text(
+                    "${type.code.uppercase()} ${total.formatMoney()}  = ${rev.formatMoney()} so'm",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Text(
+                "J: ${report.totalRevenue.formatMoney()}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (report.totalPayments > 0) {
+                Text(
+                    "🅿️ ${report.totalPayments.formatMoney()} so'm",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
             }
         }
     }
