@@ -48,6 +48,7 @@ class AddTransactionUseCase @Inject constructor(
         var txCount = 0
         for ((type, amount) in entry.items) {
             val override = entry.tOneTime[type]  // t? a20 → t_override
+            val tier = if (type in entry.t1Types) "t1" else null  // t1a → A yuki T1 tarifda
             txDao.insert(
                 TransactionEntity(
                     userId = userId,
@@ -55,7 +56,8 @@ class AddTransactionUseCase @Inject constructor(
                     type = type.code,
                     amount = amount,
                     date = dateStr,
-                    tOverride = override
+                    tOverride = override,
+                    costTier = tier
                 )
             )
             txCount++

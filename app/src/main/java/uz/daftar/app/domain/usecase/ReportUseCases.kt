@@ -175,9 +175,11 @@ internal suspend fun buildReport(
     // Global T narxlar (ulgurji tannarx) — turlar bo'yicha bir marta
     val cargo = setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
     val tPrices = mutableMapOf<String, Double?>()
+    val t1Prices = mutableMapOf<String, Double?>()
     for (t in cargo) {
         val code = t.code.lowercase()
         tPrices[code] = yukDao.getLatestGlobal(userId, code, "t")?.price
+        t1Prices[code] = yukDao.getLatestGlobal(userId, code, "t1")?.price
     }
 
     for (tx in txs) {
@@ -194,8 +196,11 @@ internal suspend fun buildReport(
                     userId, tx.clientName, tx.type, tx.date, priceDao, yukDao
                 ) ?: tx.tOverride
                 if (nPrice != null) revenue += tx.amount * nPrice
-                // Ulgurji tannarx (T): bir martalik override yoki global T
-                val tPrice = tx.tOverride ?: tPrices[tx.type.lowercase()]
+                // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T
+                val globalCost = if (tx.costTier == "t1")
+                    (t1Prices[tx.type.lowercase()] ?: tPrices[tx.type.lowercase()])
+                else tPrices[tx.type.lowercase()]
+                val tPrice = tx.tOverride ?: globalCost
                 if (tPrice != null) tCost += tx.amount * tPrice
             }
             else -> { /* boshqa turlar e'tibordan chiqarilgan */ }
@@ -260,7 +265,11 @@ class GetClientProfitUseCase @Inject constructor(
         val txs = txDao.getByClient(userId, cn)
         val cargo = setOf("a", "b", "c", "d", "k")
         val tPrices = mutableMapOf<String, Double?>()
-        for (t in cargo) tPrices[t] = yukDao.getLatestGlobal(userId, t, "t")?.price
+        val t1Prices = mutableMapOf<String, Double?>()
+        for (t in cargo) {
+            tPrices[t] = yukDao.getLatestGlobal(userId, t, "t")?.price
+            t1Prices[t] = yukDao.getLatestGlobal(userId, t, "t1")?.price
+        }
 
         val nowYear = LocalDate.now().year
         val byMonth = DoubleArray(12)        // joriy yil oylik foyda
@@ -274,7 +283,8 @@ class GetClientProfitUseCase @Inject constructor(
                 "q" -> tx.amount
                 in cargo -> {
                     val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao) ?: tx.tOverride
-                    val t = tx.tOverride ?: tPrices[tx.type]
+                    val globalCost = if (tx.costTier == "t1") (t1Prices[tx.type] ?: tPrices[tx.type]) else tPrices[tx.type]
+                    val t = tx.tOverride ?: globalCost
                     if (n != null && t != null) tx.amount * (n - t)
                     else 0.0
                 }

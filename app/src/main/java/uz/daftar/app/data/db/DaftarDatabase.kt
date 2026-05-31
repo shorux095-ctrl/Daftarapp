@@ -48,7 +48,7 @@ import uz.daftar.app.data.db.entity.YukRasxodNarxEntity
         ClientDebtCacheEntity::class,
         ClientLimitEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class DaftarDatabase : RoomDatabase() {

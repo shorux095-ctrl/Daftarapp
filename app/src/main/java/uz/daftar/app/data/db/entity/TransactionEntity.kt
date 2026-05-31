@@ -23,5 +23,6 @@ data class TransactionEntity(
     val type: String,          // 'a', 'b', 'c', 'd', 'k', 'p', 'q'
     val amount: Double,
     val date: String,          // ISO-8601 string (bot.py bilan moslik uchun)
-    @ColumnInfo(name = "t_override") val tOverride: Double? = null
+    @ColumnInfo(name = "t_override") val tOverride: Double? = null,
+    @ColumnInfo(name = "cost_tier") val costTier: String? = null  // null/"t" = T, "t1" = T1 tarif
 )

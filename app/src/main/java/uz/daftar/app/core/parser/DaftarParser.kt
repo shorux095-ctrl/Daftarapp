@@ -46,6 +46,7 @@ object DaftarParser {
         val clientPrices = mutableMapOf<TxType, Double>()
         val tPrices = mutableMapOf<TxType, Double>()
         val tOneTime = mutableMapOf<TxType, Double>()
+        val t1Types = mutableSetOf<TxType>()
 
         var i = 0
         var nameDone = false
@@ -70,7 +71,7 @@ object DaftarParser {
 
             // NARX MARKER (n, narx, t, tk, t1, t?, na20, ta25, t?a30, t1a30)
             val narxAdvance = tryParseNarxInline(
-                pl, parts, i, clientPrices, tPrices, tOneTime, lastCargoType
+                pl, parts, i, clientPrices, tPrices, tOneTime, t1Types, lastCargoType
             )
             if (narxAdvance > 0) {
                 nameDone = true
@@ -93,7 +94,7 @@ object DaftarParser {
         val clientName = normalizeName(ismParts.joinToString(" "))
 
         // Yuk ham, narx ham bo'lmasa — xato. Faqat narx bo'lsa (n c4.3) — ruxsat.
-        if (items.isEmpty() && clientPrices.isEmpty() && tPrices.isEmpty() && tOneTime.isEmpty()) {
+        if (items.isEmpty() && clientPrices.isEmpty() && tPrices.isEmpty() && tOneTime.isEmpty() && t1Types.isEmpty()) {
             return ParseResult.Failure(ParseError.NoItems)
         }
 
@@ -105,6 +106,7 @@ object DaftarParser {
                 clientPrices = clientPrices,
                 tPrices = tPrices,
                 tOneTime = tOneTime,
+                t1Types = t1Types,
                 rawText = input
             )
         )
@@ -158,6 +160,7 @@ object DaftarParser {
         clientPrices: MutableMap<TxType, Double>,
         tPrices: MutableMap<TxType, Double>,
         tOneTime: MutableMap<TxType, Double>,
+        t1Types: MutableSet<TxType>,
         lastCargoType: TxType?
     ): Int {
         // "n" yoki "narx" — keyingi BIR NECHTA token N narx ("n c20 a20" → C=20, A=20)
@@ -172,11 +175,30 @@ object DaftarParser {
                 tPrices[type] = price
             }
         }
-        // "t?" yoki "t1" — bir martalik T (bir nechta)
-        if (pl == "t?" || pl == "t1") {
+        // "t?" — bir martalik T narx (bir nechta)
+        if (pl == "t?") {
             return consumeMultiNarx(parts, i, lastCargoType) { type, price ->
                 tOneTime[type] = price
             }
+        }
+        // "t1" — T1 TARIF markeri (tannarx 2-daraja). Keyingi bare yuk harflari (a/b/c),
+        //         bo'lmasa oxirgi yuk turiga. Narx EMAS — global T1 narx alohida qo'yiladi.
+        if (pl == "t1") {
+            var j = i + 1
+            var n = 0
+            while (j < parts.size) {
+                val t = TxType.fromCode(parts[j].lowercase())
+                if (t != null && t.code[0] in NUM_TYPES) {
+                    t1Types.add(t); j++; n++
+                } else break
+            }
+            if (n == 0 && lastCargoType != null) t1Types.add(lastCargoType)
+            return 1 + n
+        }
+        // "t1a" — yakka tarif markeri (narxsiz): A yuki T1 da
+        if (pl.length == 3 && pl.startsWith("t1") && pl[2] in NUM_TYPES) {
+            val type = TxType.fromCode(pl[2].toString())
+            if (type != null) { t1Types.add(type); return 1 }
         }
         // "na20" / "nb30" — N yakka token
         if (pl.length >= 3 && pl[0] == 'n' && pl[1] in NUM_TYPES) {

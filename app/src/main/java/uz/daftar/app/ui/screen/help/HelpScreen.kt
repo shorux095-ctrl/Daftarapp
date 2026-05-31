@@ -95,6 +95,18 @@ fun HelpScreen(onBack: () -> Unit) {
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
+            Section("💰 T va T1 narx (tannarx)") {
+                Cmd("T a10 b20 c3.3")
+                Body("Global asosiy tannarx (T) — mijozsiz, hammaga.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("T1 a16.5 b1.9")
+                Body("Global 2-daraja tannarx (T1) — ba'zi yuklar boshqa narxda olinса.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("Ali a100 b200 n a20 t1a")
+                Body("t1a — faqat A yuki T1 tarifda hisoblanadi, B esa T da. Foyda = N − (T yoki T1). Qarzga ta'sir qilmaydi.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
             Section("🗑 O'chirish") {
                 Cmd("x ali        •        30.05 x ali")
                 Body("Mijozning yozuvini o'chiradi (ixtiyoriy sana bilan).")

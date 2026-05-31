@@ -14,6 +14,7 @@ data class ParsedEntry(
     val clientPrices: Map<TxType, Double>,   // n a20 → per-client A narxi 20
     val tPrices: Map<TxType, Double>,        // t a25 → T narx (global)
     val tOneTime: Map<TxType, Double>,       // t? a30 → bir martalik T narx
+    val t1Types: Set<TxType> = emptySet(),   // t1a → A yuki T1 tarifда (tannarx 2-daraja)
     val rawText: String                  // Asl matn
 ) {
     val hasYuk: Boolean

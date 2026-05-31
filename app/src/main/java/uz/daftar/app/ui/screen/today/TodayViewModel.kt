@@ -89,13 +89,19 @@ data class TodayUiState(
     val dateReport: uz.daftar.app.domain.usecase.DateReport? = null,
 
     // ───────── Matnli hisobot ("shu oy qarz" / "shu oy foyda") ─────────
-    val textReport: TextReport? = null
+    val textReport: TextReport? = null,
+
+    // Ko'rinish buyrug'i (sana/tarix/foyda) — SEND bilan "qotirib" qo'yiladi
+    val isViewCommand: Boolean = false,
+    val pinnedView: Boolean = false,
+    val globalPrice: GlobalPriceCmd? = null
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
-    val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand) && !isSending
+    val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand || isViewCommand || globalPrice != null) && !isSending
 }
 
 data class TextReport(val title: String, val body: String)
+data class GlobalPriceCmd(val group: String, val prices: Map<String, Double>, val date: java.time.LocalDate?)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -112,7 +118,9 @@ class TodayViewModel @Inject constructor(
     private val getMonthlyReport: uz.daftar.app.domain.usecase.GetMonthlyReportUseCase,
     private val getMonthClientDebt: uz.daftar.app.domain.usecase.GetMonthClientDebtUseCase,
     private val getClientProfit: uz.daftar.app.domain.usecase.GetClientProfitUseCase,
-    private val getOverdue: uz.daftar.app.domain.usecase.GetOverdueDebtorsUseCase
+    private val getOverdue: uz.daftar.app.domain.usecase.GetOverdueDebtorsUseCase,
+    private val setGlobalPrice: uz.daftar.app.domain.usecase.SetGlobalPriceUseCase,
+    private val setYukNarx: uz.daftar.app.domain.usecase.SetYukNarxUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -212,15 +220,49 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(input = text, justSentSummary = null) }
         // Parser preview
         if (text.isBlank()) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, previews = emptyList(), dateReport = null, textReport = null) }
+            _state.update {
+                if (it.pinnedView) {
+                    // Qotirilgan ko'rinish — saqlanadi, faqat input/parse tozalanadi
+                    it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false)
+                } else {
+                    it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false, previews = emptyList(), dateReport = null, textReport = null)
+                }
+            }
             updateSuggestions("")
             return
         }
+        // Yangi matn yozilyapti — pin bekor qilinadi (live preview)
+        _state.update { it.copy(pinnedView = false, globalPrice = null) }
         // X-o'chirish komandasi tekshirish ("x" yoki "12.03 x" + ismlar)
         if (isDeleteCommandText(text)) {
             _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previews = emptyList(), dateReport = null, textReport = null) }
             updateSuggestions("")
             return
+        }
+        // Global tannarx: "t a10 b20" yoki "t1 a16.5 b1.9" (mijozsiz)
+        run {
+            val tk = text.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (tk.size >= 2 && (tk[0] == "t" || tk[0] == "t1")) {
+                val prices = LinkedHashMap<String, Double>()
+                var allOk = true
+                for (tok in tk.drop(1)) {
+                    if (tok.length >= 2 && tok[0] in "abcdk") {
+                        val p = tok.substring(1).replace(",", ".").toDoubleOrNull()
+                        if (p != null) prices[tok[0].toString()] = p else { allOk = false; break }
+                    } else { allOk = false; break }
+                }
+                if (allOk && prices.isNotEmpty()) {
+                    _state.update {
+                        it.copy(
+                            parsed = emptyList(), errorMessage = null, isDeleteCommand = false,
+                            isViewCommand = false, previews = emptyList(), dateReport = null,
+                            textReport = null, globalPrice = GlobalPriceCmd(tk[0], prices, null)
+                        )
+                    }
+                    updateSuggestions("")
+                    return
+                }
+            }
         }
         // "bugun" / "kecha" / "DD.MM" + ixtiyoriy tur filtri ("30.05 a b c")
         val trimmedLow = text.trim().lowercase()
@@ -228,17 +270,17 @@ class TodayViewModel @Inject constructor(
         // "shu oy qarz" / "oy qarz" va "shu oy foyda" / "oy foyda"
         when (trimmedLow) {
             "shu oy qarz", "oy qarz", "shu oy karz", "oy karz" -> {
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
                 loadMonthDebt()
                 return
             }
             "shu oy foyda", "oy foyda" -> {
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
                 loadMonthProfit()
                 return
             }
             "eslatma", "qarz eslatma", "eslatmalar", "muddat" -> {
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
                 loadOverdue()
                 return
             }
@@ -249,7 +291,7 @@ class TodayViewModel @Inject constructor(
             val tk = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
             if (tk.size >= 2 && tk.last() == "foyda") {
                 val name = tk.dropLast(1).joinToString(" ")
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
                 loadClientProfit(name)
                 return
             }
@@ -285,7 +327,7 @@ class TodayViewModel @Inject constructor(
             }
             if (isReport) {
                 val types = if (filterLetters.isEmpty()) null else filterLetters.toSet()
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), textReport = null) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), textReport = null, isViewCommand = true) }
                 loadDateReport(baseDate, types, useNarx)
                 return
             }
@@ -295,13 +337,21 @@ class TodayViewModel @Inject constructor(
         val results = text.lines().filter { it.isNotBlank() }.map { DaftarParser.parse(it) }
         val parsedList = results.filterIsInstance<ParseResult.Success>().map { it.entry }
         val firstError = results.filterIsInstance<ParseResult.Failure>().firstOrNull()
+        // Faqat ism yozilganmi? (marker yo'q, harfli) — bu tarix ko'rinishi, xato emas
+        val markerReCheck = Regex("""(^|\s)[abcdkpqnt](\d|\s|$)""", RegexOption.IGNORE_CASE)
+        val isNameOnly = parsedList.isEmpty() && text.lines().any { ln ->
+            val l = ln.trim()
+            l.length >= 2 && l.any { it.isLetter() } && !markerReCheck.containsMatchIn(l) &&
+                l.all { it.isLetterOrDigit() || it == ' ' || it == '\'' || it == '-' }
+        }
         _state.update {
             it.copy(
                 parsed = parsedList,
                 isDeleteCommand = false,
                 dateReport = null,
                 textReport = null,
-                errorMessage = if (parsedList.isEmpty()) firstError?.error?.message else null
+                isViewCommand = isNameOnly,
+                errorMessage = if (parsedList.isEmpty() && !isNameOnly) firstError?.error?.message else null
             )
         }
         // Autocomplete — birinchi so'z (ism)
@@ -334,12 +384,17 @@ class TodayViewModel @Inject constructor(
 
     /** Sana hisobotини yopish */
     fun clearDateReport() {
-        _state.update { it.copy(dateReport = null) }
+        _state.update { it.copy(dateReport = null, pinnedView = false) }
     }
 
     /** Matnli hisobotни yopish */
     fun clearTextReport() {
-        _state.update { it.copy(textReport = null) }
+        _state.update { it.copy(textReport = null, pinnedView = false) }
+    }
+
+    /** Tarix ko'rinishini yopish (X) */
+    fun clearPreviews() {
+        _state.update { it.copy(previews = emptyList(), pinnedView = false) }
     }
 
     private var monthJob: Job? = null
@@ -592,6 +647,40 @@ class TodayViewModel @Inject constructor(
         // X-o'chirish komandasi bo'lsa
         if (s.isDeleteCommand) {
             handleDeleteCommand(s.input)
+            return
+        }
+        // Global tannarx (T / T1) — mijozsiz narx qo'yish
+        val gp = s.globalPrice
+        if (gp != null) {
+            viewModelScope.launch {
+                _state.update { it.copy(isSending = true) }
+                try {
+                    setGlobalPrice(userId, gp.group, gp.prices, gp.date)
+                    val label = gp.prices.entries.joinToString(", ") { "${it.key.uppercase()}=${it.value}" }
+                    _state.update {
+                        it.copy(
+                            isSending = false, input = "", globalPrice = null,
+                            errorMessage = null, suggestions = emptyList(),
+                            justSentSummary = "✅ Global ${gp.group.uppercase()} narx: $label"
+                        )
+                    }
+                } catch (e: Exception) {
+                    _state.update { it.copy(isSending = false, errorMessage = "Xato: ${e.message}") }
+                }
+            }
+            return
+        }
+        // Ko'rinish buyrug'i (tarix/hisobot/foyda) — yozuv emas: ko'rinishni QOTIRAMIZ
+        if (s.parsed.isEmpty() && s.isViewCommand) {
+            _state.update {
+                it.copy(
+                    input = "",
+                    isViewCommand = false,
+                    pinnedView = true,
+                    errorMessage = null,
+                    suggestions = emptyList()
+                )
+            }
             return
         }
         if (s.parsed.isEmpty()) return

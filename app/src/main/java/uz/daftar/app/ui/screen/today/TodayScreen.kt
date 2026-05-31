@@ -295,6 +295,14 @@ fun TodayScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(8.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { vm.clearPreviews() }) {
+                            Text("✕ Yopish")
+                        }
+                    }
                     for (preview in state.previews) {
                         PreviewHistoryCard(
                             name = preview.name,
@@ -826,7 +834,7 @@ private fun InputBar(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("a", "b", "c", "p", "n").forEach { code ->
+                listOf("a", "b", "c", "p", "n", "t", "t1").forEach { code ->
                     AssistChip(
                         onClick = {
                             val cur = tfv.text
@@ -838,8 +846,8 @@ private fun InputBar(
                             val newPos = pos + ins.length  // kursor harfdan KEYIN
                             tfv = TextFieldValue(newText, selection = TextRange(newPos))
                             onChange(newText)
-                            // n/t (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
-                            if (code !in listOf("n", "t")) numericMode = true
+                            // n/t/t1 (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
+                            if (code !in listOf("n", "t", "t1")) numericMode = true
                         },
                         label = { Text(code.uppercase()) }
                     )
