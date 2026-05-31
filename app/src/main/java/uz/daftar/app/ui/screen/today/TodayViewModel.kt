@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.today
 
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatQty
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -94,7 +95,10 @@ data class TodayUiState(
     // Ko'rinish buyrug'i (sana/tarix/foyda) — SEND bilan "qotirib" qo'yiladi
     val isViewCommand: Boolean = false,
     val pinnedView: Boolean = false,
-    val globalPrice: GlobalPriceCmd? = null
+    val globalPrice: GlobalPriceCmd? = null,
+
+    /** Bot-uslubidagi chat oqimi — har yozuv/javob alohida xabar */
+    val chat: List<ChatItem> = emptyList()
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
     val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand || isViewCommand || globalPrice != null) && !isSending
@@ -102,6 +106,21 @@ data class TodayUiState(
 
 data class TextReport(val title: String, val body: String)
 data class GlobalPriceCmd(val group: String, val prices: Map<String, Double>, val date: java.time.LocalDate?)
+
+/** Chat oqimidagi bitta xabar */
+sealed interface ChatItem {
+    val id: Long
+    /** Foydalanuvchi yozgan matn (o'ng tomon) */
+    data class User(override val id: Long, val text: String) : ChatItem
+    /** Oddiy javob matni — ✅ Saqlandi, narx yangilandi, global narx, xato (chap tomon) */
+    data class Info(override val id: Long, val text: String) : ChatItem
+    /** Sana hisoboti (chap) */
+    data class DateRep(override val id: Long, val report: uz.daftar.app.domain.usecase.DateReport) : ChatItem
+    /** Matnli hisobot: foyda/qarz/eslatma (chap) */
+    data class TextRep(override val id: Long, val report: TextReport) : ChatItem
+    /** Mijoz tarixi (chap) */
+    data class History(override val id: Long, val preview: ClientPreview) : ChatItem
+}
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -215,6 +234,28 @@ class TodayViewModel @Inject constructor(
     }
 
     // ────────── Yozish ──────────
+
+    private var chatIdCounter = 0L
+    private fun nextChatId(): Long = ++chatIdCounter
+    private fun appendChat(vararg items: ChatItem) {
+        _state.update { it.copy(chat = it.chat + items.toList()) }
+    }
+
+    /** Chatdagi bitta xabarni o'chirish (✕ tugma) */
+    fun removeChat(id: Long) {
+        _state.update { it.copy(chat = it.chat.filterNot { c -> c.id == id }) }
+    }
+
+    /** Chatdagi tarix kartasida oyni surish (⬅️/➡️) */
+    fun shiftHistoryMonth(id: Long, delta: Int) {
+        _state.update { st ->
+            st.copy(chat = st.chat.map { c ->
+                if (c is ChatItem.History && c.id == id)
+                    c.copy(preview = c.preview.copy(month = c.preview.month.plusMonths(delta.toLong())))
+                else c
+            })
+        }
+    }
 
     fun onInputChange(text: String) {
         _state.update { it.copy(input = text, justSentSummary = null) }
@@ -644,12 +685,13 @@ class TodayViewModel @Inject constructor(
 
     fun send() {
         val s = state.value
-        // X-o'chirish komandasi bo'lsa
+        val raw = s.input.trim()
+        // 1) X-o'chirish komandasi
         if (s.isDeleteCommand) {
             handleDeleteCommand(s.input)
             return
         }
-        // Global tannarx (T / T1) — mijozsiz narx qo'yish
+        // 2) Global tannarx (T / T1)
         val gp = s.globalPrice
         if (gp != null) {
             viewModelScope.launch {
@@ -657,62 +699,84 @@ class TodayViewModel @Inject constructor(
                 try {
                     setGlobalPrice(userId, gp.group, gp.prices, gp.date)
                     val label = gp.prices.entries.joinToString(", ") { "${it.key.uppercase()}=${it.value}" }
-                    _state.update {
-                        it.copy(
-                            isSending = false, input = "", globalPrice = null,
-                            errorMessage = null, suggestions = emptyList(),
-                            justSentSummary = "✅ Global ${gp.group.uppercase()} narx: $label"
-                        )
-                    }
-                } catch (e: Exception) {
-                    _state.update { it.copy(isSending = false, errorMessage = "Xato: ${e.message}") }
-                }
-            }
-            return
-        }
-        // Ko'rinish buyrug'i (tarix/hisobot/foyda) — yozuv emas: ko'rinishni QOTIRAMIZ
-        if (s.parsed.isEmpty() && s.isViewCommand) {
-            _state.update {
-                it.copy(
-                    input = "",
-                    isViewCommand = false,
-                    pinnedView = true,
-                    errorMessage = null,
-                    suggestions = emptyList()
-                )
-            }
-            return
-        }
-        if (s.parsed.isEmpty()) return
-        viewModelScope.launch {
-            _state.update { it.copy(isSending = true) }
-            var savedCount = 0
-            try {
-                for (entry in s.parsed) {
-                    addTx(userId, entry)
-                    savedCount++
-                }
-                _state.update {
-                    it.copy(
-                        isSending = false,
-                        input = "",
-                        parsed = emptyList(),
-                        isDeleteCommand = false,
-                        errorMessage = null,
-                        suggestions = emptyList(),
-                        // Saqlangach qotirilgan hisobot/tarix yopiladi — yangi yozuv uy ekranida ko'rinsin
-                        previews = emptyList(),
-                        dateReport = null,
-                        textReport = null,
-                        pinnedView = false,
-                        isViewCommand = false,
-                        justSentSummary = "✅ $savedCount ta yozuv saqlandi"
+                    appendChat(
+                        ChatItem.User(nextChatId(), raw),
+                        ChatItem.Info(nextChatId(), "✅ Global ${gp.group.uppercase()} narx yangilandi\n$label")
                     )
+                    _state.update { it.copy(isSending = false, input = "", globalPrice = null, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), isViewCommand = false) }
+                } catch (e: Exception) {
+                    appendChat(ChatItem.Info(nextChatId(), "❌ Xato: ${e.message}"))
+                    _state.update { it.copy(isSending = false) }
                 }
-            } catch (e: Exception) {
-                _state.update { it.copy(isSending = false, errorMessage = "Xato: ${e.message}") }
             }
+            return
         }
+        // 3) Yozuv (tranzaksiya yoki narx) — chatga ✅ Saqlandi qo'shamiz
+        if (s.parsed.isNotEmpty()) {
+            viewModelScope.launch {
+                _state.update { it.copy(isSending = true) }
+                try {
+                    appendChat(ChatItem.User(nextChatId(), raw))
+                    for (entry in s.parsed) {
+                        addTx(userId, entry)
+                        appendChat(ChatItem.Info(nextChatId(), buildSavedText(entry)))
+                    }
+                    _state.update { it.copy(isSending = false, input = "", parsed = emptyList(), isDeleteCommand = false, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), pinnedView = false, isViewCommand = false) }
+                } catch (e: Exception) {
+                    appendChat(ChatItem.Info(nextChatId(), "❌ Xato: ${e.message}"))
+                    _state.update { it.copy(isSending = false) }
+                }
+            }
+            return
+        }
+        // 4) Ko'rinish natijalari (jonli yuklangan) — chatga qo'shamiz (stack bo'ladi)
+        if (s.dateReport != null) {
+            appendChat(ChatItem.User(nextChatId(), raw), ChatItem.DateRep(nextChatId(), s.dateReport))
+            _state.update { it.copy(input = "", dateReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            return
+        }
+        if (s.textReport != null) {
+            appendChat(ChatItem.User(nextChatId(), raw), ChatItem.TextRep(nextChatId(), s.textReport))
+            _state.update { it.copy(input = "", textReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            return
+        }
+        if (s.previews.isNotEmpty()) {
+            val items = mutableListOf<ChatItem>(ChatItem.User(nextChatId(), raw))
+            s.previews.forEach { items.add(ChatItem.History(nextChatId(), it)) }
+            appendChat(*items.toTypedArray())
+            _state.update { it.copy(input = "", previews = emptyList(), isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            return
+        }
+    }
+
+    /** ✅ Saqlandi matnini bot uslubida quradi (narx + qarz bilan) */
+    private suspend fun buildSavedText(entry: uz.daftar.app.core.parser.ParsedEntry): String {
+        val cn = entry.clientName.lowercase()
+        val prices = runCatching { getUnitPrices(userId, cn) }.getOrDefault(emptyMap())
+        val debt = runCatching { calcDebt(userId, cn) }.getOrDefault(0L)
+        val nameCap = entry.clientName.replaceFirstChar { it.uppercase() }
+        val sb = StringBuilder()
+        sb.append("✅ Saqlandi\n")
+        sb.append("📅 ").append(LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))).append("\n")
+        sb.append(nameCap).append("\n")
+        val cargo = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+        var hasItem = false
+        for (t in cargo) {
+            val q = entry.items[t] ?: continue
+            hasItem = true
+            val p = prices[t]
+            if (p != null) sb.append("  ${t.code.uppercase()}: ${q.formatQty()} × ${p.formatQty()} = ${(q * p).formatMoney()}\n")
+            else sb.append("  ${t.code.uppercase()}: ${q.formatQty()}  (narx yo'q)\n")
+        }
+        entry.items[TxType.P]?.let { sb.append("  P: ${it.formatMoney()}\n") }
+        entry.items[TxType.Q]?.let { sb.append("  Q: ${it.formatMoney()}\n") }
+        if (!hasItem && entry.clientPrices.isNotEmpty()) {
+            sb.append("  💲 Narx yangilandi: ")
+            sb.append(entry.clientPrices.entries.joinToString(", ") { "${it.key.code.uppercase()}=${it.value.formatQty()}" })
+            sb.append("\n")
+        }
+        sb.append("💳 Qarz: ${debt.formatMoney()} so'm")
+        return sb.toString()
     }
 
     // ────────── X bilan o'chirish (matn komandasi) ──────────

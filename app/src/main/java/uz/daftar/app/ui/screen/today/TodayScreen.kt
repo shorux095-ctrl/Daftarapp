@@ -90,6 +90,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -134,10 +135,10 @@ fun TodayScreen(
     // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
 
-    // Yangi yozuv qo'shilsa, oxiriga scroll
-    LaunchedEffect(state.transactions.size) {
-        if (state.transactions.isNotEmpty()) {
-            listState.animateScrollToItem(state.transactions.size - 1)
+    // Yangi xabar qo'shilsa, chat oxiriga scroll
+    LaunchedEffect(state.chat.size) {
+        if (state.chat.isNotEmpty()) {
+            listState.animateScrollToItem(state.chat.size - 1)
         }
     }
     LaunchedEffect(state.justSentSummary) {
@@ -273,100 +274,49 @@ fun TodayScreen(
             return@Scaffold
         }
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state.dateReport != null) {
-                // Hisobot — butun ekranni to'liq egallaydi (summary yashirin)
-                DateReportCard(
-                    report = state.dateReport!!,
-                    onClose = { vm.clearDateReport() },
-                    modifier = Modifier.weight(1f)
-                )
-            } else if (state.textReport != null) {
-                // Matnli hisobot (shu oy qarz / foyda) — to'liq oyna
-                TextReportCard(
-                    report = state.textReport!!,
-                    onClose = { vm.clearTextReport() },
-                    modifier = Modifier.weight(1f)
-                )
-            } else if (state.previews.isNotEmpty()) {
-                // Mijoz tarixi — butun ekranni to'liq egallaydi
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(8.dp)
+            if (state.chat.isEmpty()) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { vm.clearPreviews() }) {
-                            Text("✕ Yopish")
-                        }
-                    }
-                    for (preview in state.previews) {
-                        PreviewHistoryCard(
-                            name = preview.name,
-                            debt = preview.debt,
-                            allTxs = preview.transactions,
-                            priceByTx = preview.priceByTx,
-                            balanceAfter = preview.balanceAfter,
-                            month = preview.month,
-                            onPrev = { vm.prevPreviewMonth(preview.name) },
-                            onNext = { vm.nextPreviewMonth(preview.name) }
-                        )
-                    }
+                    Text(
+                        "Yozuv yozing:\n\"Ali a10 n a20 p150\"\n\nHisobot: \"bugun\", \"kecha\"\nTarix: \"ali\"\nQarz eslatma: \"eslatma\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
                 }
             } else {
-                // Yuqori summary
-                if (state.transactions.isNotEmpty()) {
-                    SummaryBar(state.totalByType, state.clientCount, state.filter)
-                }
-                HorizontalDivider()
-                if (state.transactions.isEmpty()) {
-                    EmptyView(state.filter)
-                } else {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = 12.dp, vertical = 8.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Sana bo'yicha guruhlash (sana boshi tepada, oxiri pastda — ascending)
-                    val grouped = state.transactions.groupBy { it.date.toLocalDate() }
-                        .toSortedMap()
-                    for ((date, dayTxs) in grouped) {
-                        item("date-$date") { DateSeparator(date) }
-                        // Har "save" (mijoz + aniq vaqt) alohida karta — vaqt bo'yicha
-                        val saves = dayTxs
-                            .groupBy { it.clientName.lowercase() to it.date }
-                            .entries
-                            .sortedBy { it.value.first().date }
-                        for (entry in saves) {
-                            val clientLower = entry.key.first
-                            val saveTxs = entry.value
-                            item(key = "save-${clientLower}-${entry.key.second}") {
-                                ClientDayCard(
-                                    date = date,
-                                    clientName = saveTxs.first().clientName,
-                                    txs = saveTxs,
-                                    clientPrices = state.priceByClient[clientLower],
-                                    clientDebt = state.debtBySave["$clientLower|${entry.key.second}"]
-                                        ?: state.debtByClient[clientLower],
-                                    selected = state.selected,
-                                    inSelectionMode = state.isSelectionMode,
-                                    onTxClick = { txId ->
-                                        if (state.isSelectionMode) vm.toggleSelect(txId)
-                                        else onEditTx(txId)
-                                    },
-                                    onTxLongClick = { txId -> vm.toggleSelect(txId) }
-                                )
-                            }
+                    items(state.chat, key = { it.id }) { item ->
+                        when (item) {
+                            is ChatItem.User -> ChatUserBubble(item.text)
+                            is ChatItem.Info -> ChatBotBubble(item.text)
+                            is ChatItem.DateRep -> DateReportCard(
+                                report = item.report,
+                                onClose = { vm.removeChat(item.id) }
+                            )
+                            is ChatItem.TextRep -> TextReportCard(
+                                report = item.report,
+                                onClose = { vm.removeChat(item.id) }
+                            )
+                            is ChatItem.History -> PreviewHistoryCard(
+                                name = item.preview.name,
+                                debt = item.preview.debt,
+                                allTxs = item.preview.transactions,
+                                priceByTx = item.preview.priceByTx,
+                                balanceAfter = item.preview.balanceAfter,
+                                month = item.preview.month,
+                                onPrev = { vm.shiftHistoryMonth(item.id, -1) },
+                                onNext = { vm.shiftHistoryMonth(item.id, 1) }
+                            )
                         }
                     }
-                }
                 }
             }
         }
@@ -1180,6 +1130,41 @@ private fun PreviewHistoryCard(
                     Text("Keyingi ➡️")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ChatUserBubble(text: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.widthIn(max = 300.dp)
+        ) {
+            Text(
+                text,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatBotBubble(text: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.widthIn(max = 330.dp)
+        ) {
+            Text(
+                text,
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }
