@@ -1,5 +1,6 @@
 package uz.daftar.app.data.db.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -9,6 +10,21 @@ import uz.daftar.app.data.db.entity.TransactionEntity
 
 @Dao
 interface TransactionDao {
+
+    // ───────── Paging 3 (Qidiruv) ─────────
+    @Query("""
+        SELECT * FROM transactions
+        WHERE user_id = :userId AND LOWER(client_name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY date DESC, id DESC
+    """)
+    fun pagingByClientLike(userId: Long, query: String): PagingSource<Int, TransactionEntity>
+
+    @Query("""
+        SELECT * FROM transactions
+        WHERE user_id = :userId AND date >= :start AND date < :end
+        ORDER BY date DESC, id DESC
+    """)
+    fun pagingByRange(userId: Long, start: String, end: String): PagingSource<Int, TransactionEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(tx: TransactionEntity): Long

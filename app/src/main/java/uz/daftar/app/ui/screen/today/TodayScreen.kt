@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Send
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.AssistChip
@@ -113,11 +114,14 @@ fun TodayScreen(
     onRasxod: () -> Unit = onSettings,
     onKarzina: () -> Unit = onSettings,
     onQarz: () -> Unit = onClients,
+    onManager: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // Pastki menyu ochiq/yopiq (Telegram'day toggle)
     var bottomMenuOpen by remember { mutableStateOf(false) }
@@ -161,6 +165,7 @@ fun TodayScreen(
                     onRasxod = onRasxod,
                     onKarzina = onKarzina,
                     onSettings = onSettings,
+                    onManager = onManager,
                     onYukType = { yukTypeDialog = it }
                 )
             }
@@ -180,19 +185,31 @@ fun TodayScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 AssistChip(
-                                    onClick = { vm.showDateReportButton(java.time.LocalDate.now()) },
+                                    onClick = {
+                                        bottomMenuOpen = false
+                                        keyboardController?.hide(); focusManager.clearFocus()
+                                        vm.showDateReportButton(java.time.LocalDate.now())
+                                    },
                                     label = { Text("📅 Bugun") }
                                 )
                                 AssistChip(
-                                    onClick = { vm.showDateReportButton(java.time.LocalDate.now().minusDays(1)) },
+                                    onClick = {
+                                        bottomMenuOpen = false
+                                        keyboardController?.hide(); focusManager.clearFocus()
+                                        vm.showDateReportButton(java.time.LocalDate.now().minusDays(1))
+                                    },
                                     label = { Text("📅 Kecha") }
                                 )
                                 AssistChip(
-                                    onClick = { vm.showWeekReport() },
+                                    onClick = {
+                                        bottomMenuOpen = false
+                                        keyboardController?.hide(); focusManager.clearFocus()
+                                        vm.showWeekReport()
+                                    },
                                     label = { Text("📆 Hafta") }
                                 )
                                 AssistChip(
-                                    onClick = { onYukReport() },
+                                    onClick = { bottomMenuOpen = false; onYukReport() },
                                     label = { Text("📦 Yuk") }
                                 )
                             }
@@ -236,16 +253,17 @@ fun TodayScreen(
                         }
                     }
                 }
-                // ───── Sana hisoboti (bugun/kecha/15.05) ─────
-                state.dateReport?.let { report ->
-                    DateReportCard(report = report, onClose = { vm.clearDateReport() })
-                }
+                // ───── Sana hisoboti asosiy oynaga ko'chirildi ─────
                 InputBar(
                     input = state.input,
                     onChange = vm::onInputChange,
                     suggestions = state.suggestions,
                     onSuggestionClick = vm::applySuggestion,
-                    onSend = vm::send,
+                    onSend = {
+                        bottomMenuOpen = false
+                        keyboardController?.hide(); focusManager.clearFocus()
+                        vm.send()
+                    },
                     canSend = state.canSend,
                     isSending = state.isSending,
                     errorMessage = state.errorMessage,
@@ -264,15 +282,22 @@ fun TodayScreen(
             return@Scaffold
         }
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Yuqori summary
-            if (state.transactions.isNotEmpty()) {
-                SummaryBar(state.totalByType, state.clientCount, state.filter)
-            }
-            HorizontalDivider()
-
-            if (state.transactions.isEmpty()) {
-                EmptyView(state.filter)
+            if (state.dateReport != null) {
+                // Hisobot — butun ekranni to'liq egallaydi (summary yashirin)
+                DateReportCard(
+                    report = state.dateReport!!,
+                    onClose = { vm.clearDateReport() },
+                    modifier = Modifier.weight(1f)
+                )
             } else {
+                // Yuqori summary
+                if (state.transactions.isNotEmpty()) {
+                    SummaryBar(state.totalByType, state.clientCount, state.filter)
+                }
+                HorizontalDivider()
+                if (state.transactions.isEmpty()) {
+                    EmptyView(state.filter)
+                } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -313,6 +338,7 @@ fun TodayScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -376,6 +402,7 @@ private fun ChatTopBar(
     onRasxod: () -> Unit,
     onKarzina: () -> Unit,
     onSettings: () -> Unit,
+    onManager: () -> Unit,
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -496,6 +523,12 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onKarzina() }
                     )
                     HorizontalDivider()
+                    // ── ZAXIRA (BACKUP) ──
+                    DropdownMenuItem(
+                        text = { Text("🗂 Zaxira / Backup") },
+                        leadingIcon = { Icon(Icons.Outlined.Backup, null) },
+                        onClick = { menuOpen = false; onManager() }
+                    )
                     // ── SOZLAMA ──
                     DropdownMenuItem(
                         text = { Text("⚙️ Sozlamalar") },
@@ -654,10 +687,11 @@ private fun ClientDayCard(
                 for (tx in txs) {
                     val isSelected = tx.id in selected
                     val unitPrice = tx.tOverride ?: clientPrices?.get(tx.type)
+                    val noPrice = unitPrice == null &&
+                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
                     val lineText = when {
                         tx.type == TxType.P -> "  P: ${tx.amount.formatMoney()}"
                         unitPrice != null -> "  ${tx.type.label}: ${tx.amount.formatQty()} × ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()}"
-                        tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K) -> "  ${tx.type.label}: ${tx.amount.formatQty()}  (narx yo'q)"
                         else -> "  ${tx.type.label}: ${tx.amount.formatMoney()}"
                     }
                     Row(
@@ -673,12 +707,29 @@ private fun ClientDayCard(
                             )
                             .padding(vertical = 2.dp)
                     ) {
-                        Text(
-                            lineText,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        if (noPrice) {
+                            Text(
+                                androidx.compose.ui.text.buildAnnotatedString {
+                                    append("  ${tx.type.label}: ${tx.amount.formatQty()}  ")
+                                    androidx.compose.ui.text.withStyle(
+                                        androidx.compose.ui.text.SpanStyle(
+                                            color = MaterialTheme.colorScheme.error,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    ) { append("(narx yo'q)") }
+                                },
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        } else {
+                            Text(
+                                lineText,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -1088,16 +1139,20 @@ private fun PreviewHistoryCard(
 }
 
 @Composable
-private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport, onClose: () -> Unit = {}) {
+private fun DateReportCard(
+    report: uz.daftar.app.domain.usecase.DateReport,
+    onClose: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val dateStr = report.title.ifEmpty { report.date.format(DateTimeFormatter.ofPattern("dd.MM")) }
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(14.dp).fillMaxSize()) {
             // Sarlavha + yopish
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -1125,7 +1180,7 @@ private fun DateReportCard(report: uz.daftar.app.domain.usecase.DateReport, onCl
             val scroll = rememberScrollState()
             Column(
                 modifier = Modifier
-                    .heightIn(max = 360.dp)
+                    .weight(1f)
                     .verticalScroll(scroll)
             ) {
                 for ((idx, line) in report.clientLines.withIndex()) {

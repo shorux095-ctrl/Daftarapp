@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import uz.daftar.app.core.util.formatMoney
 import uz.daftar.app.data.db.entity.TransactionEntity
 import java.time.Instant
@@ -124,26 +127,40 @@ fun SearchScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // Results
+            // Results — Paging 3
+            val items = vm.results.collectAsLazyPagingItems()
+            val refreshing = items.loadState.refresh is androidx.paging.LoadState.Loading
+            val appending = items.loadState.append is androidx.paging.LoadState.Loading
             when {
-                state.isSearching -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                refreshing -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                state.searched && state.results.isEmpty() -> Text(
+                state.searched && items.itemCount == 0 -> Text(
                     "📭 Hech narsa topilmadi",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
                 )
-                state.results.isNotEmpty() -> Column {
+                items.itemCount > 0 -> Column {
                     Text(
-                        "${state.results.size} ta yozuv",
+                        "${items.itemCount} ta yozuv",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(state.results, key = { it.id }) { tx ->
-                            ResultRow(tx)
+                        items(
+                            count = items.itemCount,
+                            key = items.itemKey { it.id }
+                        ) { index ->
+                            items[index]?.let { tx -> ResultRow(tx) }
+                        }
+                        if (appending) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                            }
                         }
                     }
                 }
