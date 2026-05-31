@@ -700,6 +700,12 @@ class TodayViewModel @Inject constructor(
                         isDeleteCommand = false,
                         errorMessage = null,
                         suggestions = emptyList(),
+                        // Saqlangach qotirilgan hisobot/tarix yopiladi — yangi yozuv uy ekranida ko'rinsin
+                        previews = emptyList(),
+                        dateReport = null,
+                        textReport = null,
+                        pinnedView = false,
+                        isViewCommand = false,
                         justSentSummary = "✅ $savedCount ta yozuv saqlandi"
                     )
                 }

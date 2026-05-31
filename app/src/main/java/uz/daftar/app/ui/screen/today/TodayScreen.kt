@@ -89,6 +89,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -815,6 +816,7 @@ private fun InputBar(
     var tfv by remember { mutableStateOf(TextFieldValue(input)) }
     // Raqamli klaviatura rejimi — yuk tugmasi bosilganda yoqiladi (faqat son yozish uchun)
     var numericMode by remember { mutableStateOf(false) }
+    var inputFocused by remember { mutableStateOf(false) }
     LaunchedEffect(input) {
         if (input != tfv.text) {
             tfv = TextFieldValue(input, selection = TextRange(input.length))
@@ -826,7 +828,8 @@ private fun InputBar(
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Tez kiritish tugmalari: A B C D K P Q (bosganda matnga qo'shiladi)
+            // Tez kiritish tugmalari — faqat yozuvga kirilganda (fokusda) ko'rinadi
+            if (inputFocused) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -834,7 +837,7 @@ private fun InputBar(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("a", "b", "c", "p", "n", "t", "t1").forEach { code ->
+                listOf("a", "b", "c", "n", "p", "t1").forEach { code ->
                     AssistChip(
                         onClick = {
                             val cur = tfv.text
@@ -846,8 +849,8 @@ private fun InputBar(
                             val newPos = pos + ins.length  // kursor harfdan KEYIN
                             tfv = TextFieldValue(newText, selection = TextRange(newPos))
                             onChange(newText)
-                            // n/t/t1 (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
-                            if (code !in listOf("n", "t", "t1")) numericMode = true
+                            // n/t1 (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
+                            if (code !in listOf("n", "t1")) numericMode = true
                         },
                         label = { Text(code.uppercase()) }
                     )
@@ -857,6 +860,7 @@ private fun InputBar(
                     onClick = { numericMode = !numericMode },
                     label = { Text(if (numericMode) "Abc" else "123") }
                 )
+            }
             }
 
             // Autocomplete chips
@@ -963,7 +967,9 @@ private fun InputBar(
                         tfv = newV
                         onChange(newV.text)
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { inputFocused = it.isFocused },
                     placeholder = { Text("Yozuv...") },
                     minLines = 1,
                     maxLines = 4,
