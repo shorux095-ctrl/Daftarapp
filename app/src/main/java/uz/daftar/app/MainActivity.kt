@@ -48,6 +48,18 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Android 13+ — bildirishnoma ruxsatini so'rash (qarz eslatma uchun)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                runCatching {
+                    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7777)
+                }
+            }
+        }
+
         setContent {
             DaftarTheme {
                 // Qulf holatini boshlang'ich tekshirish state orqali
