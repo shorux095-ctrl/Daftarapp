@@ -39,6 +39,7 @@ object Routes {
     const val CLIENT_NARX = "client_narx"
     const val REMINDER = "reminder"
     const val MANAGER = "manager"
+    const val DASHBOARD = "dashboard"
 }
 
 @Composable
@@ -65,7 +66,8 @@ fun DaftarNavHost() {
                 onRasxod = { nav.navigate(Routes.RASXOD) },
                 onKarzina = { nav.navigate(Routes.KARZINA) },
                 onQarz = { nav.navigate(Routes.QARZ) },
-                onManager = { nav.navigate(Routes.MANAGER) }
+                onManager = { nav.navigate(Routes.MANAGER) },
+                onDashboard = { nav.navigate(Routes.DASHBOARD) }
             )
         }
 
@@ -144,6 +146,7 @@ fun DaftarNavHost() {
         composable(Routes.KARZINA) { KarzinaScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.REMINDER) { ReminderLimitScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.MANAGER) { uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.DASHBOARD) { uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
     }
     }
 }

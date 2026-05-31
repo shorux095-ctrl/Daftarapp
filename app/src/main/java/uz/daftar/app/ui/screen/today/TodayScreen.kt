@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.AssistChip
@@ -82,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -115,6 +117,7 @@ fun TodayScreen(
     onKarzina: () -> Unit = onSettings,
     onQarz: () -> Unit = onClients,
     onManager: () -> Unit = onSettings,
+    onDashboard: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -166,6 +169,7 @@ fun TodayScreen(
                     onKarzina = onKarzina,
                     onSettings = onSettings,
                     onManager = onManager,
+                    onDashboard = onDashboard,
                     onYukType = { yukTypeDialog = it }
                 )
             }
@@ -403,6 +407,7 @@ private fun ChatTopBar(
     onKarzina: () -> Unit,
     onSettings: () -> Unit,
     onManager: () -> Unit,
+    onDashboard: () -> Unit,
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -523,6 +528,12 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onKarzina() }
                     )
                     HorizontalDivider()
+                    // ── DASHBOARD ──
+                    DropdownMenuItem(
+                        text = { Text("📊 Dashboard") },
+                        leadingIcon = { Icon(Icons.Outlined.BarChart, null) },
+                        onClick = { menuOpen = false; onDashboard() }
+                    )
                     // ── ZAXIRA (BACKUP) ──
                     DropdownMenuItem(
                         text = { Text("🗂 Zaxira / Backup") },
@@ -711,7 +722,7 @@ private fun ClientDayCard(
                             Text(
                                 androidx.compose.ui.text.buildAnnotatedString {
                                     append("  ${tx.type.label}: ${tx.amount.formatQty()}  ")
-                                    androidx.compose.ui.text.withStyle(
+                                    withStyle(
                                         androidx.compose.ui.text.SpanStyle(
                                             color = MaterialTheme.colorScheme.error,
                                             fontWeight = FontWeight.Bold
