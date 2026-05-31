@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.today
 
+import uz.daftar.app.core.util.formatMoney
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -85,11 +86,16 @@ data class TodayUiState(
     val previews: List<ClientPreview> = emptyList(),
 
     // ───────── Sana hisoboti (input'дa "bugun" / "kecha" / "15.05" yozilganda) ─────────
-    val dateReport: uz.daftar.app.domain.usecase.DateReport? = null
+    val dateReport: uz.daftar.app.domain.usecase.DateReport? = null,
+
+    // ───────── Matnli hisobot ("shu oy qarz" / "shu oy foyda") ─────────
+    val textReport: TextReport? = null
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
     val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand) && !isSending
 }
+
+data class TextReport(val title: String, val body: String)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -102,7 +108,9 @@ class TodayViewModel @Inject constructor(
     private val getUnitPrices: GetClientUnitPricesUseCase,
     private val getHistory: uz.daftar.app.domain.usecase.GetClientHistoryUseCase,
     private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao,
-    private val getDateReport: uz.daftar.app.domain.usecase.GetDateReportUseCase
+    private val getDateReport: uz.daftar.app.domain.usecase.GetDateReportUseCase,
+    private val getMonthlyReport: uz.daftar.app.domain.usecase.GetMonthlyReportUseCase,
+    private val getMonthClientDebt: uz.daftar.app.domain.usecase.GetMonthClientDebtUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -202,18 +210,33 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(input = text, justSentSummary = null) }
         // Parser preview
         if (text.isBlank()) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, previews = emptyList(), dateReport = null) }
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, previews = emptyList(), dateReport = null, textReport = null) }
             updateSuggestions("")
             return
         }
         // X-o'chirish komandasi tekshirish ("x" yoki "12.03 x" + ismlar)
         if (isDeleteCommandText(text)) {
-            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previews = emptyList(), dateReport = null) }
+            _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previews = emptyList(), dateReport = null, textReport = null) }
             updateSuggestions("")
             return
         }
         // "bugun" / "kecha" / "DD.MM" + ixtiyoriy tur filtri ("30.05 a b c")
         val trimmedLow = text.trim().lowercase()
+
+        // "shu oy qarz" / "oy qarz" va "shu oy foyda" / "oy foyda"
+        when (trimmedLow) {
+            "shu oy qarz", "oy qarz", "shu oy karz", "oy karz" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                loadMonthDebt()
+                return
+            }
+            "shu oy foyda", "oy foyda" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                loadMonthProfit()
+                return
+            }
+        }
+
         val tokens = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
         val baseDate: LocalDate? = if (tokens.isEmpty()) null else when (tokens[0]) {
             "bugun" -> LocalDate.now()
@@ -244,7 +267,7 @@ class TodayViewModel @Inject constructor(
             }
             if (isReport) {
                 val types = if (filterLetters.isEmpty()) null else filterLetters.toSet()
-                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList()) }
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), textReport = null) }
                 loadDateReport(baseDate, types, useNarx)
                 return
             }
@@ -259,6 +282,7 @@ class TodayViewModel @Inject constructor(
                 parsed = parsedList,
                 isDeleteCommand = false,
                 dateReport = null,
+                textReport = null,
                 errorMessage = if (parsedList.isEmpty()) firstError?.error?.message else null
             )
         }
@@ -295,6 +319,67 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(dateReport = null) }
     }
 
+    /** Matnli hisobotни yopish */
+    fun clearTextReport() {
+        _state.update { it.copy(textReport = null) }
+    }
+
+    private var monthJob: Job? = null
+
+    /** "shu oy qarz" — joriy oyda har mijoz: yuk, to'lov, qoldi */
+    private fun loadMonthDebt() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val now = LocalDate.now()
+                val rep = getMonthClientDebt(userId, now.year, now.monthValue)
+                val sb = StringBuilder()
+                if (rep.rows.isEmpty()) {
+                    sb.append("Bu oyda yozuv yo'q.")
+                } else {
+                    rep.rows.forEachIndexed { i, r ->
+                        sb.append("${i + 1}. ${r.client}\n")
+                        sb.append("    yuk: ${r.yuk.formatMoney()}   to'lov: ${r.tolov.formatMoney()}\n")
+                        sb.append("    qoldi: ${r.qoldi.formatMoney()}\n")
+                    }
+                    sb.append("\n──────────\n")
+                    sb.append("JAMI yuk:   ${rep.totalYuk.formatMoney()}\n")
+                    sb.append("JAMI to'lov: ${rep.totalTolov.formatMoney()}\n")
+                    sb.append("JAMI qoldi: ${rep.totalQoldi.formatMoney()} so'm")
+                }
+                _state.update {
+                    it.copy(textReport = TextReport("📅 Shu oy qarz — ${rep.rangeLabel}", sb.toString()))
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
+            }
+        }
+    }
+
+    /** "shu oy foyda" — joriy oy foydаси */
+    private fun loadMonthProfit() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val now = LocalDate.now()
+                val r = getMonthlyReport(userId, now.year, now.monthValue)
+                val body = buildString {
+                    append("💰 Daromad (N): ${r.revenue.formatMoney()}\n")
+                    append("📦 Tannarx (T): ${r.tCost.formatMoney()}\n")
+                    append("📈 Foyda (N−T): ${r.grossProfit.formatMoney()}\n")
+                    append("📤 Rasxod:      ${r.expenses.formatMoney()}\n")
+                    append("──────────\n")
+                    append("🎯 Sof foyda:   ${r.profit.formatMoney()} so'm")
+                }
+                _state.update {
+                    it.copy(textReport = TextReport("📈 Shu oy foyda — ${r.rangeLabel}", body))
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
+            }
+        }
+    }
+
     private var reportJob: Job? = null
     private fun loadDateReport(date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false, endDate: LocalDate = date) {
         reportJob?.cancel()
@@ -322,11 +407,12 @@ class TodayViewModel @Inject constructor(
 
         // Marker bormi? (a10, b5, p100, n a20, t a15)
         val markerRe = Regex("""(^|\s)[abcdkpqnt](\d|\s|$)""", RegexOption.IGNORE_CASE)
-        // Faqat ism-only qatorlarni olamiz (yuk/narx markeri bo'lmagan, 2+ harf)
+        // Faqat ism-only qatorlarni olamiz (yuk/narx markeri bo'lmagan, 2+ belgi, kamida 1 harf)
         val nameLines = lines.filter { line ->
             !markerRe.containsMatchIn(line) &&
             line.length >= 2 &&
-            line.all { it.isLetter() || it == ' ' || it == '\'' || it == '-' }
+            line.any { it.isLetter() } &&
+            line.all { it.isLetterOrDigit() || it == ' ' || it == '\'' || it == '-' }
         }
         if (nameLines.isEmpty()) {
             _state.update { it.copy(previews = emptyList()) }

@@ -220,7 +220,12 @@ private fun ReportView(
         // Money summary
         Text("Moliyaviy xulosa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        MoneyRow("💰 Daromad", rep.revenue, MaterialTheme.colorScheme.primary)
+        MoneyRow("💰 Daromad (N)", rep.revenue, MaterialTheme.colorScheme.primary)
+        MoneyRow("📦 Tannarx (T)", rep.tCost, MaterialTheme.colorScheme.onSurfaceVariant)
+        MoneyRow(
+            "📈 Foyda (N−T)", rep.grossProfit,
+            if (rep.grossProfit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+        )
         MoneyRow("💵 To'lov olindi", rep.payments, MaterialTheme.colorScheme.tertiary)
         MoneyRow("📤 Rasxod", rep.expenses, MaterialTheme.colorScheme.error)
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -118,6 +119,7 @@ fun TodayScreen(
     onQarz: () -> Unit = onClients,
     onManager: () -> Unit = onSettings,
     onDashboard: () -> Unit = onSettings,
+    onHelp: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -170,6 +172,7 @@ fun TodayScreen(
                     onSettings = onSettings,
                     onManager = onManager,
                     onDashboard = onDashboard,
+                    onHelp = onHelp,
                     onYukType = { yukTypeDialog = it }
                 )
             }
@@ -240,24 +243,7 @@ fun TodayScreen(
                         }
                     }
                 }
-                // ───── Jonli tarix preview (ism(lar) yozilsa) ─────
-                if (state.previews.isNotEmpty()) {
-                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                        for (preview in state.previews) {
-                            PreviewHistoryCard(
-                                name = preview.name,
-                                debt = preview.debt,
-                                allTxs = preview.transactions,
-                                priceByTx = preview.priceByTx,
-                                balanceAfter = preview.balanceAfter,
-                                month = preview.month,
-                                onPrev = { vm.prevPreviewMonth(preview.name) },
-                                onNext = { vm.nextPreviewMonth(preview.name) }
-                            )
-                        }
-                    }
-                }
-                // ───── Sana hisoboti asosiy oynaga ko'chirildi ─────
+                // ───── Mijoz tarixi asosiy oynaga ko'chirildi ─────
                 InputBar(
                     input = state.input,
                     onChange = vm::onInputChange,
@@ -293,6 +279,35 @@ fun TodayScreen(
                     onClose = { vm.clearDateReport() },
                     modifier = Modifier.weight(1f)
                 )
+            } else if (state.textReport != null) {
+                // Matnli hisobot (shu oy qarz / foyda) — to'liq oyna
+                TextReportCard(
+                    report = state.textReport!!,
+                    onClose = { vm.clearTextReport() },
+                    modifier = Modifier.weight(1f)
+                )
+            } else if (state.previews.isNotEmpty()) {
+                // Mijoz tarixi — butun ekranni to'liq egallaydi
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(8.dp)
+                ) {
+                    for (preview in state.previews) {
+                        PreviewHistoryCard(
+                            name = preview.name,
+                            debt = preview.debt,
+                            allTxs = preview.transactions,
+                            priceByTx = preview.priceByTx,
+                            balanceAfter = preview.balanceAfter,
+                            month = preview.month,
+                            onPrev = { vm.prevPreviewMonth(preview.name) },
+                            onNext = { vm.nextPreviewMonth(preview.name) }
+                        )
+                    }
+                }
             } else {
                 // Yuqori summary
                 if (state.transactions.isNotEmpty()) {
@@ -408,6 +423,7 @@ private fun ChatTopBar(
     onSettings: () -> Unit,
     onManager: () -> Unit,
     onDashboard: () -> Unit,
+    onHelp: () -> Unit,
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -533,6 +549,11 @@ private fun ChatTopBar(
                         text = { Text("📊 Dashboard") },
                         leadingIcon = { Icon(Icons.Outlined.BarChart, null) },
                         onClick = { menuOpen = false; onDashboard() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("❓ Yordam") },
+                        leadingIcon = { Icon(Icons.Outlined.HelpOutline, null) },
+                        onClick = { menuOpen = false; onHelp() }
                     )
                     // ── ZAXIRA (BACKUP) ──
                     DropdownMenuItem(
@@ -1150,6 +1171,44 @@ private fun PreviewHistoryCard(
 }
 
 @Composable
+@Composable
+private fun TextReportCard(
+    report: uz.daftar.app.ui.screen.today.TextReport,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(8.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    report.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Yopish")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                Text(
+                    report.body,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
 private fun DateReportCard(
     report: uz.daftar.app.domain.usecase.DateReport,
     onClose: () -> Unit = {},
