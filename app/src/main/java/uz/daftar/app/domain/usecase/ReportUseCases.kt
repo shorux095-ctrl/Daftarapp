@@ -7,6 +7,8 @@ import uz.daftar.app.data.db.dao.YukNarxDao
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -238,3 +240,117 @@ internal val MONTH_UZ = listOf(
     "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
     "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
 )
+
+// ───────── Mijoz foydasi (oylik / yillik) ─────────
+data class ClientProfitReport(
+    val client: String,
+    val year: Int,
+    val monthly: List<Pair<String, Long>>,  // (oy nomi, foyda) — joriy yil, nolik bo'lmagan
+    val yearly: List<Pair<Int, Long>>,       // (yil, foyda)
+    val totalThisYear: Long
+)
+
+class GetClientProfitUseCase @Inject constructor(
+    private val txDao: TransactionDao,
+    private val priceDao: PriceHistoryDao,
+    private val yukDao: YukNarxDao
+) {
+    suspend operator fun invoke(userId: Long, clientName: String): ClientProfitReport {
+        val cn = clientName.lowercase()
+        val txs = txDao.getByClient(userId, cn)
+        val cargo = setOf("a", "b", "c", "d", "k")
+        val tPrices = mutableMapOf<String, Double?>()
+        for (t in cargo) tPrices[t] = yukDao.getLatestGlobal(userId, t, "t")?.price
+
+        val nowYear = LocalDate.now().year
+        val byMonth = DoubleArray(12)        // joriy yil oylik foyda
+        val byYear = sortedMapOf<Int, Double>(compareByDescending { it })
+
+        for (tx in txs) {
+            val type = TxType.fromCode(tx.type) ?: continue
+            val d = runCatching { LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate() }.getOrNull() ?: continue
+            val profit: Double = when (tx.type) {
+                "p" -> 0.0
+                "q" -> tx.amount
+                in cargo -> {
+                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao) ?: tx.tOverride
+                    val t = tx.tOverride ?: tPrices[tx.type]
+                    if (n != null && t != null) tx.amount * (n - t)
+                    else 0.0
+                }
+                else -> 0.0
+            }
+            if (profit == 0.0) continue
+            byYear[d.year] = (byYear[d.year] ?: 0.0) + profit
+            if (d.year == nowYear) byMonth[d.monthValue - 1] += profit
+        }
+
+        val monthly = (0 until 12)
+            .filter { byMonth[it] != 0.0 }
+            .map { MONTH_UZ[it] to byMonth[it].roundToLong() }
+        val yearly = byYear.map { (y, v) -> y to v.roundToLong() }
+        return ClientProfitReport(
+            client = clientName,
+            year = nowYear,
+            monthly = monthly,
+            yearly = yearly,
+            totalThisYear = byMonth.sum().roundToLong()
+        )
+    }
+}
+
+// ───────── Qarz eslatma — muddati o'tgan qarzdorlar (yoshi bo'yicha) ─────────
+data class OverdueDebtor(
+    val client: String,
+    val debt: Long,
+    val daysOverdue: Int   // qarz boshlanganidan beri kunlar
+)
+
+class GetOverdueDebtorsUseCase @Inject constructor(
+    private val txDao: TransactionDao,
+    private val priceDao: PriceHistoryDao
+) {
+    suspend operator fun invoke(userId: Long): List<OverdueDebtor> {
+        val names = txDao.getAllClientNames(userId)
+        val today = LocalDate.now()
+        val out = mutableListOf<OverdueDebtor>()
+        for (name in names) {
+            val txs = txDao.getByClient(userId, name.lowercase()).sortedBy { it.date }
+            if (txs.isEmpty()) continue
+            val pricesByType = priceDao.getAllForClient(userId, name.lowercase()).groupBy { it.priceType }
+            var bal = 0.0
+            var startDate: LocalDate? = null
+            for (tx in txs) {
+                val before = bal
+                when (tx.type) {
+                    "p" -> bal -= tx.amount
+                    "q" -> bal += tx.amount
+                    else -> {
+                        val pr = tx.tOverride ?: findPriceAtSimple(pricesByType[tx.type], tx.date)
+                        if (pr != null) bal += tx.amount * pr
+                    }
+                }
+                if (before <= 0.0 && bal > 0.0) {
+                    startDate = runCatching {
+                        LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate()
+                    }.getOrNull()
+                }
+                if (bal <= 0.0) startDate = null
+            }
+            if (bal > 0.5 && startDate != null) {
+                val days = ChronoUnit.DAYS.between(startDate, today).toInt().coerceAtLeast(0)
+                out.add(OverdueDebtor(name, bal.roundToLong(), days))
+            }
+        }
+        return out.sortedByDescending { it.daysOverdue }
+    }
+
+    private fun findPriceAtSimple(prices: List<uz.daftar.app.data.db.entity.PriceHistoryEntity>?, at: String): Double? {
+        if (prices.isNullOrEmpty()) return null
+        var best: uz.daftar.app.data.db.entity.PriceHistoryEntity? = null
+        for (p in prices) {
+            if (p.date <= at) best = p else break
+        }
+        return best?.price ?: prices.firstOrNull()?.price
+    }
+}

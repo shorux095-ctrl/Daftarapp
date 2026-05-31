@@ -110,7 +110,9 @@ class TodayViewModel @Inject constructor(
     private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao,
     private val getDateReport: uz.daftar.app.domain.usecase.GetDateReportUseCase,
     private val getMonthlyReport: uz.daftar.app.domain.usecase.GetMonthlyReportUseCase,
-    private val getMonthClientDebt: uz.daftar.app.domain.usecase.GetMonthClientDebtUseCase
+    private val getMonthClientDebt: uz.daftar.app.domain.usecase.GetMonthClientDebtUseCase,
+    private val getClientProfit: uz.daftar.app.domain.usecase.GetClientProfitUseCase,
+    private val getOverdue: uz.daftar.app.domain.usecase.GetOverdueDebtorsUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -233,6 +235,22 @@ class TodayViewModel @Inject constructor(
             "shu oy foyda", "oy foyda" -> {
                 _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
                 loadMonthProfit()
+                return
+            }
+            "eslatma", "qarz eslatma", "eslatmalar", "muddat" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                loadOverdue()
+                return
+            }
+        }
+
+        // "<mijoz> foyda" — mijoz foydasi (oylik+yillik)
+        run {
+            val tk = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (tk.size >= 2 && tk.last() == "foyda") {
+                val name = tk.dropLast(1).joinToString(" ")
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false) }
+                loadClientProfit(name)
                 return
             }
         }
@@ -374,6 +392,62 @@ class TodayViewModel @Inject constructor(
                 _state.update {
                     it.copy(textReport = TextReport("📈 Shu oy foyda — ${r.rangeLabel}", body))
                 }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
+            }
+        }
+    }
+
+    /** "<mijoz> foyda" — mijozdan ko'rilган foyda (oylik + yillik) */
+    private fun loadClientProfit(name: String) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val r = getClientProfit(userId, name)
+                val body = buildString {
+                    append("Oylik (${r.year}):\n")
+                    if (r.monthly.isEmpty()) append("  — yo'q\n")
+                    else r.monthly.forEach { (m, v) -> append("  $m: ${v.formatMoney()}\n") }
+                    append("\nYillik:\n")
+                    if (r.yearly.isEmpty()) append("  — yo'q\n")
+                    else r.yearly.forEach { (y, v) -> append("  $y: ${v.formatMoney()}\n") }
+                    append("\n──────────\n")
+                    append("${r.year} yil jami: ${r.totalThisYear.formatMoney()} so'm")
+                }
+                _state.update { it.copy(textReport = TextReport("📈 ${r.client} — foyda", body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
+            }
+        }
+    }
+
+    /** "eslatma" — muddati o'tgan qarzdorlar (7/14/30/60 kun) */
+    private fun loadOverdue() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val list = getOverdue(userId)
+                val body = if (list.isEmpty()) {
+                    "✅ Muddati o'tgan qarz yo'q."
+                } else buildString {
+                    fun bucket(title: String, items: List<uz.daftar.app.domain.usecase.OverdueDebtor>) {
+                        if (items.isEmpty()) return
+                        append("$title\n")
+                        items.forEach { d ->
+                            append("  • ${d.client} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun)\n")
+                        }
+                        append("\n")
+                    }
+                    bucket("🔴 60+ kun", list.filter { it.daysOverdue >= 60 })
+                    bucket("🟠 30–59 kun", list.filter { it.daysOverdue in 30..59 })
+                    bucket("🟡 14–29 kun", list.filter { it.daysOverdue in 14..29 })
+                    bucket("🔵 7–13 kun", list.filter { it.daysOverdue in 7..13 })
+                    bucket("⚪ 7 kundan kam", list.filter { it.daysOverdue < 7 })
+                    val jami = list.sumOf { it.debt }
+                    append("──────────\n")
+                    append("JAMI qarz: ${jami.formatMoney()} so'm  (${list.size} mijoz)")
+                }
+                _state.update { it.copy(textReport = TextReport("⏰ Qarz eslatma", body)) }
             } catch (e: Exception) {
                 _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
             }

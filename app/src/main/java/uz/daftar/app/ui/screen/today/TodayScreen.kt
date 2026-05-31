@@ -1171,7 +1171,6 @@ private fun PreviewHistoryCard(
 }
 
 @Composable
-@Composable
 private fun TextReportCard(
     report: uz.daftar.app.ui.screen.today.TextReport,
     onClose: () -> Unit,
@@ -1209,6 +1208,7 @@ private fun TextReportCard(
     }
 }
 
+@Composable
 private fun DateReportCard(
     report: uz.daftar.app.domain.usecase.DateReport,
     onClose: () -> Unit = {},

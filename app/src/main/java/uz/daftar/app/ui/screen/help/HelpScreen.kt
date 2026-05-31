@@ -59,6 +59,18 @@ fun HelpScreen(onBack: () -> Unit) {
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
+            Section("⏰ Qarz eslatma") {
+                Cmd("eslatma")
+                Body("Muddati o'tgan qarzdorlarni kun bo'yicha guruhlab ko'rsatadi:\n🔴 60+ kun  🟠 30–59  🟡 14–29  🔵 7–13  ⚪ 7 kundan kam\nQarz boshlanган kunidan hisoblanadi. To'lov qilinса, qoldiq qarz davom etadi.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("📊 Mijoz foydasi") {
+                Cmd("ali foyda        (mijoz nomi + foyda)")
+                Body("Bitta mijozдан qancha foyda ko'rganingiz — oylik (joriy yil) va yillik bo'yicha.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
             Section("📅 Kunlik / sana hisoboti") {
                 Cmd("bugun   •   kecha   •   30.05")
                 Body("Tanlangan kun hisoboti (T narx, J jami). Hafta uchun ☰ menyuda 📆 Hafta.")
