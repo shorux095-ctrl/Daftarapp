@@ -41,6 +41,8 @@ object Routes {
     const val MANAGER = "manager"
     const val DASHBOARD = "dashboard"
     const val HELP = "help"
+    const val ESLAT = "eslat"
+    const val SKLAD = "sklad"
 }
 
 @Composable
@@ -69,7 +71,9 @@ fun DaftarNavHost() {
                 onQarz = { nav.navigate(Routes.QARZ) },
                 onManager = { nav.navigate(Routes.MANAGER) },
                 onDashboard = { nav.navigate(Routes.DASHBOARD) },
-                onHelp = { nav.navigate(Routes.HELP) }
+                onHelp = { nav.navigate(Routes.HELP) },
+                onEslat = { nav.navigate(Routes.ESLAT) },
+                onSklad = { nav.navigate(Routes.SKLAD) }
             )
         }
 
@@ -150,6 +154,8 @@ fun DaftarNavHost() {
         composable(Routes.MANAGER) { uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.DASHBOARD) { uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.HELP) { uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.ESLAT) { uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.SKLAD) { uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }
     }
     }
 }

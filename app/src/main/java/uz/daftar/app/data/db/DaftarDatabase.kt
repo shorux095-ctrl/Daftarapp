@@ -19,6 +19,8 @@ import uz.daftar.app.data.db.entity.BackupMessageEntity
 import uz.daftar.app.data.db.entity.ClientDebtCacheEntity
 import uz.daftar.app.data.db.entity.ClientEntity
 import uz.daftar.app.data.db.entity.ClientLimitEntity
+import uz.daftar.app.data.db.entity.EslatmaEntity
+import uz.daftar.app.data.db.entity.SkladEntity
 import uz.daftar.app.data.db.entity.ClientPriceEntity
 import uz.daftar.app.data.db.entity.ClientReminderEntity
 import uz.daftar.app.data.db.entity.DeletedTransactionEntity
@@ -46,9 +48,11 @@ import uz.daftar.app.data.db.entity.YukRasxodNarxEntity
         DeletedTransactionEntity::class,
         ClientReminderEntity::class,
         ClientDebtCacheEntity::class,
-        ClientLimitEntity::class
+        ClientLimitEntity::class,
+        EslatmaEntity::class,
+        SkladEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class DaftarDatabase : RoomDatabase() {
@@ -62,6 +66,8 @@ abstract class DaftarDatabase : RoomDatabase() {
     abstract fun clientLimitDao(): ClientLimitDao
     abstract fun clientDao(): ClientDao
     abstract fun deletedTxDao(): DeletedTransactionDao
+    abstract fun eslatmaDao(): uz.daftar.app.data.db.dao.EslatmaDao
+    abstract fun skladDao(): uz.daftar.app.data.db.dao.SkladDao
 
     companion object {
         const val NAME = "daftar.db"

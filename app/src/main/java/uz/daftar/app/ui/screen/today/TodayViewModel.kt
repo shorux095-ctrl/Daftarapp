@@ -2,6 +2,7 @@ package uz.daftar.app.ui.screen.today
 
 import uz.daftar.app.core.util.formatMoney
 import uz.daftar.app.core.util.formatQty
+import uz.daftar.app.core.util.formatPrice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -148,6 +149,7 @@ class TodayViewModel @Inject constructor(
     private val aiSettings: uz.daftar.app.core.ai.AiSettings,
     private val undoLast: uz.daftar.app.domain.usecase.UndoLastUseCase,
     private val editByMatch: uz.daftar.app.domain.usecase.EditByMatchUseCase,
+    private val chatStore: uz.daftar.app.core.chat.ChatStore,
     private val setYukNarx: uz.daftar.app.domain.usecase.SetYukNarxUseCase
 ) : ViewModel() {
 
@@ -163,7 +165,7 @@ class TodayViewModel @Inject constructor(
     private val DELETE_X_RE = Regex("""^(\d{1,2}\.\d{1,2})\s+x$|^x\s+(\d{1,2}\.\d{1,2})$""")
 
     init {
-        seedTodayChat()
+        restoreChat()
         // Tezkor shablonlarni kuzatish
         viewModelScope.launch {
             templateStore.templates.collectLatest { list ->
@@ -249,6 +251,71 @@ class TodayViewModel @Inject constructor(
     private fun nextChatId(): Long = ++chatIdCounter
     private fun appendChat(vararg items: ChatItem) {
         _state.update { it.copy(chat = it.chat + items.toList()) }
+        persistChat()
+    }
+
+    /** Chatni telefonga saqlaydi (matn ko'rinishida). */
+    private fun persistChat() {
+        val snapshot = _state.value.chat
+        viewModelScope.launch {
+            runCatching { chatStore.save(serializeChat(snapshot)) }
+        }
+    }
+
+    private fun serializeChat(chat: List<ChatItem>): String {
+        val arr = org.json.JSONArray()
+        for (c in chat) {
+            val pair: Pair<Boolean, String> = when (c) {
+                is ChatItem.User -> true to c.text
+                is ChatItem.Info -> false to c.text
+                is ChatItem.TextRep -> false to "${c.report.title}\n${c.report.body}"
+                is ChatItem.History -> false to historySnapshot(c.preview)
+                is ChatItem.DateRep -> continue
+            }
+            arr.put(org.json.JSONObject().put("u", pair.first).put("t", pair.second))
+        }
+        return arr.toString()
+    }
+
+    private fun deserializeChat(json: String): List<ChatItem> {
+        val arr = org.json.JSONArray(json)
+        val list = mutableListOf<ChatItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val u = o.optBoolean("u", false)
+            val t = o.optString("t", "")
+            if (t.isBlank()) continue
+            val id = nextChatId()
+            list.add(if (u) ChatItem.User(id, t) else ChatItem.Info(id, t))
+        }
+        return list
+    }
+
+    /** Tarix kartasini matnga aylantiradi (saqlash uchun). */
+    private fun historySnapshot(p: ClientPreview): String {
+        val sb = StringBuilder()
+        sb.append("👤 ${p.name.replaceFirstChar { it.uppercase() }} — tarix\n")
+        sb.append("💳 Qarz: ${p.debt.formatMoney()} so'm")
+        val ym = p.month.toString() // yyyy-MM
+        val monthTxs = p.transactions.filter { it.date.take(7) == ym }.sortedBy { it.date }
+        for (tx in monthTxs) {
+            val price = p.priceByTx[tx.id]
+            val priceStr = if (price == null) "(narx yo'q)" else "× ${price.formatPrice()}"
+            val d = tx.date
+            val dm = if (d.length >= 10) "${d.substring(8, 10)}.${d.substring(5, 7)}" else d
+            sb.append("\n$dm  ${tx.type.uppercase()}: ${tx.amount.formatQty()} $priceStr")
+        }
+        return sb.toString()
+    }
+
+    /** Ilova ochilganda saqlangan chatni tiklaydi (qayta generatsiya yo'q). */
+    private fun restoreChat() {
+        viewModelScope.launch {
+            val json = runCatching { chatStore.load() }.getOrDefault("")
+            if (json.isBlank()) return@launch
+            val list = runCatching { deserializeChat(json) }.getOrDefault(emptyList())
+            if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
+        }
     }
 
     // ── t1set parser ──
@@ -326,16 +393,21 @@ class TodayViewModel @Inject constructor(
     /** Chatdagi bitta xabarni o'chirish (✕ tugma) */
     fun removeChat(id: Long) {
         _state.update { it.copy(chat = it.chat.filterNot { c -> c.id == id }) }
+        persistChat()
     }
 
-    /** Chatdagi tarix kartasida oyni surish (⬅️/➡️) */
+    /** Chatdagi tarix kartasida oyni surish (⬅️/➡️) — DB'dan yangi ma'lumot tortadi */
     fun shiftHistoryMonth(id: Long, delta: Int) {
-        _state.update { st ->
-            st.copy(chat = st.chat.map { c ->
-                if (c is ChatItem.History && c.id == id)
-                    c.copy(preview = c.preview.copy(month = c.preview.month.plusMonths(delta.toLong())))
-                else c
-            })
+        val item = _state.value.chat.firstOrNull { it is ChatItem.History && it.id == id } as? ChatItem.History ?: return
+        val newMonth = item.preview.month.plusMonths(delta.toLong())
+        viewModelScope.launch {
+            val fresh = buildClientPreview(item.preview.name, newMonth) ?: item.preview.copy(month = newMonth)
+            _state.update { st ->
+                st.copy(chat = st.chat.map { c ->
+                    if (c is ChatItem.History && c.id == id) c.copy(preview = fresh) else c
+                })
+            }
+            persistChat()
         }
     }
 
@@ -847,40 +919,46 @@ class TodayViewModel @Inject constructor(
                 val list = mutableListOf<ClientPreview>()
                 for (line in nameLines) {
                     val cn = DaftarParser.normalizeName(line)
-                    val history = runCatching { getHistory(userId, cn) }.getOrNull() ?: continue
-                    if (history.transactions.isEmpty()) continue
-                    val allPrices = priceDao.getAllForClient(userId, cn)
-                    val pricesByType = allPrices.groupBy { it.priceType }
-                    val priceByTx = mutableMapOf<Long, Double?>()
-                    for (tx in history.transactions) {
-                        priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
-                    }
-                    val asc = history.transactions.sortedBy { it.date }
-                    var running = 0.0
-                    val balAfter = mutableMapOf<Long, Long>()
-                    for (tx in asc) {
-                        when (tx.type.lowercase()) {
-                            "p" -> { running -= tx.amount; balAfter[tx.id] = running.toLong() }
-                            "q" -> running += tx.amount
-                            else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
-                        }
-                    }
-                    list.add(
-                        ClientPreview(
-                            name = line,
-                            debt = history.debt,
-                            transactions = history.transactions.sortedByDescending { tx -> tx.date },
-                            priceByTx = priceByTx,
-                            balanceAfter = balAfter,
-                            month = existingMonths[cn] ?: java.time.YearMonth.now()
-                        )
-                    )
+                    val month = existingMonths[cn] ?: java.time.YearMonth.now()
+                    val cp = buildClientPreview(line, month) ?: continue
+                    list.add(cp)
                 }
                 _state.update { it.copy(previews = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(previews = emptyList()) }
             }
         }
+    }
+
+    /** Mijoz tarixini DB'dan yangi tortib ClientPreview quradi (qayta ishlatiladi). */
+    private suspend fun buildClientPreview(displayName: String, month: java.time.YearMonth): ClientPreview? {
+        val cn = DaftarParser.normalizeName(displayName)
+        val history = runCatching { getHistory(userId, cn) }.getOrNull() ?: return null
+        if (history.transactions.isEmpty()) return null
+        val allPrices = priceDao.getAllForClient(userId, cn)
+        val pricesByType = allPrices.groupBy { it.priceType }
+        val priceByTx = mutableMapOf<Long, Double?>()
+        for (tx in history.transactions) {
+            priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
+        }
+        val asc = history.transactions.sortedBy { it.date }
+        var running = 0.0
+        val balAfter = mutableMapOf<Long, Long>()
+        for (tx in asc) {
+            when (tx.type.lowercase()) {
+                "p" -> { running -= tx.amount; balAfter[tx.id] = running.toLong() }
+                "q" -> running += tx.amount
+                else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
+            }
+        }
+        return ClientPreview(
+            name = displayName,
+            debt = history.debt,
+            transactions = history.transactions.sortedByDescending { tx -> tx.date },
+            priceByTx = priceByTx,
+            balanceAfter = balAfter,
+            month = month
+        )
     }
 
     private fun findPriceAtDate(prices: List<uz.daftar.app.data.db.entity.PriceHistoryEntity>?, atDate: String): Double? {

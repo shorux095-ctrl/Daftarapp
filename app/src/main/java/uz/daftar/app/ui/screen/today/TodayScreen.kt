@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
@@ -122,6 +123,8 @@ fun TodayScreen(
     onManager: () -> Unit = onSettings,
     onDashboard: () -> Unit = onSettings,
     onHelp: () -> Unit = onSettings,
+    onEslat: () -> Unit = onSettings,
+    onSklad: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -175,6 +178,8 @@ fun TodayScreen(
                     onManager = onManager,
                     onDashboard = onDashboard,
                     onHelp = onHelp,
+                    onEslat = onEslat,
+                    onSklad = onSklad,
                     onYukType = { yukTypeDialog = it }
                 )
             }
@@ -383,6 +388,8 @@ private fun ChatTopBar(
     onManager: () -> Unit,
     onDashboard: () -> Unit,
     onHelp: () -> Unit,
+    onEslat: () -> Unit,
+    onSklad: () -> Unit,
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -489,6 +496,17 @@ private fun ChatTopBar(
                         text = { Text("💸 Rasxod") },
                         leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
                         onClick = { menuOpen = false; onRasxod() }
+                    )
+                    // ── SKLAD / ESLAT ──
+                    DropdownMenuItem(
+                        text = { Text("📦 Sklad (ombor)") },
+                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
+                        onClick = { menuOpen = false; onSklad() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("⏰ Eslat (bildirishnoma)") },
+                        leadingIcon = { Icon(Icons.Outlined.Notifications, null) },
+                        onClick = { menuOpen = false; onEslat() }
                     )
                     HorizontalDivider()
                     // ── YORDAM (edit / alias) ──
@@ -1159,8 +1177,22 @@ private fun ChatBotBubble(text: String) {
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.widthIn(max = 330.dp)
         ) {
+            val marker = "(narx yo'q)"
+            val errColor = MaterialTheme.colorScheme.error
+            val annotated = androidx.compose.ui.text.buildAnnotatedString {
+                var start = 0
+                while (true) {
+                    val idx = text.indexOf(marker, start)
+                    if (idx < 0) { append(text.substring(start)); break }
+                    append(text.substring(start, idx))
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) {
+                        append(marker)
+                    }
+                    start = idx + marker.length
+                }
+            }
             Text(
-                text,
+                annotated,
                 modifier = Modifier.padding(12.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace

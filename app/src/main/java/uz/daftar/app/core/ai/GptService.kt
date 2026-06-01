@@ -81,10 +81,18 @@ class GptService @Inject constructor(
         val code = conn.responseCode
         val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
             ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-        if (code !in 200..299) return Out.Err("xato $code")
+        if (code !in 200..299) return Out.Err(errMsg(resp, code))
         val text = JSONObject(resp).optJSONArray("choices")
             ?.optJSONObject(0)?.optJSONObject("message")?.optString("content")?.trim().orEmpty()
         return if (text.isBlank()) Out.Err("bo'sh javob") else Out.Ok(text)
+    }
+
+    /** Xato javobidan haqiqiy sababni ajratadi (Google/OpenAI: error.message). */
+    private fun errMsg(resp: String, code: Int): String {
+        val m = runCatching {
+            JSONObject(resp).getJSONObject("error").optString("message")
+        }.getOrNull()
+        return if (m.isNullOrBlank()) "xato $code" else "$m"
     }
 
     private fun callGemini(p: AiProvider, key: String, prompt: String): Out {
@@ -97,7 +105,7 @@ class GptService @Inject constructor(
         val code = conn.responseCode
         val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
             ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-        if (code !in 200..299) return Out.Err("xato $code")
+        if (code !in 200..299) return Out.Err(errMsg(resp, code))
         val text = JSONObject(resp).optJSONArray("candidates")
             ?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
             ?.optJSONObject(0)?.optString("text")?.trim().orEmpty()
