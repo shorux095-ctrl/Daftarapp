@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
 import androidx.compose.material.icons.outlined.Notifications
@@ -82,6 +84,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -129,6 +133,8 @@ fun TodayScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val calScope = rememberCoroutineScope()
+    var showCalendar by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -151,6 +157,35 @@ fun TodayScreen(
         }
     }
 
+    val jumpToDate: (java.time.LocalDate) -> Unit = { target ->
+        val idx = state.chat.indexOfFirst {
+            java.time.Instant.ofEpochMilli(it.ts)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate() == target
+        }
+        if (idx >= 0) calScope.launch { listState.animateScrollToItem(idx) }
+    }
+
+    if (showCalendar) {
+        val dpState = androidx.compose.material3.rememberDatePickerState()
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { showCalendar = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val ms = dpState.selectedDateMillis
+                    showCalendar = false
+                    if (ms != null) {
+                        val target = java.time.Instant.ofEpochMilli(ms)
+                            .atZone(java.time.ZoneId.of("UTC")).toLocalDate()
+                        jumpToDate(target)
+                    }
+                }) { Text("Ko'rish") }
+            },
+            dismissButton = { TextButton(onClick = { showCalendar = false }) { Text("Bekor") } }
+        ) {
+            androidx.compose.material3.DatePicker(state = dpState)
+        }
+    }
+
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
@@ -164,6 +199,8 @@ fun TodayScreen(
                 ChatTopBar(
                     filter = state.filter,
                     onFilterChange = vm::setFilter,
+                    onOpenCalendar = { showCalendar = true },
+                    onJumpToDate = jumpToDate,
                     onClients = onClients,
                     onQarz = onQarz,
                     onReports = onReports,
@@ -298,28 +335,33 @@ fun TodayScreen(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(state.chat, key = { it.id }) { item ->
-                        when (item) {
-                            is ChatItem.User -> ChatUserBubble(item.text)
-                            is ChatItem.Info -> ChatBotBubble(item.text)
-                            is ChatItem.DateRep -> DateReportCard(
-                                report = item.report,
-                                onClose = { vm.removeChat(item.id) }
-                            )
-                            is ChatItem.TextRep -> TextReportCard(
-                                report = item.report,
-                                onClose = { vm.removeChat(item.id) }
-                            )
-                            is ChatItem.History -> PreviewHistoryCard(
-                                name = item.preview.name,
-                                debt = item.preview.debt,
-                                allTxs = item.preview.transactions,
-                                priceByTx = item.preview.priceByTx,
-                                balanceAfter = item.preview.balanceAfter,
-                                month = item.preview.month,
-                                onPrev = { vm.shiftHistoryMonth(item.id, -1) },
-                                onNext = { vm.shiftHistoryMonth(item.id, 1) }
-                            )
+                    itemsIndexed(state.chat, key = { _, it -> it.id }) { index, item ->
+                        val prevTs = if (index == 0) null else state.chat[index - 1].ts
+                        val showHeader = prevTs == null || !isSameDay(prevTs, item.ts)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            if (showHeader) ChatDateSeparator(item.ts)
+                            when (item) {
+                                is ChatItem.User -> ChatUserBubble(item.text)
+                                is ChatItem.Info -> ChatBotBubble(item.text)
+                                is ChatItem.DateRep -> DateReportCard(
+                                    report = item.report,
+                                    onClose = { vm.removeChat(item.id) }
+                                )
+                                is ChatItem.TextRep -> TextReportCard(
+                                    report = item.report,
+                                    onClose = { vm.removeChat(item.id) }
+                                )
+                                is ChatItem.History -> PreviewHistoryCard(
+                                    name = item.preview.name,
+                                    debt = item.preview.debt,
+                                    allTxs = item.preview.transactions,
+                                    priceByTx = item.preview.priceByTx,
+                                    balanceAfter = item.preview.balanceAfter,
+                                    month = item.preview.month,
+                                    onPrev = { vm.shiftHistoryMonth(item.id, -1) },
+                                    onNext = { vm.shiftHistoryMonth(item.id, 1) }
+                                )
+                            }
                         }
                     }
                 }
@@ -390,6 +432,8 @@ private fun ChatTopBar(
     onHelp: () -> Unit,
     onEslat: () -> Unit,
     onSklad: () -> Unit,
+    onOpenCalendar: () -> Unit = {},
+    onJumpToDate: (java.time.LocalDate) -> Unit = {},
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -400,25 +444,16 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = { Text("Daftar", fontWeight = FontWeight.SemiBold) },
         actions = {
-            // Filter dropdown (Bugun/Kecha/Yuk/Hammasi)
-            Box {
-                AssistChip(
-                    onClick = { filterOpen = true },
-                    label = { Text(filter.label) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
-                DropdownMenu(expanded = filterOpen, onDismissRequest = { filterOpen = false }) {
-                    Filter.entries.forEach { f ->
-                        DropdownMenuItem(
-                            text = { Text(f.label) },
-                            onClick = { onFilterChange(f); filterOpen = false }
-                        )
-                    }
-                }
+            // Bugun / Kecha / Kalendar — sana bo'yicha o'tish
+            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Bugun")
             }
-            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now().minusDays(1)) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Kecha")
+            }
+            IconButton(onClick = onOpenCalendar) {
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = "Kalendar")
+            }
             // Asosiy menu — 3 nuqta
             Box {
                 IconButton(onClick = { menuOpen = true }) {
@@ -1155,6 +1190,40 @@ private fun PreviewHistoryCard(
                     Text("Keyingi ➡️")
                 }
             }
+        }
+    }
+}
+
+private fun isSameDay(a: Long, b: Long): Boolean {
+    val z = java.time.ZoneId.systemDefault()
+    return java.time.Instant.ofEpochMilli(a).atZone(z).toLocalDate() ==
+           java.time.Instant.ofEpochMilli(b).atZone(z).toLocalDate()
+}
+
+@Composable
+private fun ChatDateSeparator(ts: Long) {
+    val z = java.time.ZoneId.systemDefault()
+    val d = java.time.Instant.ofEpochMilli(ts).atZone(z).toLocalDate()
+    val today = java.time.LocalDate.now()
+    val label = when (d) {
+        today -> "Bugun"
+        today.minusDays(1) -> "Kecha"
+        else -> d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                label,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
         }
     }
 }
