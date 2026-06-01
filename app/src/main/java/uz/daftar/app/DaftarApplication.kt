@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import uz.daftar.app.core.notify.AutoReportWorker
 import uz.daftar.app.core.notify.DebtReminderWorker
 import uz.daftar.app.core.notify.createReminderChannel
 import java.util.Calendar
@@ -28,6 +29,28 @@ class DaftarApplication : Application(), Configuration.Provider {
         super.onCreate()
         createReminderChannel(this)
         scheduleDailyReminder()
+        scheduleDailyAutoReport()
+    }
+
+    /** Har kuni 08:00 — zaxira + kechagi/haftalik/oylik hisobot */
+    private fun scheduleDailyAutoReport() {
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 8)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val delay = target.timeInMillis - now.timeInMillis
+        val request = PeriodicWorkRequestBuilder<AutoReportWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "daily_auto_report",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
     }
 
     /** Har kuni 11:00 da qarz eslatma ishini rejalashtiradi */

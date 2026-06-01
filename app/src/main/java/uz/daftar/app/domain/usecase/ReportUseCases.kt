@@ -231,10 +231,12 @@ private suspend fun findPriceForReport(
     priceDao: PriceHistoryDao,
     yukDao: YukNarxDao
 ): Double? {
+    // Kun darajasida: shu kunning oxirigacha — bugun qo'yilgan narx bugungi yuklarga ham tegishli
+    val dayEnd = date.take(10) + " 23:59:59"
     // 1) Client uchun N narx
-    val nPrice = priceDao.getPriceAt(userId, clientName, type, date)
+    val nPrice = priceDao.getPriceAt(userId, clientName, type, dayEnd)
     if (nPrice != null) return nPrice
-    val nNext = priceDao.getNextPrice(userId, clientName, type, date)
+    val nNext = priceDao.getNextPrice(userId, clientName, type, dayEnd)
     if (nNext != null) return nNext
     // 2) Global T narx
     val tEntry = yukDao.getLatestGlobal(userId, type, "t") ?: return null
@@ -359,7 +361,7 @@ class GetOverdueDebtorsUseCase @Inject constructor(
         if (prices.isNullOrEmpty()) return null
         var best: uz.daftar.app.data.db.entity.PriceHistoryEntity? = null
         for (p in prices) {
-            if (p.date <= at) best = p else break
+            if (p.date.take(10) <= at.take(10)) best = p else break
         }
         return best?.price ?: prices.firstOrNull()?.price
     }

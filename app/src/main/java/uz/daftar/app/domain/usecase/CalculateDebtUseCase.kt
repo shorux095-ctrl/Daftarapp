@@ -72,6 +72,7 @@ class CalculateDebtUseCase @Inject constructor(
         return prices.firstOrNull()?.price
     }
 
-    /** ISO sana stringlarini taqqoslash (alfabit tartibi xronologik) */
-    private fun compareDates(a: String, b: String): Int = a.compareTo(b)
+    /** ISO sana stringlarini KUN darajasida taqqoslash (soat e'tiborga olinmaydi).
+     *  Shunda bugun qo'yilgan narx bugungi (oldinroq soatdagi) yuklarga ham tatbiq etiladi. */
+    private fun compareDates(a: String, b: String): Int = a.take(10).compareTo(b.take(10))
 }

@@ -104,6 +104,20 @@ fun HelpScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 Cmd("Ali a100 b200 n a20 t1a")
                 Body("t1a — faqat A yuki T1 tarifda hisoblanadi, B esa T da. Foyda = N − (T yoki T1). Qarzga ta'sir qilmaydi.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("t1set Ali c       •   t1aset Ali")
+                Body("Mavjud yozuvlarni T1 ga o'tkazadi:\n• t1set Ali c — bugungi Ali C yuklari\n• t1set Ali c 15.05 — shu kun\n• t1set Ali 22.05 — shu kun barchasi\n• t1set Ali c 01.05-15.05 — oraliq\n• t1aset/t1bset/t1cset Ali — faqat A/B/C\n• Ko'p qatorli (sana 1-qatorda): hammasiga o'sha sana")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("✏️ Tuzatish (tahrir)") {
+                Cmd("edit ali a10 a15")
+                Body("Mijozning A:10 yozuvini A:15 ga o'zgartiradi (eng oxirgi mos yozuv).")
+                Spacer(Modifier.height(6.dp))
+                Cmd("undo   •   bekor")
+                Body("Eng oxirgi saqlangan yozuvni bekor qiladi.")
+                Spacer(Modifier.height(6.dp))
+                Body("Narxni o'zgartirish: shunchaki yangi narx yozing — \"ali n a25\". Bugungi va keyingi yuklarga shu narx amal qiladi.")
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
@@ -115,6 +129,20 @@ fun HelpScreen(onBack: () -> Unit) {
 
             Section("🧭 Menyu") {
                 Body("📊 Dashboard — foyda grafigi (oylik/yillik)\n📦 Yuk hisoboti — pul va soni\n🗂 Zaxira / Backup — ma'lumotni saqlash/tiklash\n🔍 Qidirish — tez qidiruv")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("🤖 GPT (sun'iy intellekt)") {
+                Cmd("gpt kalit <provider> <KALIT>")
+                Body("Provayderlar: gemini, groq, cerebras, openrouter. Bir nechtasini qo'shing — biri limitga yetsa, avtomatik keyingisi ishlaydi (ko'proq limit). Kalitlar faqat telefoningizda.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("gpt <savol>   •   prognoz")
+                Body("Biznesingiz bo'yicha aniq javob (\"gpt eng ko'p qarzdor kim?\"). prognoz — keyingi oy taxmini.\n\nBepul: aistudio.google.com/apikey, console.groq.com, cloud.cerebras.ai, openrouter.ai")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("🔔 Avtomatik bildirishnomalar") {
+                Body("Ilova o'zi telefonga eslatma yuboradi (yopiq bo'lsa ham):\n• Har kuni 08:00 — kechagi hisobot + DB zaxira\n• Har dushanba — haftalik xulosa\n• Oy 1-kuni — o'tgan oy hisoboti + umumiy qarz\n• Har kuni 11:00 — qarz eslatma (7+ kun)\n\nBirinchi ochishda bildirishnoma ruxsatini bering.")
             }
             Spacer(Modifier.height(24.dp))
         }

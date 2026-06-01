@@ -1180,7 +1180,7 @@ private fun TextReportCard(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1196,7 +1196,7 @@ private fun TextReportCard(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
                 Text(
                     report.body,
                     style = MaterialTheme.typography.bodyLarge,
@@ -1221,7 +1221,7 @@ private fun DateReportCard(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
     ) {
-        Column(modifier = Modifier.padding(14.dp).fillMaxSize()) {
+        Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
             // Sarlavha + yopish
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -1249,7 +1249,7 @@ private fun DateReportCard(
             val scroll = rememberScrollState()
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .heightIn(max = 340.dp)
                     .verticalScroll(scroll)
             ) {
                 for ((idx, line) in report.clientLines.withIndex()) {

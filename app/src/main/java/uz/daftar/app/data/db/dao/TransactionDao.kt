@@ -35,8 +35,20 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("SELECT * FROM transactions WHERE user_id = :userId ORDER BY id DESC LIMIT 1")
+    suspend fun getLast(userId: Long): TransactionEntity?
+
+    @Query("DELETE FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND date = :date")
+    suspend fun deleteSave(userId: Long, clientName: String, date: String): Int
+
     @Query("DELETE FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName)")
     suspend fun deleteByClient(userId: Long, clientName: String): Int
+
+    @Query("UPDATE transactions SET cost_tier = :tier WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND date >= :start AND date < :end")
+    suspend fun setTierAll(userId: Long, clientName: String, start: String, end: String, tier: String?): Int
+
+    @Query("UPDATE transactions SET cost_tier = :tier WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND type = :type AND date >= :start AND date < :end")
+    suspend fun setTierType(userId: Long, clientName: String, type: String, start: String, end: String, tier: String?): Int
 
     /** Sana oralig'idagi barcha yozuvlar — kunlik/oylik hisobotlar uchun. */
     @Query("""
