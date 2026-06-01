@@ -44,9 +44,11 @@ class GptService @Inject constructor(
         val errors = StringBuilder()
         for (p in configured) {
             val key = ai.getKey(p.id)
-            val res = runCatching {
+            val res: Out = try {
                 if (p.kind == "gemini") callGemini(p, key, prompt) else callOpenAi(p, key, prompt)
-            }.getOrElse { Result.failure(it.message ?: "xato") }
+            } catch (e: Exception) {
+                Out.Err(e.message ?: "xato")
+            }
             when (res) {
                 is Out.Ok -> return@withContext res.text
                 is Out.Err -> errors.append("• ${p.displayName}: ${res.msg}\n")
@@ -59,9 +61,6 @@ class GptService @Inject constructor(
         data class Ok(val text: String) : Out()
         data class Err(val msg: String) : Out()
     }
-
-    private fun Result<Out>.getOrElse(block: (Throwable) -> Out): Out =
-        fold({ it }, { block(it) })
 
     private fun open(urlStr: String): HttpURLConnection =
         (URL(urlStr).openConnection() as HttpURLConnection).apply {
