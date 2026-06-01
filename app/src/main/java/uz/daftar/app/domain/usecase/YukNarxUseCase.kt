@@ -15,7 +15,7 @@ import javax.inject.Inject
 class SetYukNarxUseCase @Inject constructor(
     private val yukNarxDao: YukNarxDao
 ) {
-    suspend operator fun invoke(userId: Long, prices: Map<TxType, Double>) {
+    suspend operator fun invoke(userId: Long, prices: Map<TxType, Double>, group: String = "t") {
         val now = LocalDateTime.now(ZONE).format(ISO)
         for ((type, price) in prices) {
             if (type.code !in setOf("a", "b", "c", "d", "k")) continue
@@ -27,7 +27,7 @@ class SetYukNarxUseCase @Inject constructor(
                     price = price,
                     date = now,
                     oneTime = 0,
-                    priceGroup = "t"
+                    priceGroup = group
                 )
             )
         }
@@ -45,12 +45,12 @@ class SetYukNarxUseCase @Inject constructor(
 class GetCurrentYukNarxUseCase @Inject constructor(
     private val yukNarxDao: YukNarxDao
 ) {
-    suspend operator fun invoke(userId: Long): Map<TxType, Double?> {
-        val result = mutableMapOf<TxType, Double?>()
+    /** Har yuk turi uchun oxirgi global narx yozuvi (narx + sana). group: "t" yoki "t1". */
+    suspend operator fun invoke(userId: Long, group: String = "t"): Map<TxType, YukNarxEntity?> {
+        val result = mutableMapOf<TxType, YukNarxEntity?>()
         for (code in listOf("a", "b", "c", "d", "k")) {
             val type = TxType.fromCode(code) ?: continue
-            val entry = yukNarxDao.getLatestGlobal(userId, code, "t")
-            result[type] = entry?.price
+            result[type] = yukNarxDao.getLatestGlobal(userId, code, group)
         }
         return result
     }

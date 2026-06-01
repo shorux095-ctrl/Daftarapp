@@ -1072,7 +1072,7 @@ private fun PreviewHistoryCard(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             // Sarlavha
@@ -1249,7 +1249,8 @@ private fun ChatUserBubble(text: String) {
 private fun ChatBotBubble(text: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            color = androidx.compose.ui.graphics.Color.White,
+            shadowElevation = 1.dp,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.widthIn(max = 330.dp)
         ) {
@@ -1286,7 +1287,8 @@ private fun TextReportCard(
     Surface(
         modifier = modifier.fillMaxWidth().padding(8.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shadowElevation = 1.dp,
+        color = androidx.compose.ui.graphics.Color.White
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Row(
@@ -1327,7 +1329,7 @@ private fun DateReportCard(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
         Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
             // Sarlavha + yopish

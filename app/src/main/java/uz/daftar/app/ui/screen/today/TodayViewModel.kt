@@ -115,16 +115,17 @@ data class T1SetOp(val client: String, val type: String?, val start: java.time.L
 /** Chat oqimidagi bitta xabar */
 sealed interface ChatItem {
     val id: Long
+    val ts: Long
     /** Foydalanuvchi yozgan matn (o'ng tomon) */
-    data class User(override val id: Long, val text: String) : ChatItem
+    data class User(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Oddiy javob matni — ✅ Saqlandi, narx yangilandi, global narx, xato (chap tomon) */
-    data class Info(override val id: Long, val text: String) : ChatItem
+    data class Info(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Sana hisoboti (chap) */
-    data class DateRep(override val id: Long, val report: uz.daftar.app.domain.usecase.DateReport) : ChatItem
+    data class DateRep(override val id: Long, val report: uz.daftar.app.domain.usecase.DateReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Matnli hisobot: foyda/qarz/eslatma (chap) */
-    data class TextRep(override val id: Long, val report: TextReport) : ChatItem
+    data class TextRep(override val id: Long, val report: TextReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Mijoz tarixi (chap) */
-    data class History(override val id: Long, val preview: ClientPreview) : ChatItem
+    data class History(override val id: Long, val preview: ClientPreview, override val ts: Long = System.currentTimeMillis()) : ChatItem
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -266,20 +267,30 @@ class TodayViewModel @Inject constructor(
         val arr = org.json.JSONArray()
         for (c in chat) {
             val o = org.json.JSONObject()
+            o.put("ts", c.ts)
             when (c) {
                 is ChatItem.User -> { o.put("k", "u"); o.put("t", c.text) }
                 is ChatItem.Info -> { o.put("k", "i"); o.put("t", c.text) }
                 is ChatItem.TextRep -> { o.put("k", "i"); o.put("t", "${c.report.title}\n${c.report.body}") }
+                is ChatItem.DateRep -> { o.put("k", "i"); o.put("t", dateReportText(c.report)) }
                 is ChatItem.History -> {
                     o.put("k", "h")
                     o.put("name", c.preview.name)
                     o.put("month", c.preview.month.toString())
                 }
-                is ChatItem.DateRep -> continue  // sana hisoboti — vaqtinchalik
             }
             arr.put(o)
         }
         return arr.toString()
+    }
+
+    /** Sana hisobotini matnga aylantiradi (saqlash uchun — yo'qolmasin). */
+    private fun dateReportText(r: uz.daftar.app.domain.usecase.DateReport): String {
+        val sb = StringBuilder()
+        sb.append("📅 ${r.title}\n")
+        sb.append("Daromad: ${r.totalRevenue.toLong().formatMoney()} so'm\n")
+        sb.append("To'lov: ${r.totalPayments.toLong().formatMoney()} so'm")
+        return sb.toString()
     }
 
     /** Saqlangan chatni tiklaydi. Tarix to'liq karta sifatida qayta tortiladi. */
@@ -288,19 +299,20 @@ class TodayViewModel @Inject constructor(
         val list = mutableListOf<ChatItem>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            val k = o.optString("k", "i")
+            val k = o.optString("k", if (o.has("u")) { if (o.optBoolean("u")) "u" else "i" } else "i")
+            val ts = o.optLong("ts", System.currentTimeMillis())
             when (k) {
                 "h" -> {
                     val name = o.optString("name", "")
                     val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
                     if (name.isNotBlank()) {
                         val cp = buildClientPreview(name, month)
-                        if (cp != null) list.add(ChatItem.History(nextChatId(), cp))
-                        else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix"))
+                        if (cp != null) list.add(ChatItem.History(nextChatId(), cp, ts))
+                        else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts))
                     }
                 }
-                "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t)) }
-                else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t)) }
+                "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
+                else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
             }
         }
         return list

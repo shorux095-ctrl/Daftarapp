@@ -8,13 +8,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uz.daftar.app.data.db.entity.YukNarxEntity
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.GetCurrentYukNarxUseCase
 import uz.daftar.app.domain.usecase.SetYukNarxUseCase
 import javax.inject.Inject
 
 data class YukNarxState(
-    val current: Map<TxType, Double?> = emptyMap(),
+    val group: String = "t",                       // "t" yoki "t1"
+    val current: Map<TxType, YukNarxEntity?> = emptyMap(),
     val isLoading: Boolean = true,
     val message: String? = null
 )
@@ -31,19 +33,20 @@ class YukNarxViewModel @Inject constructor(
 
     init { refresh() }
 
+    fun setGroup(group: String) {
+        if (group == _state.value.group) return
+        _state.update { it.copy(group = group) }
+        refresh()
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            val current = getCurrent(userId)
+            val current = getCurrent(userId, _state.value.group)
             _state.update { it.copy(current = current, isLoading = false) }
         }
     }
 
-    /**
-     * Yangi T narxlarni saqlash.
-     * input: type → "20" yoki "20.5" formatdagi string.
-     * Bo'sh yoki noto'g'ri stringlar e'tibordan chiqariladi.
-     */
     fun setPrices(input: Map<TxType, String>) {
         val parsed: Map<TxType, Double> = input.mapNotNull { (type, str) ->
             val v = str.trim().replace(",", ".").toDoubleOrNull()
@@ -54,10 +57,11 @@ class YukNarxViewModel @Inject constructor(
             _state.update { it.copy(message = "❌ Hech qanday narx kiritilmadi") }
             return
         }
+        val group = _state.value.group
         viewModelScope.launch {
-            setNarx(userId, parsed)
+            setNarx(userId, parsed, group)
             _state.update {
-                it.copy(message = "✅ ${parsed.size} ta narx saqlandi")
+                it.copy(message = "✅ ${parsed.size} ta ${group.uppercase()} narx saqlandi")
             }
             refresh()
         }

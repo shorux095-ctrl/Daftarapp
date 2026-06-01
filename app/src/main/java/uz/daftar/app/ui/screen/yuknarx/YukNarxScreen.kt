@@ -21,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.data.db.entity.YukNarxEntity
 import uz.daftar.app.domain.model.TxType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,7 +68,7 @@ fun YukNarxScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("🚛 Yuk narxlari (T)") },
+                title = { Text("🚛 Yuk narxlari") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
@@ -84,20 +86,37 @@ fun YukNarxScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            // ── T / T1 tab ──
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.group == "t",
+                    onClick = { vm.setGroup("t"); inputs.clear() },
+                    label = { Text("T narx") }
+                )
+                FilterChip(
+                    selected = state.group == "t1",
+                    onClick = { vm.setGroup("t1"); inputs.clear() },
+                    label = { Text("T1 narx") }
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        "💡 Global T narxlar",
+                        if (state.group == "t") "💡 Global T narx (tannarx)" else "💡 T1 narx (2-tannarx)",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Bu narxlar barcha mijozlar uchun standart hisoblanadi. " +
-                                "Mijozga N narx alohida berilmagan bo'lsa, shu T narx ishlatiladi.",
+                        if (state.group == "t")
+                            "Barcha yuklar uchun standart tannarx. Foyda hisobida ishlatiladi."
+                        else
+                            "Ba'zi yuklarning ikkinchi tannarxi (t1 belgili yuklar uchun). Foydaga ta'sir qiladi.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -106,7 +125,7 @@ fun YukNarxScreen(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                "Hozirgi T narxlar",
+                if (state.group == "t") "Hozirgi T narxlar" else "Hozirgi T1 narxlar",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -114,10 +133,9 @@ fun YukNarxScreen(
 
             val yukTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
             for (type in yukTypes) {
-                val currentPrice = state.current[type]
                 YukNarxRow(
                     type = type,
-                    currentPrice = currentPrice,
+                    entry = state.current[type],
                     value = inputs[type] ?: "",
                     onChange = { inputs[type] = it }
                 )
@@ -129,23 +147,28 @@ fun YukNarxScreen(
             Spacer(Modifier.height(16.dp))
 
             Button(
-                onClick = { vm.setPrices(inputs.toMap()) },
+                onClick = { vm.setPrices(inputs.toMap()); inputs.clear() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = inputs.values.any { it.isNotBlank() }
             ) {
                 Icon(Icons.Outlined.Save, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Saqlash")
+                Text(if (state.group == "t") "T narxni saqlash" else "T1 narxni saqlash")
             }
             Spacer(Modifier.height(16.dp))
         }
     }
 }
 
+/** "yyyy-MM-dd HH:mm:ss" -> "dd.MM HH:mm" */
+private fun fmtDate(d: String): String {
+    return if (d.length >= 16) "${d.substring(8, 10)}.${d.substring(5, 7)} ${d.substring(11, 16)}" else d
+}
+
 @Composable
 private fun YukNarxRow(
     type: TxType,
-    currentPrice: Double?,
+    entry: YukNarxEntity?,
     value: String,
     onChange: (String) -> Unit
 ) {
@@ -161,23 +184,22 @@ private fun YukNarxRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(modifier = Modifier.width(60.dp)) {
-                Text(
-                    type.label,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "narx",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(type.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("narx", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Hozir: ${if (currentPrice != null) "${currentPrice.formatMoney()} so'm" else "—"}",
+                    "Hozir: ${if (entry != null) "${entry.price.formatMoney()} so'm" else "—"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (entry != null) {
+                    Text(
+                        "🕒 Qo'yildi: ${fmtDate(entry.date)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = value,
