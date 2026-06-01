@@ -265,47 +265,45 @@ class TodayViewModel @Inject constructor(
     private fun serializeChat(chat: List<ChatItem>): String {
         val arr = org.json.JSONArray()
         for (c in chat) {
-            val pair: Pair<Boolean, String> = when (c) {
-                is ChatItem.User -> true to c.text
-                is ChatItem.Info -> false to c.text
-                is ChatItem.TextRep -> false to "${c.report.title}\n${c.report.body}"
-                is ChatItem.History -> false to historySnapshot(c.preview)
-                is ChatItem.DateRep -> continue
+            val o = org.json.JSONObject()
+            when (c) {
+                is ChatItem.User -> { o.put("k", "u"); o.put("t", c.text) }
+                is ChatItem.Info -> { o.put("k", "i"); o.put("t", c.text) }
+                is ChatItem.TextRep -> { o.put("k", "i"); o.put("t", "${c.report.title}\n${c.report.body}") }
+                is ChatItem.History -> {
+                    o.put("k", "h")
+                    o.put("name", c.preview.name)
+                    o.put("month", c.preview.month.toString())
+                }
+                is ChatItem.DateRep -> continue  // sana hisoboti — vaqtinchalik
             }
-            arr.put(org.json.JSONObject().put("u", pair.first).put("t", pair.second))
+            arr.put(o)
         }
         return arr.toString()
     }
 
-    private fun deserializeChat(json: String): List<ChatItem> {
+    /** Saqlangan chatni tiklaydi. Tarix to'liq karta sifatida qayta tortiladi. */
+    private suspend fun deserializeChat(json: String): List<ChatItem> {
         val arr = org.json.JSONArray(json)
         val list = mutableListOf<ChatItem>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            val u = o.optBoolean("u", false)
-            val t = o.optString("t", "")
-            if (t.isBlank()) continue
-            val id = nextChatId()
-            list.add(if (u) ChatItem.User(id, t) else ChatItem.Info(id, t))
+            val k = o.optString("k", "i")
+            when (k) {
+                "h" -> {
+                    val name = o.optString("name", "")
+                    val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
+                    if (name.isNotBlank()) {
+                        val cp = buildClientPreview(name, month)
+                        if (cp != null) list.add(ChatItem.History(nextChatId(), cp))
+                        else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix"))
+                    }
+                }
+                "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t)) }
+                else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t)) }
+            }
         }
         return list
-    }
-
-    /** Tarix kartasini matnga aylantiradi (saqlash uchun). */
-    private fun historySnapshot(p: ClientPreview): String {
-        val sb = StringBuilder()
-        sb.append("👤 ${p.name.replaceFirstChar { it.uppercase() }} — tarix\n")
-        sb.append("💳 Qarz: ${p.debt.formatMoney()} so'm")
-        val ym = p.month.toString() // yyyy-MM
-        val monthTxs = p.transactions.filter { it.date.take(7) == ym }.sortedBy { it.date }
-        for (tx in monthTxs) {
-            val price = p.priceByTx[tx.id]
-            val priceStr = if (price == null) "(narx yo'q)" else "× ${price.formatPrice()}"
-            val d = tx.date
-            val dm = if (d.length >= 10) "${d.substring(8, 10)}.${d.substring(5, 7)}" else d
-            sb.append("\n$dm  ${tx.type.uppercase()}: ${tx.amount.formatQty()} $priceStr")
-        }
-        return sb.toString()
     }
 
     /** Ilova ochilganda saqlangan chatni tiklaydi (qayta generatsiya yo'q). */
@@ -919,8 +917,7 @@ class TodayViewModel @Inject constructor(
                 val list = mutableListOf<ClientPreview>()
                 for (line in nameLines) {
                     val cn = DaftarParser.normalizeName(line)
-                    val month = existingMonths[cn] ?: java.time.YearMonth.now()
-                    val cp = buildClientPreview(line, month) ?: continue
+                    val cp = buildClientPreview(line, existingMonths[cn]) ?: continue
                     list.add(cp)
                 }
                 _state.update { it.copy(previews = list) }
@@ -930,11 +927,18 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /** Mijoz tarixini DB'dan yangi tortib ClientPreview quradi (qayta ishlatiladi). */
-    private suspend fun buildClientPreview(displayName: String, month: java.time.YearMonth): ClientPreview? {
+    /** Mijoz tarixini DB'dan yangi tortib ClientPreview quradi. month=null bo'lsa — ma'lumot bor eng oxirgi oy. */
+    private suspend fun buildClientPreview(displayName: String, month: java.time.YearMonth?): ClientPreview? {
         val cn = DaftarParser.normalizeName(displayName)
         val history = runCatching { getHistory(userId, cn) }.getOrNull() ?: return null
         if (history.transactions.isEmpty()) return null
+        // Oy ko'rsatilmagan bo'lsa — yozuv bor eng oxirgi oyni tanlaymiz (bo'sh oy ochilmasin)
+        val effMonth = month ?: run {
+            val latest = history.transactions.maxByOrNull { it.date }?.date
+            if (latest != null && latest.length >= 7)
+                runCatching { java.time.YearMonth.parse(latest.take(7)) }.getOrNull() ?: java.time.YearMonth.now()
+            else java.time.YearMonth.now()
+        }
         val allPrices = priceDao.getAllForClient(userId, cn)
         val pricesByType = allPrices.groupBy { it.priceType }
         val priceByTx = mutableMapOf<Long, Double?>()
@@ -957,7 +961,7 @@ class TodayViewModel @Inject constructor(
             transactions = history.transactions.sortedByDescending { tx -> tx.date },
             priceByTx = priceByTx,
             balanceAfter = balAfter,
-            month = month
+            month = effMonth
         )
     }
 

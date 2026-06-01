@@ -425,6 +425,13 @@ private fun ChatTopBar(
                     Icon(Icons.Outlined.MoreVert, contentDescription = "Menyu")
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    // ── SOZLAMA (tepada — oson topish uchun) ──
+                    DropdownMenuItem(
+                        text = { Text("⚙️ Sozlamalar") },
+                        leadingIcon = { Icon(Icons.Outlined.Settings, null) },
+                        onClick = { menuOpen = false; onSettings() }
+                    )
+                    HorizontalDivider()
                     // ── YUKLAR (bosganda A B C D K) ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuklar") },

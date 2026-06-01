@@ -81,13 +81,17 @@ class ClientHistoryViewModel @Inject constructor(
                     }
                 }
 
+                val latestMonth = h.transactions.maxByOrNull { it.date }?.date?.let { d ->
+                    if (d.length >= 7) runCatching { YearMonth.parse(d.take(7)) }.getOrNull() else null
+                }
                 _state.update {
                     it.copy(
                         isLoading = false,
                         debt = h.debt,
                         transactions = h.transactions.sortedByDescending { tx -> tx.date },
                         priceByTx = priceByTx,
-                        balanceAfterPayment = balAfterPay
+                        balanceAfterPayment = balAfterPay,
+                        selectedMonth = latestMonth ?: it.selectedMonth
                     )
                 }
             } catch (e: Exception) {
