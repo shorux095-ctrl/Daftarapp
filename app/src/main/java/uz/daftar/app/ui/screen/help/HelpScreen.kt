@@ -71,6 +71,30 @@ fun HelpScreen(onBack: () -> Unit) {
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
+            Section("📊 Tahlil") {
+                Cmd("solishtir")
+                Body("Shu oy ↔ o'tgan oy: daromad, foyda, to'lov, sof foyda (🔼🔽 farqi bilan).")
+                Spacer(Modifier.height(6.dp))
+                Cmd("foyda top   •   top 5")
+                Body("foyda top — eng ko'p foyda bergan mijozlar (shu yil). top 5 — eng katta 5 qarzdor.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("faol   •   nofaol")
+                Body("Oxirgi 30 kunda harakat bor (faol) yoki yo'q (nofaol) mijozlar.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("qarz tahlil ali")
+                Body("Mijoz qarzi oyma-oy qanday o'sgani + hozirgi qarz.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("💲 Narx ko'rish") {
+                Cmd("narx tarix")
+                Body("Hozirgi T va T1 narxlar + qachon qo'yilgani (sana, vaqt).")
+                Spacer(Modifier.height(6.dp))
+                Cmd("narx korish ali")
+                Body("Mijozning N narxlari + qachon qo'yilgani.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
             Section("📅 Kunlik / sana hisoboti") {
                 Cmd("bugun   •   kecha   •   30.05")
                 Body("Tanlangan kun hisoboti (T narx, J jami). Hafta uchun ☰ menyuda 📆 Hafta.")
