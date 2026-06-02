@@ -18,11 +18,19 @@ class ChatStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val chatKey = stringPreferencesKey("chat_json")
+    private val lastReportKey = stringPreferencesKey("last_report_date")
 
     suspend fun load(): String =
         context.chatDataStore.data.map { it[chatKey] ?: "" }.first()
 
     suspend fun save(json: String) {
         context.chatDataStore.edit { it[chatKey] = json }
+    }
+
+    suspend fun getLastReportDate(): String =
+        context.chatDataStore.data.map { it[lastReportKey] ?: "" }.first()
+
+    suspend fun setLastReportDate(date: String) {
+        context.chatDataStore.edit { it[lastReportKey] = date }
     }
 }

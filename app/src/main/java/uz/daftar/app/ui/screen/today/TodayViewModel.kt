@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.daftar.app.core.parser.DaftarParser
@@ -151,7 +152,8 @@ class TodayViewModel @Inject constructor(
     private val undoLast: uz.daftar.app.domain.usecase.UndoLastUseCase,
     private val editByMatch: uz.daftar.app.domain.usecase.EditByMatchUseCase,
     private val chatStore: uz.daftar.app.core.chat.ChatStore,
-    private val setYukNarx: uz.daftar.app.domain.usecase.SetYukNarxUseCase
+    private val setYukNarx: uz.daftar.app.domain.usecase.SetYukNarxUseCase,
+    private val getCurrentYukNarx: uz.daftar.app.domain.usecase.GetCurrentYukNarxUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -272,7 +274,16 @@ class TodayViewModel @Inject constructor(
                 is ChatItem.User -> { o.put("k", "u"); o.put("t", c.text) }
                 is ChatItem.Info -> { o.put("k", "i"); o.put("t", c.text) }
                 is ChatItem.TextRep -> { o.put("k", "i"); o.put("t", "${c.report.title}\n${c.report.body}") }
-                is ChatItem.DateRep -> { o.put("k", "i"); o.put("t", dateReportText(c.report)) }
+                is ChatItem.DateRep -> {
+                    // Bitta kunlik hisobot — sana saqlanib, ochilganda to'liq tortiladi (tarixdek)
+                    if (c.report.title.contains("–")) {
+                        o.put("k", "i"); o.put("t", dateReportText(c.report))  // haftalik/oylik — matn
+                    } else {
+                        o.put("k", "d")
+                        o.put("date", c.report.date.toString())
+                        o.put("narx", c.report.useNarx)
+                    }
+                }
                 is ChatItem.History -> {
                     o.put("k", "h")
                     o.put("name", c.preview.name)
@@ -284,12 +295,25 @@ class TodayViewModel @Inject constructor(
         return arr.toString()
     }
 
-    /** Sana hisobotini matnga aylantiradi (saqlash uchun — yo'qolmasin). */
+    /** Sana hisobotini to'liq matnga aylantiradi (saqlash uchun — yo'qolmasin). */
     private fun dateReportText(r: uz.daftar.app.domain.usecase.DateReport): String {
         val sb = StringBuilder()
-        sb.append("📅 ${r.title}\n")
-        sb.append("Daromad: ${r.totalRevenue.toLong().formatMoney()} so'm\n")
-        sb.append("To'lov: ${r.totalPayments.toLong().formatMoney()} so'm")
+        sb.append("📅 ${r.title}")
+        r.clientLines.forEachIndexed { i, cl ->
+            val parts = cl.entries.joinToString("  ") { e ->
+                val p = if (e.price != null) " [${e.price.formatPrice()}]" else ""
+                "${e.type.code.uppercase()}:${e.amount.formatQty()}$p"
+            }
+            sb.append("\n${i + 1}. ${cl.clientName}  $parts")
+        }
+        sb.append("\n— JAMI —")
+        for ((type, amt) in r.totalsByType) {
+            if (amt == 0.0) continue
+            val rev = r.revenueByType[type] ?: 0.0
+            sb.append("\n${type.code.uppercase()} ${amt.formatQty()} = ${rev.toLong().formatMoney()} so'm")
+        }
+        sb.append("\nDaromad: ${r.totalRevenue.toLong().formatMoney()} so'm")
+        sb.append("\nTo'lov: ${r.totalPayments.toLong().formatMoney()} so'm")
         return sb.toString()
     }
 
@@ -311,6 +335,15 @@ class TodayViewModel @Inject constructor(
                         else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts))
                     }
                 }
+                "d" -> {
+                    val ds = o.optString("date")
+                    val narx = o.optBoolean("narx", false)
+                    val date = runCatching { LocalDate.parse(ds) }.getOrNull()
+                    if (date != null) {
+                        val r = runCatching { getDateReport(userId, date, null, narx) }.getOrNull()
+                        if (r != null) list.add(ChatItem.DateRep(nextChatId(), r, ts))
+                    }
+                }
                 "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
                 else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
             }
@@ -322,10 +355,53 @@ class TodayViewModel @Inject constructor(
     private fun restoreChat() {
         viewModelScope.launch {
             val json = runCatching { chatStore.load() }.getOrDefault("")
-            if (json.isBlank()) return@launch
-            val list = runCatching { deserializeChat(json) }.getOrDefault(emptyList())
-            if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
+            if (json.isNotBlank()) {
+                val list = runCatching { deserializeChat(json) }.getOrDefault(emptyList())
+                if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
+            }
+            runCatching { maybeShowAutoReports() }
         }
+    }
+
+    /** Kuniga bir marta: kechagi (+ dushanba haftalik, 1-sanada oylik) hisobotni chatga qo'yadi. */
+    private suspend fun maybeShowAutoReports() {
+        val today = LocalDate.now()
+        val last = runCatching { chatStore.getLastReportDate() }.getOrDefault("")
+        if (last == today.toString()) return
+
+        // Kechagi hisobot
+        runCatching {
+            val y = today.minusDays(1)
+            val r = getDateReport(userId, y, null, false)
+            if (r.clientLines.isNotEmpty() || r.totalPayments > 0) {
+                appendChat(ChatItem.Info(nextChatId(), "🗓 Kechagi hisobot\n" + dateReportText(r)))
+            }
+        }
+        // Dushanba — o'tgan haftalik
+        if (today.dayOfWeek == java.time.DayOfWeek.MONDAY) {
+            runCatching {
+                val prevMon = today.minusWeeks(1).with(java.time.DayOfWeek.MONDAY)
+                val prevSun = prevMon.plusDays(6)
+                val r = getDateReport.range(userId, prevMon, prevSun, null, false)
+                if (r.clientLines.isNotEmpty() || r.totalPayments > 0) {
+                    appendChat(ChatItem.Info(nextChatId(), "📅 Haftalik hisobot\n" + dateReportText(r)))
+                }
+            }
+        }
+        // Oyning 1-sanasi — o'tgan oylik
+        if (today.dayOfMonth == 1) {
+            runCatching {
+                val prev = today.minusMonths(1)
+                val r = getMonthlyReport(userId, prev.year, prev.monthValue)
+                val txt = "📆 Oylik hisobot (${prev.monthValue}.${prev.year})\n" +
+                        "Daromad: ${r.revenue.toLong().formatMoney()} so'm\n" +
+                        "Foyda: ${r.grossProfit.toLong().formatMoney()} so'm\n" +
+                        "To'lov: ${r.payments.toLong().formatMoney()} so'm\n" +
+                        "Sof foyda: ${r.profit.toLong().formatMoney()} so'm"
+                appendChat(ChatItem.Info(nextChatId(), txt))
+            }
+        }
+        runCatching { chatStore.setLastReportDate(today.toString()) }
     }
 
     // ── t1set parser ──
@@ -517,7 +593,8 @@ class TodayViewModel @Inject constructor(
         val nameCap = first.clientName.replaceFirstChar { it.uppercase() }
         val sb = StringBuilder()
         sb.append("✅ Saqlandi\n")
-        sb.append("📅 ").append(first.date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))).append("\n")
+        sb.append("📅 ").append(first.date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")))
+            .append("      🕒 ").append(java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))).append("\n")
         sb.append(nameCap).append("\n")
         for (tx in txs) {
             when (tx.type) {
@@ -648,6 +725,52 @@ class TodayViewModel @Inject constructor(
                 loadOverdue()
                 return
             }
+            "solishtir", "solishtirish", "taqqosla" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadCompare(); return
+            }
+            "foyda top", "top foyda" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadProfitTop(); return
+            }
+            "top", "top 5", "top5", "qarzdor top" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadTopDebtors(); return
+            }
+            "faol" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadActivity(true); return
+            }
+            "nofaol", "g'oyib" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadActivity(false); return
+            }
+            "narx tarix", "t tarix", "narxlar" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadPriceHistory(); return
+            }
+        }
+
+        // "qarz tahlil <mijoz>" — bitta mijoz qarzi tahlili
+        run {
+            val tk = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (tk.size >= 3 && tk[0] == "qarz" && tk[1] == "tahlil") {
+                val name = tk.drop(2).joinToString(" ")
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadDebtAnalysis(name); return
+            }
+            // "narx korish <mijoz>" yoki "narx <mijoz>"
+            if (tk.size >= 2 && tk[0] == "narx") {
+                if (tk[1] == "tarix" || tk[1] == "tarixi") {
+                    _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                    loadPriceHistory(); return
+                }
+                val name = (if (tk[1] == "korish") tk.drop(2) else tk.drop(1)).joinToString(" ")
+                if (name.isNotBlank()) {
+                    _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                    loadClientPrices(name); return
+                }
+            }
         }
 
         // "<mijoz> foyda" — mijoz foydasi (oylik+yillik)
@@ -733,8 +856,9 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             appendChat(ChatItem.User(nextChatId(), label))
             val report = runCatching { getDateReport(userId, date, null, useNarx) }.getOrNull()
-            if (report != null) appendChat(ChatItem.DateRep(nextChatId(), report))
-            else appendChat(ChatItem.Info(nextChatId(), "Hisobot topilmadi"))
+            if (report != null && (report.clientLines.isNotEmpty() || report.totalPayments > 0))
+                appendChat(ChatItem.DateRep(nextChatId(), report))
+            else appendChat(ChatItem.Info(nextChatId(), "❌ $label — bu kunda yozuv yo'q"))
             _state.update { it.copy(input = "", parsed = emptyList(), errorMessage = null) }
         }
     }
@@ -756,6 +880,179 @@ class TodayViewModel @Inject constructor(
     /** Sana hisobotини yopish */
     fun clearDateReport() {
         _state.update { it.copy(dateReport = null, pinnedView = false) }
+    }
+
+    /** "solishtir" — shu oy vs o'tgan oy */
+    private fun loadCompare() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val now = LocalDate.now()
+                val cur = getMonthlyReport(userId, now.year, now.monthValue)
+                val pm = now.minusMonths(1)
+                val prev = getMonthlyReport(userId, pm.year, pm.monthValue)
+                fun line(label: String, a: Long, b: Long): String {
+                    val diff = a - b
+                    val arrow = if (diff > 0) "🔼" else if (diff < 0) "🔽" else "➡️"
+                    return "$label\n  Shu oy: ${a.formatMoney()}\n  O'tgan: ${b.formatMoney()}\n  $arrow ${diff.formatMoney()}"
+                }
+                val body = listOf(
+                    line("💰 Daromad", cur.revenue, prev.revenue),
+                    line("📈 Foyda", cur.grossProfit, prev.grossProfit),
+                    line("💳 To'lov", cur.payments, prev.payments),
+                    line("✅ Sof foyda", cur.profit, prev.profit)
+                ).joinToString("\n\n")
+                _state.update { it.copy(textReport = TextReport("📊 Solishtirish (${pm.monthValue}.${pm.year} ↔ ${now.monthValue}.${now.year})", body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "foyda top" — eng ko'p foyda bergan mijozlar (shu yil) */
+    private fun loadProfitTop() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val names = runCatching { repo.observeClientNames(userId).first() }.getOrDefault(emptyList())
+                val rows = mutableListOf<Pair<String, Long>>()
+                for (n in names) {
+                    val p = runCatching { getClientProfit(userId, n).totalThisYear }.getOrDefault(0L)
+                    if (p != 0L) rows.add(n to p)
+                }
+                rows.sortByDescending { it.second }
+                val body = if (rows.isEmpty()) "Ma'lumot yo'q."
+                else rows.take(10).mapIndexed { i, (n, p) -> "${i + 1}. ${n.replaceFirstChar { it.uppercase() }} — ${p.formatMoney()} so'm" }.joinToString("\n")
+                _state.update { it.copy(textReport = TextReport("🏆 Foyda — top mijozlar (shu yil)", body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "top 5" — eng katta qarzdorlar */
+    private fun loadTopDebtors() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val list = getOverdue(userId).sortedByDescending { it.debt }.take(5)
+                val body = if (list.isEmpty()) "Qarzdor yo'q 🎉"
+                else list.mapIndexed { i, d -> "${i + 1}. ${d.client.replaceFirstChar { it.uppercase() }} — ${d.debt.formatMoney()} so'm (${d.daysOverdue} kun)" }.joinToString("\n")
+                _state.update { it.copy(textReport = TextReport("🔝 Top 5 qarzdor", body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "faol" / "nofaol" — oxirgi 30 kunda harakat bor/yo'q mijozlar */
+    private fun loadActivity(active: Boolean) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val names = runCatching { repo.observeClientNames(userId).first() }.getOrDefault(emptyList())
+                val limit = LocalDate.now().minusDays(30).toString()  // "yyyy-MM-dd"
+                val rows = mutableListOf<Pair<String, String>>()
+                for (n in names) {
+                    val cn = DaftarParser.normalizeName(n)
+                    val h = runCatching { getHistory(userId, cn) }.getOrNull() ?: continue
+                    val last = h.transactions.maxByOrNull { it.date }?.date ?: continue
+                    val isActive = last.take(10) >= limit
+                    if (isActive == active) rows.add(n to last.take(10))
+                }
+                rows.sortByDescending { it.second }
+                val title = if (active) "🟢 Faol mijozlar (30 kun)" else "🔴 Nofaol mijozlar (30+ kun)"
+                val body = if (rows.isEmpty()) "Mijoz yo'q."
+                else rows.take(20).joinToString("\n") { (n, d) ->
+                    val dm = if (d.length >= 10) "${d.substring(8, 10)}.${d.substring(5, 7)}.${d.substring(0, 4)}" else d
+                    "• ${n.replaceFirstChar { it.uppercase() }} — oxirgi: $dm"
+                }
+                _state.update { it.copy(textReport = TextReport(title, body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "narx tarix" — hozirgi T va T1 narxlar + qachon qo'yilgani */
+    private fun loadPriceHistory() {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                fun fmt(d: String) = if (d.length >= 16) "${d.substring(8, 10)}.${d.substring(5, 7)} ${d.substring(11, 16)}" else d
+                val sb = StringBuilder()
+                for (group in listOf("t", "t1")) {
+                    sb.append(if (group == "t") "— T narx —\n" else "\n— T1 narx —\n")
+                    val cur = getCurrentYukNarx(userId, group)
+                    var any = false
+                    for ((type, e) in cur) {
+                        if (e != null) {
+                            sb.append("${type.code.uppercase()}: ${e.price.formatMoney()} so'm  🕒 ${fmt(e.date)}\n")
+                            any = true
+                        }
+                    }
+                    if (!any) sb.append("  — yo'q\n")
+                }
+                _state.update { it.copy(textReport = TextReport("💲 Narx tarixi", sb.toString().trim())) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "narx korish <mijoz>" — mijozning N narxlari */
+    private fun loadClientPrices(name: String) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val cn = DaftarParser.normalizeName(name)
+                val all = priceDao.getAllForClient(userId, cn)
+                fun fmt(d: String) = if (d.length >= 16) "${d.substring(8, 10)}.${d.substring(5, 7)} ${d.substring(11, 16)}" else d
+                val body = if (all.isEmpty()) "Bu mijozga alohida narx qo'yilmagan (global T narx ishlatiladi)."
+                else all.groupBy { it.priceType }.toSortedMap().map { (type, list) ->
+                    val latest = list.maxByOrNull { it.date }!!
+                    "${type.uppercase()}: ${latest.price.formatMoney()} so'm  🕒 ${fmt(latest.date)}"
+                }.joinToString("\n")
+                _state.update { it.copy(textReport = TextReport("💲 ${name.replaceFirstChar { it.uppercase() }} — narxlari", body)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "qarz tahlil <mijoz>" — oylar bo'yicha qarz qanday o'sgani */
+    private fun loadDebtAnalysis(name: String) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val cp = buildClientPreview(name, null)
+                if (cp == null) {
+                    _state.update { it.copy(textReport = TextReport("📉 $name", "Bu mijozda yozuv yo'q.")) }
+                    return@launch
+                }
+                val byMonth = sortedMapOf<String, Double>()
+                for (tx in cp.transactions.sortedBy { it.date }) {
+                    val ym = tx.date.take(7)
+                    val delta = when (tx.type.lowercase()) {
+                        "p" -> -tx.amount
+                        "q" -> tx.amount
+                        else -> (cp.priceByTx[tx.id] ?: 0.0) * tx.amount
+                    }
+                    byMonth[ym] = (byMonth[ym] ?: 0.0) + delta
+                }
+                var running = 0.0
+                val sb = StringBuilder()
+                for ((ym, delta) in byMonth) {
+                    running += delta
+                    val sign = if (delta >= 0) "+" else ""
+                    sb.append("$ym:  $sign${delta.toLong().formatMoney()}  →  jami ${running.toLong().formatMoney()}\n")
+                }
+                sb.append("\n💳 Hozirgi qarz: ${cp.debt.formatMoney()} so'm")
+                _state.update { it.copy(textReport = TextReport("📉 ${name.replaceFirstChar { it.uppercase() }} — qarz tahlili", sb.toString())) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
     }
 
     /** Matnli hisobotни yopish */

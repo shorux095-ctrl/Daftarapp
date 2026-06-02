@@ -28,8 +28,10 @@ class DaftarApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createReminderChannel(this)
-        scheduleDailyReminder()
-        scheduleDailyAutoReport()
+        // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
+        // Foydalanuvchi qo'ygan "Eslat" eslatmalari ishlashda davom etadi (alohida ishlaydi).
+        // scheduleDailyReminder()
+        // scheduleDailyAutoReport()
     }
 
     /** Har kuni 08:00 — zaxira + kechagi/haftalik/oylik hisobot */

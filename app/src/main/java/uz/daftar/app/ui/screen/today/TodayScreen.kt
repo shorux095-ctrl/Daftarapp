@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
 import androidx.compose.material.icons.outlined.Notifications
@@ -163,6 +164,7 @@ fun TodayScreen(
                 .atZone(java.time.ZoneId.systemDefault()).toLocalDate() == target
         }
         if (idx >= 0) calScope.launch { listState.animateScrollToItem(idx) }
+        else calScope.launch { snackbar.showSnackbar("Bu kunda yozuv yo'q") }
     }
 
     if (showCalendar) {
@@ -176,7 +178,7 @@ fun TodayScreen(
                     if (ms != null) {
                         val target = java.time.Instant.ofEpochMilli(ms)
                             .atZone(java.time.ZoneId.of("UTC")).toLocalDate()
-                        jumpToDate(target)
+                        vm.showDateReportButton(target)
                     }
                 }) { Text("Ko'rish") }
             },
@@ -443,30 +445,13 @@ private fun ChatTopBar(
 
     CenterAlignedTopAppBar(
         title = { Text("Daftar", fontWeight = FontWeight.SemiBold) },
-        actions = {
-            // Bugun / Kecha / Kalendar — sana bo'yicha o'tish
-            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("Bugun")
-            }
-            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now().minusDays(1)) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("Kecha")
-            }
-            IconButton(onClick = onOpenCalendar) {
-                Icon(Icons.Outlined.CalendarMonth, contentDescription = "Kalendar")
-            }
-            // Asosiy menu — 3 nuqta
+        navigationIcon = {
+            // Asosiy menu — chapda hamburger (☰)
             Box {
                 IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "Menyu")
+                    Icon(Icons.Filled.Menu, contentDescription = "Menyu")
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    // ── SOZLAMA (tepada — oson topish uchun) ──
-                    DropdownMenuItem(
-                        text = { Text("⚙️ Sozlamalar") },
-                        leadingIcon = { Icon(Icons.Outlined.Settings, null) },
-                        onClick = { menuOpen = false; onSettings() }
-                    )
-                    HorizontalDivider()
                     // ── YUKLAR (bosganda A B C D K) ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuklar") },
@@ -482,7 +467,6 @@ private fun ChatTopBar(
                             )
                         }
                     }
-                    // ── YUK HISOBOTI (T/N/P/Farq jadval) ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuk hisoboti") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
@@ -493,7 +477,6 @@ private fun ChatTopBar(
                         leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
                         onClick = { menuOpen = false; onNReport() }
                     )
-                    // ── MIJOZ ──
                     DropdownMenuItem(
                         text = { Text("👥 Mijozlar") },
                         leadingIcon = { Icon(Icons.Outlined.People, null) },
@@ -509,7 +492,6 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onSearch() }
                     )
                     HorizontalDivider()
-                    // ── HISOBOTLAR (T narx / N narx, oylik/yillik) ──
                     DropdownMenuItem(
                         text = { Text("📊 Hisobotlar") },
                         leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
@@ -521,25 +503,21 @@ private fun ChatTopBar(
                         DropdownMenuItem(text = { Text("     🏷 N narx hisobot") }, onClick = { menuOpen = false; onReports() })
                         DropdownMenuItem(text = { Text("     📅 Oylik / Yillik") }, onClick = { menuOpen = false; onReports() })
                     }
-                    // ── NARX ──
                     DropdownMenuItem(
                         text = { Text("🚛 Narx (T)") },
                         leadingIcon = { Icon(Icons.Outlined.LocalShipping, null) },
                         onClick = { menuOpen = false; onYukNarx() }
                     )
-                    // ── SOF FOYDA ──
                     DropdownMenuItem(
                         text = { Text("📈 Sof foyda") },
                         leadingIcon = { Icon(Icons.Outlined.TrendingUp, null) },
                         onClick = { menuOpen = false; onReports() }
                     )
-                    // ── RASXOD ──
                     DropdownMenuItem(
                         text = { Text("💸 Rasxod") },
                         leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
                         onClick = { menuOpen = false; onRasxod() }
                     )
-                    // ── SKLAD / ESLAT ──
                     DropdownMenuItem(
                         text = { Text("📦 Sklad (ombor)") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
@@ -551,7 +529,6 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onEslat() }
                     )
                     HorizontalDivider()
-                    // ── YORDAM (edit / alias) ──
                     DropdownMenuItem(
                         text = { Text("🔁 Alias / Nomini o'zgartirish") },
                         leadingIcon = { Icon(Icons.Outlined.AutoFixHigh, null) },
@@ -563,7 +540,6 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onKarzina() }
                     )
                     HorizontalDivider()
-                    // ── DASHBOARD ──
                     DropdownMenuItem(
                         text = { Text("📊 Dashboard") },
                         leadingIcon = { Icon(Icons.Outlined.BarChart, null) },
@@ -574,19 +550,28 @@ private fun ChatTopBar(
                         leadingIcon = { Icon(Icons.Outlined.HelpOutline, null) },
                         onClick = { menuOpen = false; onHelp() }
                     )
-                    // ── ZAXIRA (BACKUP) ──
                     DropdownMenuItem(
                         text = { Text("🗂 Zaxira / Backup") },
                         leadingIcon = { Icon(Icons.Outlined.Backup, null) },
                         onClick = { menuOpen = false; onManager() }
                     )
-                    // ── SOZLAMA ──
+                    HorizontalDivider()
+                    // ── SOZLAMA (eng pastda) ──
                     DropdownMenuItem(
                         text = { Text("⚙️ Sozlamalar") },
                         leadingIcon = { Icon(Icons.Outlined.Settings, null) },
                         onClick = { menuOpen = false; onSettings() }
                     )
                 }
+            }
+        },
+        actions = {
+            // Bugun + Kalendar (Kecha olib tashlandi)
+            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Bugun")
+            }
+            IconButton(onClick = onOpenCalendar) {
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = "Kalendar")
             }
         }
     )
@@ -1256,16 +1241,27 @@ private fun ChatBotBubble(text: String) {
         ) {
             val marker = "(narx yo'q)"
             val errColor = MaterialTheme.colorScheme.error
+            val timeColor = MaterialTheme.colorScheme.primary
+            val timeRe = Regex("🕒 \\d{1,2}:\\d{2}")
             val annotated = androidx.compose.ui.text.buildAnnotatedString {
-                var start = 0
-                while (true) {
-                    val idx = text.indexOf(marker, start)
-                    if (idx < 0) { append(text.substring(start)); break }
-                    append(text.substring(start, idx))
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) {
-                        append(marker)
+                var i = 0
+                while (i < text.length) {
+                    val mIdx = text.indexOf(marker, i)
+                    val tm = timeRe.find(text, i)
+                    val tIdx = tm?.range?.first ?: -1
+                    when {
+                        mIdx >= 0 && (tIdx < 0 || mIdx < tIdx) -> {
+                            append(text.substring(i, mIdx))
+                            withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) { append(marker) }
+                            i = mIdx + marker.length
+                        }
+                        tIdx >= 0 -> {
+                            append(text.substring(i, tIdx))
+                            withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tm!!.value) }
+                            i = tIdx + tm.value.length
+                        }
+                        else -> { append(text.substring(i)); i = text.length }
                     }
-                    start = idx + marker.length
                 }
             }
             Text(
