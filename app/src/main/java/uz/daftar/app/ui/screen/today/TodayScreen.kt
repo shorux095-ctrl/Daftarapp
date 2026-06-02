@@ -1256,9 +1256,10 @@ private fun ChatBotBubble(text: String) {
                             i = mIdx + marker.length
                         }
                         tIdx >= 0 -> {
+                            val tv = tm!!.value
                             append(text.substring(i, tIdx))
-                            withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tm!!.value) }
-                            i = tIdx + tm.value.length
+                            withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tv) }
+                            i = tIdx + tv.length
                         }
                         else -> { append(text.substring(i)); i = text.length }
                     }
