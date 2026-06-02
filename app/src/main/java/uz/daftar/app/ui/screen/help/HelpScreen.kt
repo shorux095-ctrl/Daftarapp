@@ -95,6 +95,32 @@ fun HelpScreen(onBack: () -> Unit) {
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
+            Section("💸 Rasxod") {
+                Cmd("r100 gaz     •     r 300 aka moshinga")
+                Body("Xarajat yozish: r + summa + izoh. Masalan r20 non.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("rasxod     •     rasxod oy     •     rasxod yil")
+                Body("Bugungi / oylik / yillik xarajatlar ro'yxati + JAMI.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+            Section("🗑 O'chirish") {
+                Cmd("x ali")
+                Body("Bugungi Ali yozuvlarini o'chiradi. x ali a — faqat A turini.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("01.06 x ali     •     01.06 x ali a")
+                Body("01.06 dagi Ali yozuvlari (yoki faqat A turi).")
+                Spacer(Modifier.height(6.dp))
+                Cmd("01.06 x     •     delete 02.06     •     delete bugun")
+                Body("O'sha kunning BARCHA yozuvlari. Ha/Yo'q so'raydi.")
+                Spacer(Modifier.height(6.dp))
+                Cmd("ochir ali")
+                Body("Ali'ning BUTUN tarixini (barcha sanalar) o'chiradi. Ha/Yo'q so'raydi.")
+                Spacer(Modifier.height(6.dp))
+                Body("Eslatma: chatdagi kartani uzoq bossangiz — faqat ekrandan o'chadi, ma'lumot saqlanadi.")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
             Section("📅 Kunlik / sana hisoboti") {
                 Cmd("bugun   •   kecha   •   30.05")
                 Body("Tanlangan kun hisoboti (T narx, J jami). Hafta uchun ☰ menyuda 📆 Hafta.")

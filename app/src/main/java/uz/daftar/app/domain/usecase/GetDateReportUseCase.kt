@@ -81,10 +81,12 @@ class GetDateReportUseCase @Inject constructor(
             nPricesByClient[cl] = m
         }
 
-        // Global T narxlar
+        // Global T narxlar (T va T1)
         val tPrices = mutableMapOf<String, Double?>()
+        val t1Prices = mutableMapOf<String, Double?>()
         for (t in cargoTypes) {
             tPrices[t] = yukNarxDao.getLatestGlobal(userId, t, "t")?.price
+            t1Prices[t] = yukNarxDao.getLatestGlobal(userId, t, "t1")?.price
         }
 
         fun effectivePrice(tx: TransactionEntity): Double? {
@@ -93,8 +95,8 @@ class GetDateReportUseCase @Inject constructor(
                 // N narx (sotilgan narx): mijoz N narxи → global T
                 nPricesByClient[tx.clientName.lowercase()]?.get(t) ?: tPrices[t]
             } else {
-                // T narx (J): bir martalik T override → global T
-                tx.tOverride ?: tPrices[t]
+                // T narx (J): bir martalik T override → T1 tarif → global T
+                tx.tOverride ?: if (tx.costTier == "t1") (t1Prices[t] ?: tPrices[t]) else tPrices[t]
             }
         }
 

@@ -45,6 +45,18 @@ class TransactionRepository @Inject constructor(
         ids.forEach { txDao.deleteById(it) }
     }
 
+    /** Bir kunning BARCHA yozuvlarini o'chirish (faqat shu sana). Nechta o'chgani qaytadi. */
+    suspend fun deleteByDate(userId: Long, date: LocalDate): Int {
+        val start = "$date 00:00:00"
+        val end = "${date.plusDays(1)} 00:00:00"
+        return txDao.deleteByDateRange(userId, start, end)
+    }
+
+    /** Bitta mijozning BARCHA yozuvlarini o'chirish (butun tarix). Nechta o'chgani qaytadi. */
+    suspend fun deleteByClientAll(userId: Long, clientName: String): Int {
+        return txDao.deleteByClient(userId, clientName)
+    }
+
     /** Mijoz nomi takliflar — autocomplete uchun */
     suspend fun suggestClients(userId: Long, prefix: String): List<String> {
         if (prefix.isBlank()) return emptyList()

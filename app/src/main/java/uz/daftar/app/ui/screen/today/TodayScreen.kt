@@ -169,6 +169,38 @@ fun TodayScreen(
         else calScope.launch { snackbar.showSnackbar("Bu kunda yozuv yo'q") }
     }
 
+    state.confirmDeleteDate?.let { d ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelDeleteAll() },
+            title = { Text("⚠️ O'chirishni tasdiqlang") },
+            text = {
+                Text("${d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))} dagi BARCHA yozuvlar o'chiriladi. Bu amalни orqaga qaytarib bo'lmaydi. Davom etilsinmi?")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmDeleteAll() }) {
+                    Text("Ha, o'chir", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { vm.cancelDeleteAll() }) { Text("Yo'q") } }
+        )
+    }
+
+    state.confirmDeleteClient?.let { name ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelDeleteAll() },
+            title = { Text("⚠️ O'chirishni tasdiqlang") },
+            text = {
+                Text("${name.replaceFirstChar { it.uppercase() }} — BUTUN tarixi (barcha sanalar) o'chiriladi. Bu amalни orqaga qaytarib bo'lmaydi. Davom etilsinmi?")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmDeleteClient() }) {
+                    Text("Ha, o'chir", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { vm.cancelDeleteAll() }) { Text("Yo'q") } }
+        )
+    }
+
     if (showCalendar) {
         val dpState = androidx.compose.material3.rememberDatePickerState()
         androidx.compose.material3.DatePickerDialog(
@@ -1254,7 +1286,7 @@ private fun ChatUserBubble(text: String) {
             Text(
                 text,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyLarge
             )
         }
     }
@@ -1298,7 +1330,7 @@ private fun ChatBotBubble(text: String) {
             Text(
                 annotated,
                 modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 fontFamily = FontFamily.Monospace
             )
         }

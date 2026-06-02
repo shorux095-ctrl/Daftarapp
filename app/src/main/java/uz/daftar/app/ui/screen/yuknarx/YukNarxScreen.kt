@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatPrice
 import uz.daftar.app.data.db.entity.YukNarxEntity
 import uz.daftar.app.domain.model.TxType
 
@@ -189,7 +190,7 @@ private fun YukNarxRow(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Hozir: ${if (entry != null) "${entry.price.formatMoney()} so'm" else "—"}",
+                    "Hozir: ${if (entry != null) "${entry.price.formatPrice()} so'm" else "—"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

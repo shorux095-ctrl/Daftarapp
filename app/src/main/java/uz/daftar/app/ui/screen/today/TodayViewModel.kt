@@ -83,6 +83,17 @@ data class TodayUiState(
 
     /** Input "x" o'chirish komandasimi (x / 12.03 x + ismlar) */
     val isDeleteCommand: Boolean = false,
+    /** "delete 02.06" — kun bo'yicha o'chirish (Send bosilganda tasdiq so'raladi) */
+    val deleteAllDate: java.time.LocalDate? = null,
+    /** Tasdiq oynasi ko'rsatilishi kerak bo'lgan sana (Ha/Yo'q) */
+    val confirmDeleteDate: java.time.LocalDate? = null,
+    /** "ochir ali" — mijozning butun tarixini o'chirish (Send → tasdiq) */
+    val deleteClientName: String? = null,
+    /** Tasdiq oynasi ko'rsatilishi kerak bo'lgan mijoz (Ha/Yo'q) */
+    val confirmDeleteClient: String? = null,
+    /** "r100 gaz" — kutilayotgan rasxod (Send → saqlash) */
+    val rasxodAmount: Double? = null,
+    val rasxodNote: String = "",
 
     // ───────── Jonli tarix preview (input'дa ism(lar) yozilganda) ─────────
     /** Topilgan mijozlar ro'yxati — har biri alohida tarix kartasiga ega */
@@ -106,7 +117,7 @@ data class TodayUiState(
     val chat: List<ChatItem> = emptyList()
 ) {
     val isSelectionMode: Boolean get() = selected.isNotEmpty()
-    val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand || isViewCommand || globalPrice != null || t1set != null || aiQuery != null || isEditUndo) && !isSending
+    val canSend: Boolean get() = (parsed.isNotEmpty() || isDeleteCommand || isViewCommand || globalPrice != null || t1set != null || aiQuery != null || isEditUndo || deleteAllDate != null || deleteClientName != null || rasxodAmount != null) && !isSending
 }
 
 data class TextReport(val title: String, val body: String)
@@ -153,7 +164,10 @@ class TodayViewModel @Inject constructor(
     private val editByMatch: uz.daftar.app.domain.usecase.EditByMatchUseCase,
     private val chatStore: uz.daftar.app.core.chat.ChatStore,
     private val setYukNarx: uz.daftar.app.domain.usecase.SetYukNarxUseCase,
-    private val getCurrentYukNarx: uz.daftar.app.domain.usecase.GetCurrentYukNarxUseCase
+    private val getCurrentYukNarx: uz.daftar.app.domain.usecase.GetCurrentYukNarxUseCase,
+    private val addRasxod: uz.daftar.app.domain.usecase.AddRasxodUseCase,
+    private val getRasxodRange: uz.daftar.app.domain.usecase.GetRasxodRangeUseCase,
+    private val getRasxodTotal: uz.daftar.app.domain.usecase.GetRasxodTotalUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -482,6 +496,69 @@ class TodayViewModel @Inject constructor(
         persistChat()
     }
 
+    /** "delete 02.06" / "delete bugun" / "01.06 x" / "x 01.06" — sanani aniqlaydi (aks holda null). */
+    private fun parseDeleteAllDate(text: String): java.time.LocalDate? {
+        val tk = text.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tk.size != 2) return null
+        val today = java.time.LocalDate.now()
+        fun parseDmy(s: String): java.time.LocalDate? {
+            val m = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""").find(s) ?: return null
+            val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
+            val y = m.groupValues[3].let { if (it.isBlank()) today.year else if (it.length == 2) 2000 + it.toInt() else it.toInt() }
+            return runCatching { java.time.LocalDate.of(y, mo, d) }.getOrNull()
+        }
+        // "delete <date>" / "o'chir <date>"
+        if (tk[0] in setOf("delete", "o'chir", "ochir", "tozala")) {
+            return when (tk[1]) {
+                "bugun" -> today
+                "kecha" -> today.minusDays(1)
+                else -> parseDmy(tk[1])
+            }
+        }
+        // "01.06 x" yoki "x 01.06" — butun kun
+        if (tk[1] == "x") return parseDmy(tk[0])
+        if (tk[0] == "x") return parseDmy(tk[1])
+        return null
+    }
+
+    /** Send bosilganda — tasdiq oynasini ochadi (hali o'chirmaydi). */
+    private fun requestDeleteAll() {
+        val d = _state.value.deleteAllDate ?: return
+        _state.update { it.copy(confirmDeleteDate = d, deleteAllDate = null, input = "", parsed = emptyList()) }
+    }
+
+    /** "Yo'q" — bekor qiladi. */
+    fun cancelDeleteAll() { _state.update { it.copy(confirmDeleteDate = null, confirmDeleteClient = null) } }
+
+    /** "Ha" — o'sha kunning BARCHA yozuvlarini o'chiradi (faqat shu sana). */
+    fun confirmDeleteAll() {
+        val d = _state.value.confirmDeleteDate ?: return
+        viewModelScope.launch {
+            val n = runCatching { repo.deleteByDate(userId, d) }.getOrDefault(0)
+            _state.update { it.copy(confirmDeleteDate = null) }
+            val label = d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $label — $n ta yozuv o'chirildi" else "$label — o'chiriladigan yozuv yo'q"))
+        }
+    }
+
+    /** Send bosilganda — mijoz o'chirish tasdig'ini ochadi. */
+    private fun requestDeleteClient() {
+        val name = _state.value.deleteClientName ?: return
+        _state.update { it.copy(confirmDeleteClient = name, deleteClientName = null, input = "", parsed = emptyList()) }
+    }
+
+    /** "Ha" — mijozning BUTUN tarixini o'chiradi. */
+    fun confirmDeleteClient() {
+        val name = _state.value.confirmDeleteClient ?: return
+        viewModelScope.launch {
+            val cn = DaftarParser.normalizeName(name)
+            val n = runCatching { repo.deleteByClientAll(userId, cn) }.getOrDefault(0)
+            _state.update { it.copy(confirmDeleteClient = null) }
+            val disp = name.replaceFirstChar { it.uppercase() }
+            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $disp — butun tarix o'chirildi ($n ta yozuv)" else "$disp — o'chiriladigan yozuv yo'q"))
+        }
+    }
+
     /** Chatdagi tarix kartasida oyni surish (⬅️/➡️) — DB'dan yangi ma'lumot tortadi */
     fun shiftHistoryMonth(id: Long, delta: Int) {
         val item = _state.value.chat.firstOrNull { it is ChatItem.History && it.id == id } as? ChatItem.History ?: return
@@ -627,7 +704,39 @@ class TodayViewModel @Inject constructor(
             return
         }
         // Yangi matn yozilyapti — pin bekor qilinadi (live preview)
-        _state.update { it.copy(pinnedView = false, globalPrice = null, t1set = null, aiQuery = null, isEditUndo = false) }
+        _state.update { it.copy(pinnedView = false, globalPrice = null, t1set = null, aiQuery = null, isEditUndo = false, deleteAllDate = null, deleteClientName = null, rasxodAmount = null) }
+        // "r100 gaz" / "r 100 gaz" — rasxod (xarajat)
+        run {
+            val m = Regex("""^[rR]\s*(\d+(?:[.,]\d+)?)\s*(.*)$""").matchEntire(text.trim())
+            if (m != null) {
+                val amt = m.groupValues[1].replace(",", ".").toDoubleOrNull()
+                if (amt != null && amt > 0) {
+                    _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false, previews = emptyList(), dateReport = null, textReport = null, rasxodAmount = amt, rasxodNote = m.groupValues[2].trim()) }
+                    updateSuggestions("")
+                    return
+                }
+            }
+        }
+        // "delete 02.06" / "o'chir bugun" — kun bo'yicha BARCHA yozuvlarni o'chirish (tasdiq bilan)
+        run {
+            val d = parseDeleteAllDate(text.trim())
+            if (d != null) {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false, previews = emptyList(), dateReport = null, textReport = null, deleteAllDate = d) }
+                updateSuggestions("")
+                return
+            }
+        }
+        // "ochir ali" / "o'chir ali" — mijozning BUTUN tarixini o'chirish (tasdiq bilan)
+        run {
+            val tk = text.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (tk.size >= 2 && tk[0] in setOf("ochir", "o'chir") &&
+                !Regex("""^\d{1,2}\.\d{1,2}.*""").matches(tk[1]) && tk[1] !in setOf("bugun", "kecha")) {
+                val name = tk.drop(1).joinToString(" ")
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false, previews = emptyList(), dateReport = null, textReport = null, deleteClientName = name) }
+                updateSuggestions("")
+                return
+            }
+        }
         // edit / undo / bekor
         run {
             val low = text.trim().lowercase()
@@ -748,6 +857,18 @@ class TodayViewModel @Inject constructor(
             "narx tarix", "t tarix", "narxlar" -> {
                 _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
                 loadPriceHistory(); return
+            }
+            "rasxod", "rasxod bugun", "harajat" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadRasxod("bugun"); return
+            }
+            "rasxod oy", "rasxod oylik" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadRasxod("oy"); return
+            }
+            "rasxod yil", "rasxod yillik" -> {
+                _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), dateReport = null, isDeleteCommand = false, isViewCommand = true) }
+                loadRasxod("yil"); return
             }
         }
 
@@ -987,7 +1108,7 @@ class TodayViewModel @Inject constructor(
                     var any = false
                     for ((type, e) in cur) {
                         if (e != null) {
-                            sb.append("${type.code.uppercase()}: ${e.price.formatMoney()} so'm  🕒 ${fmt(e.date)}\n")
+                            sb.append("${type.code.uppercase()}: ${e.price.formatPrice()} so'm  🕒 ${fmt(e.date)}\n")
                             any = true
                         }
                     }
@@ -1011,7 +1132,7 @@ class TodayViewModel @Inject constructor(
                 val body = if (all.isEmpty()) "Bu mijozga alohida narx qo'yilmagan (global T narx ishlatiladi)."
                 else all.groupBy { it.priceType }.toSortedMap().map { (type, list) ->
                     val latest = list.maxByOrNull { it.date }!!
-                    "${type.uppercase()}: ${latest.price.formatMoney()} so'm  🕒 ${fmt(latest.date)}"
+                    "${type.uppercase()}: ${latest.price.formatPrice()} so'm  🕒 ${fmt(latest.date)}"
                 }.joinToString("\n")
                 _state.update { it.copy(textReport = TextReport("💲 ${name.replaceFirstChar { it.uppercase() }} — narxlari", body)) }
             } catch (e: Exception) {
@@ -1049,6 +1170,32 @@ class TodayViewModel @Inject constructor(
                 }
                 sb.append("\n💳 Hozirgi qarz: ${cp.debt.formatMoney()} so'm")
                 _state.update { it.copy(textReport = TextReport("📉 ${name.replaceFirstChar { it.uppercase() }} — qarz tahlili", sb.toString())) }
+            } catch (e: Exception) {
+                _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
+            }
+        }
+    }
+
+    /** "rasxod" / "rasxod oy" / "rasxod yil" — xarajatlar ro'yxati + JAMI */
+    private fun loadRasxod(period: String) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            try {
+                val today = LocalDate.now()
+                val from: LocalDate; val title: String
+                when (period) {
+                    "oy" -> { from = today.withDayOfMonth(1); title = "💸 Rasxod — ${today.monthValue}.${today.year}" }
+                    "yil" -> { from = today.withDayOfYear(1); title = "💸 Rasxod — ${today.year}-yil" }
+                    else -> { from = today; title = "💸 Rasxod — bugun" }
+                }
+                val list = getRasxodRange(userId, from, today)
+                val total = getRasxodTotal(userId, from, today)
+                val body = if (list.isEmpty()) "Rasxod yo'q."
+                else list.sortedByDescending { it.date }.joinToString("\n") { r ->
+                    val d = if (r.date.length >= 10) "${r.date.substring(8, 10)}.${r.date.substring(5, 7)}" else r.date
+                    "• $d  ${r.amount.toLong().formatMoney()} so'm" + if (r.note.isNotBlank()) " — ${r.note}" else ""
+                } + "\n\n— JAMI: ${total.formatMoney()} so'm"
+                _state.update { it.copy(textReport = TextReport(title, body)) }
             } catch (e: Exception) {
                 _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Xato")) }
             }
@@ -1326,6 +1473,29 @@ class TodayViewModel @Inject constructor(
     fun send() {
         val s = state.value
         val raw = s.input.trim()
+        // 0) "delete 02.06" — tasdiq so'raydi (hali o'chirmaydi)
+        if (s.deleteAllDate != null) {
+            requestDeleteAll()
+            return
+        }
+        // 0b) "ochir ali" — mijoz tarixini o'chirish tasdig'i
+        if (s.deleteClientName != null) {
+            requestDeleteClient()
+            return
+        }
+        // 0c) Rasxod saqlash ("r100 gaz")
+        if (s.rasxodAmount != null) {
+            val amt = s.rasxodAmount
+            val note = s.rasxodNote
+            val typed = s.input.trim()
+            viewModelScope.launch {
+                runCatching { addRasxod(userId, amt, note) }
+                _state.update { it.copy(input = "", parsed = emptyList(), rasxodAmount = null, rasxodNote = "") }
+                appendChat(ChatItem.User(nextChatId(), typed))
+                appendChat(ChatItem.Info(nextChatId(), "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()} so'm" + if (note.isNotBlank()) " — $note" else ""))
+            }
+            return
+        }
         // 1) X-o'chirish komandasi
         if (s.isDeleteCommand) {
             handleDeleteCommand(s.input)

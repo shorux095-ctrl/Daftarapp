@@ -41,6 +41,9 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND date = :date")
     suspend fun deleteSave(userId: Long, clientName: String, date: String): Int
 
+    @Query("DELETE FROM transactions WHERE user_id = :userId AND date >= :start AND date < :end")
+    suspend fun deleteByDateRange(userId: Long, start: String, end: String): Int
+
     @Query("DELETE FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName)")
     suspend fun deleteByClient(userId: Long, clientName: String): Int
 
