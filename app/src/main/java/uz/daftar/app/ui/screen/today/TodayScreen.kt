@@ -98,6 +98,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
@@ -136,6 +137,7 @@ fun TodayScreen(
     val listState = rememberLazyListState()
     val calScope = rememberCoroutineScope()
     var showCalendar by remember { mutableStateOf(false) }
+    var deleteChatId by remember { mutableStateOf<Long?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -342,27 +344,51 @@ fun TodayScreen(
                         val showHeader = prevTs == null || !isSameDay(prevTs, item.ts)
                         Column(modifier = Modifier.fillMaxWidth()) {
                             if (showHeader) ChatDateSeparator(item.ts)
-                            when (item) {
-                                is ChatItem.User -> ChatUserBubble(item.text)
-                                is ChatItem.Info -> ChatBotBubble(item.text)
-                                is ChatItem.DateRep -> DateReportCard(
-                                    report = item.report,
-                                    onClose = { vm.removeChat(item.id) }
+                            Box(
+                                modifier = Modifier.fillMaxWidth().combinedClickable(
+                                    onClick = { if (deleteChatId == item.id) deleteChatId = null },
+                                    onLongClick = { deleteChatId = item.id }
                                 )
-                                is ChatItem.TextRep -> TextReportCard(
-                                    report = item.report,
-                                    onClose = { vm.removeChat(item.id) }
-                                )
-                                is ChatItem.History -> PreviewHistoryCard(
-                                    name = item.preview.name,
-                                    debt = item.preview.debt,
-                                    allTxs = item.preview.transactions,
-                                    priceByTx = item.preview.priceByTx,
-                                    balanceAfter = item.preview.balanceAfter,
-                                    month = item.preview.month,
-                                    onPrev = { vm.shiftHistoryMonth(item.id, -1) },
-                                    onNext = { vm.shiftHistoryMonth(item.id, 1) }
-                                )
+                            ) {
+                                when (item) {
+                                    is ChatItem.User -> ChatUserBubble(item.text)
+                                    is ChatItem.Info -> ChatBotBubble(item.text)
+                                    is ChatItem.DateRep -> DateReportCard(
+                                        report = item.report,
+                                        onClose = { vm.removeChat(item.id) }
+                                    )
+                                    is ChatItem.TextRep -> TextReportCard(
+                                        report = item.report,
+                                        onClose = { vm.removeChat(item.id) }
+                                    )
+                                    is ChatItem.History -> PreviewHistoryCard(
+                                        name = item.preview.name,
+                                        debt = item.preview.debt,
+                                        allTxs = item.preview.transactions,
+                                        priceByTx = item.preview.priceByTx,
+                                        balanceAfter = item.preview.balanceAfter,
+                                        month = item.preview.month,
+                                        onPrev = { vm.shiftHistoryMonth(item.id, -1) },
+                                        onNext = { vm.shiftHistoryMonth(item.id, 1) }
+                                    )
+                                }
+                                if (deleteChatId == item.id) {
+                                    Surface(
+                                        onClick = { vm.removeChat(item.id); deleteChatId = null },
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = androidx.compose.ui.graphics.Color.White)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("O'chirish", color = androidx.compose.ui.graphics.Color.White, fontSize = 13.sp)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -451,7 +477,11 @@ private fun ChatTopBar(
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menyu")
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier.heightIn(max = 460.dp)
+                ) {
                     // ── YUKLAR (bosganda A B C D K) ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuklar") },
