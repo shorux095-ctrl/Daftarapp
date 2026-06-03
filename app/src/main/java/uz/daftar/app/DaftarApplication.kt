@@ -27,9 +27,23 @@ class DaftarApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Global xato tutuvchi — har qanday crash sababini faylga yozadi,
+        // keyingi ochilishda chatda ko'rsatamiz (dasturchiga yuborish uchun).
+        runCatching {
+            val prev = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { t, e ->
+                runCatching {
+                    val sw = java.io.StringWriter()
+                    e.printStackTrace(java.io.PrintWriter(sw))
+                    java.io.File(filesDir, "last_crash.txt").writeText(
+                        "${java.util.Date()}\n${e}\n\n$sw"
+                    )
+                }
+                prev?.uncaughtException(t, e)
+            }
+        }
         createReminderChannel(this)
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
-        // Foydalanuvchi qo'ygan "Eslat" eslatmalari ishlashda davom etadi (alohida ishlaydi).
         // scheduleDailyReminder()
         // scheduleDailyAutoReport()
     }

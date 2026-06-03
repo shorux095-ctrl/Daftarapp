@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -504,36 +506,47 @@ class TodayViewModel @Inject constructor(
         persistChat()
     }
 
-    /** Eski bot CSV (client,type,amount,date,t_override) — ilovaga import qiladi. */
+    /** Oxirgi crash matnini chatda ko'rsatadi (dasturchiga yuborish uchun). */
+    fun showCrashLog(text: String) {
+        appendChat(ChatItem.Info(nextChatId(), "⚠️ Oxirgi xato (shu xabarni skrinshot qilib yuboring):\n\n" + text.take(1800)))
+    }
+
+    /** Eski bot CSV (client,type,amount,date,t_override) — ilovaga import qiladi (fon thread'da). */
     fun importCsv(content: String) {
         viewModelScope.launch {
-            val entities = mutableListOf<uz.daftar.app.data.db.entity.TransactionEntity>()
-            var bad = 0
-            val lines = content.lines()
-            for ((idx, line) in lines.withIndex()) {
-                if (line.isBlank()) continue
-                if (idx == 0 && line.lowercase().startsWith("client")) continue // sarlavha
-                runCatching {
-                    val p = line.split(",")
-                    val client = p.getOrNull(0)?.trim().orEmpty()
-                    val type = p.getOrNull(1)?.trim()?.lowercase().orEmpty()
-                    val amount = p.getOrNull(2)?.trim()?.replace(",", ".")?.toDoubleOrNull()
-                    val date = p.getOrNull(3)?.trim()?.replace("T", " ").orEmpty()
-                    val tov = p.getOrNull(4)?.trim()?.takeIf { it.isNotBlank() }?.replace(",", ".")?.toDoubleOrNull()
-                    if (client.isNotBlank() && type.isNotBlank() && amount != null && date.isNotBlank()) {
-                        entities.add(uz.daftar.app.data.db.entity.TransactionEntity(userId = userId, clientName = client, type = type, amount = amount, date = date, tOverride = tov))
-                    } else bad++
-                }.onFailure { bad++ }
+            val (count, bad) = withContext(Dispatchers.IO) {
+                val entities = mutableListOf<uz.daftar.app.data.db.entity.TransactionEntity>()
+                var b = 0
+                val lines = content.lines()
+                for ((idx, line) in lines.withIndex()) {
+                    if (line.isBlank()) continue
+                    if (idx == 0 && line.lowercase().startsWith("client")) continue
+                    runCatching {
+                        val p = line.split(",")
+                        val client = p.getOrNull(0)?.trim().orEmpty()
+                        val type = p.getOrNull(1)?.trim()?.lowercase().orEmpty()
+                        val amount = p.getOrNull(2)?.trim()?.replace(",", ".")?.toDoubleOrNull()
+                        val date = p.getOrNull(3)?.trim()?.replace("T", " ").orEmpty()
+                        val tov = p.getOrNull(4)?.trim()?.takeIf { it.isNotBlank() }?.replace(",", ".")?.toDoubleOrNull()
+                        if (client.isNotBlank() && type.isNotBlank() && amount != null && date.isNotBlank()) {
+                            entities.add(uz.daftar.app.data.db.entity.TransactionEntity(userId = userId, clientName = client, type = type, amount = amount, date = date, tOverride = tov))
+                        } else b++
+                    }.onFailure { b++ }
+                }
+                runCatching { repo.importTransactions(entities) }
+                entities.size to b
             }
-            runCatching { repo.importTransactions(entities) }
-            appendChat(ChatItem.Info(nextChatId(), "📥 CSV import: ${entities.size} ta yozuv qo'shildi" + if (bad > 0) " ($bad ta o'tkazib yuborildi)" else ""))
+            appendChat(ChatItem.Info(nextChatId(), "📥 CSV import: $count ta yozuv qo'shildi" + if (bad > 0) " ($bad ta o'tkazib yuborildi)" else ""))
         }
     }
 
-    /** Eski bot .db (SQLite) faylini to'liq import qiladi. */
+    /** Eski bot .db (SQLite) faylini to'liq import qiladi (fon thread'da — ilova qotmaydi). */
     fun importDb(path: String) {
         viewModelScope.launch {
-            val r = runCatching { importOldDb(userId, path) }.getOrNull()
+            appendChat(ChatItem.Info(nextChatId(), "⏳ Import boshlandi... (biroz kuting)"))
+            val r = withContext(Dispatchers.IO) {
+                runCatching { importOldDb(userId, path) }.getOrNull()
+            }
             if (r == null || !r.ok) {
                 appendChat(ChatItem.Info(nextChatId(), "❌ Faylni o'qib bo'lmadi. To'g'ri eski bot .db faylini tanlang."))
                 return@launch
