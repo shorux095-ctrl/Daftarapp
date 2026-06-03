@@ -147,10 +147,23 @@ fun TodayScreen(
     val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             calScope.launch {
-                val text = withContext(Dispatchers.IO) {
-                    runCatching { csvContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { r -> r.readText() } }.getOrNull()
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val tmp = java.io.File(csvContext.cacheDir, "import_tmp.bin")
+                        csvContext.contentResolver.openInputStream(uri)?.use { input ->
+                            tmp.outputStream().use { out -> input.copyTo(out) }
+                        }
+                        val header = ByteArray(16)
+                        tmp.inputStream().use { it.read(header) }
+                        if (String(header).startsWith("SQLite format 3")) {
+                            tmp.absolutePath to true   // .db
+                        } else {
+                            tmp.readText() to false     // .csv
+                        }
+                    }.getOrNull()
+                }?.let { (data, isDb) ->
+                    if (isDb) vm.importDb(data) else vm.importCsv(data)
                 }
-                if (!text.isNullOrBlank()) vm.importCsv(text)
             }
         }
     }
@@ -649,7 +662,7 @@ private fun ChatTopBar(
                         onClick = { menuOpen = false; onManager() }
                     )
                     DropdownMenuItem(
-                        text = { Text("📥 CSV import (eski bot)") },
+                        text = { Text("📥 Import (eski bot .db / .csv)") },
                         leadingIcon = { Icon(Icons.Outlined.Backup, null) },
                         onClick = { menuOpen = false; csvLauncher.launch("*/*") }
                     )

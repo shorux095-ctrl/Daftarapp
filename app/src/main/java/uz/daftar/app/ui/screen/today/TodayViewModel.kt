@@ -169,7 +169,8 @@ class TodayViewModel @Inject constructor(
     private val getCurrentYukNarx: uz.daftar.app.domain.usecase.GetCurrentYukNarxUseCase,
     private val addRasxod: uz.daftar.app.domain.usecase.AddRasxodUseCase,
     private val getRasxodRange: uz.daftar.app.domain.usecase.GetRasxodRangeUseCase,
-    private val getRasxodTotal: uz.daftar.app.domain.usecase.GetRasxodTotalUseCase
+    private val getRasxodTotal: uz.daftar.app.domain.usecase.GetRasxodTotalUseCase,
+    private val importOldDb: uz.daftar.app.domain.usecase.ImportOldDbUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -526,6 +527,26 @@ class TodayViewModel @Inject constructor(
             }
             runCatching { repo.importTransactions(entities) }
             appendChat(ChatItem.Info(nextChatId(), "📥 CSV import: ${entities.size} ta yozuv qo'shildi" + if (bad > 0) " ($bad ta o'tkazib yuborildi)" else ""))
+        }
+    }
+
+    /** Eski bot .db (SQLite) faylini to'liq import qiladi. */
+    fun importDb(path: String) {
+        viewModelScope.launch {
+            val r = runCatching { importOldDb(userId, path) }.getOrNull()
+            if (r == null || !r.ok) {
+                appendChat(ChatItem.Info(nextChatId(), "❌ Faylni o'qib bo'lmadi. To'g'ri eski bot .db faylini tanlang."))
+                return@launch
+            }
+            appendChat(ChatItem.Info(nextChatId(),
+                "📥 Import tugadi:\n" +
+                "• Yozuvlar: ${r.tx} ta\n" +
+                "• Narx tarixi: ${r.price} ta\n" +
+                "• Mijoz narxlari: ${r.clientPrice} ta\n" +
+                "• Yuk narx: ${r.yukNarx} ta\n" +
+                "• Rasxod: ${r.rasxod} ta\n" +
+                "• Aliaslar: ${r.alias} ta\n\n" +
+                "Mijozni yozib tekshiring (masalan: ali)."))
         }
     }
 
