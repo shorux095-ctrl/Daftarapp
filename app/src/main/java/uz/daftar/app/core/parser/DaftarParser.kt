@@ -200,6 +200,24 @@ object DaftarParser {
             val type = TxType.fromCode(pl[2].toString())
             if (type != null) { t1Types.add(type); return 1 }
         }
+        // "na" / "nb" ... (2 harf, raqamsiz) → keyingi token shu tur N narxi: "na 20" → N(A)=20
+        if (pl.length == 2 && pl[0] == 'n' && pl[1] in NUM_TYPES) {
+            val type = TxType.fromCode(pl[1].toString())
+            if (type != null && i + 1 < parts.size) {
+                val amt = parts[i + 1].replace(",", ".").toDoubleOrNull()
+                if (amt != null) { clientPrices[type] = amt; return 2 }
+            }
+            return 0
+        }
+        // "ta" / "tb" ... (2 harf, raqamsiz) → keyingi token shu tur T narxi: "ta 25" → T(A)=25
+        if (pl.length == 2 && pl[0] == 't' && pl[1] in NUM_TYPES) {
+            val type = TxType.fromCode(pl[1].toString())
+            if (type != null && i + 1 < parts.size) {
+                val amt = parts[i + 1].replace(",", ".").toDoubleOrNull()
+                if (amt != null) { tPrices[type] = amt; return 2 }
+            }
+            return 0
+        }
         // "na20" / "nb30" — N yakka token
         if (pl.length >= 3 && pl[0] == 'n' && pl[1] in NUM_TYPES) {
             val amt = pl.substring(2).replace(",", ".").toDoubleOrNull()
