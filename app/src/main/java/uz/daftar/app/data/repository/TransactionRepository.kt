@@ -57,6 +57,16 @@ class TransactionRepository @Inject constructor(
         return txDao.deleteByClient(userId, clientName)
     }
 
+    /** Bitta yozuv qo'shish (masalan qarz yopish uchun P to'lov). */
+    suspend fun insertTransaction(tx: uz.daftar.app.data.db.entity.TransactionEntity): Long {
+        return txDao.insert(tx)
+    }
+
+    /** CSV importdan ko'p yozuvni bir vaqtda qo'shish. */
+    suspend fun importTransactions(entities: List<uz.daftar.app.data.db.entity.TransactionEntity>) {
+        if (entities.isNotEmpty()) txDao.insertAll(entities)
+    }
+
     /** Mijoz nomi takliflar — autocomplete uchun */
     suspend fun suggestClients(userId: Long, prefix: String): List<String> {
         if (prefix.isBlank()) return emptyList()

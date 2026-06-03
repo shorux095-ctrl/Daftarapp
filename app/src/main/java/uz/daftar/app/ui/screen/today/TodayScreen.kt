@@ -76,6 +76,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -85,6 +87,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
@@ -136,6 +143,17 @@ fun TodayScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val calScope = rememberCoroutineScope()
+    val csvContext = LocalContext.current
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            calScope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    runCatching { csvContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { r -> r.readText() } }.getOrNull()
+                }
+                if (!text.isNullOrBlank()) vm.importCsv(text)
+            }
+        }
+    }
     var showCalendar by remember { mutableStateOf(false) }
     var deleteChatId by remember { mutableStateOf<Long?>(null) }
     val snackbar = remember { SnackbarHostState() }
@@ -198,6 +216,18 @@ fun TodayScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { vm.cancelDeleteAll() }) { Text("Yo'q") } }
+        )
+    }
+
+    state.confirmCloseDebt?.let { (name, debt) ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelCloseDebt() },
+            title = { Text("💰 Qarzni yopish") },
+            text = {
+                Text("${name.replaceFirstChar { it.uppercase() }} — ${debt} so'm qarz to'liq yopiladi (bugungi sana bilan to'lov yoziladi). Davom etilsinmi?")
+            },
+            confirmButton = { TextButton(onClick = { vm.confirmCloseDebt() }) { Text("Ha, yop") } },
+            dismissButton = { TextButton(onClick = { vm.cancelCloseDebt() }) { Text("Yo'q") } }
         )
     }
 
@@ -401,7 +431,8 @@ fun TodayScreen(
                                         balanceAfter = item.preview.balanceAfter,
                                         month = item.preview.month,
                                         onPrev = { vm.shiftHistoryMonth(item.id, -1) },
-                                        onNext = { vm.shiftHistoryMonth(item.id, 1) }
+                                        onNext = { vm.shiftHistoryMonth(item.id, 1) },
+                                        onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) }
                                     )
                                 }
                                 if (deleteChatId == item.id) {
@@ -616,6 +647,11 @@ private fun ChatTopBar(
                         text = { Text("🗂 Zaxira / Backup") },
                         leadingIcon = { Icon(Icons.Outlined.Backup, null) },
                         onClick = { menuOpen = false; onManager() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📥 CSV import (eski bot)") },
+                        leadingIcon = { Icon(Icons.Outlined.Backup, null) },
+                        onClick = { menuOpen = false; csvLauncher.launch("*/*") }
                     )
                     HorizontalDivider()
                     // ── SOZLAMA (eng pastda) ──
@@ -1084,7 +1120,8 @@ private fun PreviewHistoryCard(
     balanceAfter: Map<Long, Long>,
     month: java.time.YearMonth,
     onPrev: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onCloseDebt: () -> Unit = {}
 ) {
     val monthPrefix = "%04d-%02d".format(month.year, month.monthValue)
     val monthTxs = allTxs.filter { it.date.startsWith(monthPrefix) }
@@ -1235,6 +1272,16 @@ private fun PreviewHistoryCard(
                 }
                 FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                     Text("Keyingi ➡️")
+                }
+            }
+            if (debt > 0) {
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = onCloseDebt,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("💰 Qarzni yopish (${debt.formatMoney()})")
                 }
             }
         }

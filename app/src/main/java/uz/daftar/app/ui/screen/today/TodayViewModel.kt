@@ -94,6 +94,8 @@ data class TodayUiState(
     /** "r100 gaz" — kutilayotgan rasxod (Send → saqlash) */
     val rasxodAmount: Double? = null,
     val rasxodNote: String = "",
+    /** Tarix kartasida "Qarzni yopish" tasdig'i (mijoz nomi + qarz) */
+    val confirmCloseDebt: Pair<String, Long>? = null,
 
     // ───────── Jonli tarix preview (input'дa ism(lar) yozilganda) ─────────
     /** Topilgan mijozlar ro'yxati — har biri alohida tarix kartasiga ega */
@@ -499,6 +501,67 @@ class TodayViewModel @Inject constructor(
     fun removeChat(id: Long) {
         _state.update { it.copy(chat = it.chat.filterNot { c -> c.id == id }) }
         persistChat()
+    }
+
+    /** Eski bot CSV (client,type,amount,date,t_override) — ilovaga import qiladi. */
+    fun importCsv(content: String) {
+        viewModelScope.launch {
+            val entities = mutableListOf<uz.daftar.app.data.db.entity.TransactionEntity>()
+            var bad = 0
+            val lines = content.lines()
+            for ((idx, line) in lines.withIndex()) {
+                if (line.isBlank()) continue
+                if (idx == 0 && line.lowercase().startsWith("client")) continue // sarlavha
+                runCatching {
+                    val p = line.split(",")
+                    val client = p.getOrNull(0)?.trim().orEmpty()
+                    val type = p.getOrNull(1)?.trim()?.lowercase().orEmpty()
+                    val amount = p.getOrNull(2)?.trim()?.replace(",", ".")?.toDoubleOrNull()
+                    val date = p.getOrNull(3)?.trim()?.replace("T", " ").orEmpty()
+                    val tov = p.getOrNull(4)?.trim()?.takeIf { it.isNotBlank() }?.replace(",", ".")?.toDoubleOrNull()
+                    if (client.isNotBlank() && type.isNotBlank() && amount != null && date.isNotBlank()) {
+                        entities.add(uz.daftar.app.data.db.entity.TransactionEntity(userId = userId, clientName = client, type = type, amount = amount, date = date, tOverride = tov))
+                    } else bad++
+                }.onFailure { bad++ }
+            }
+            runCatching { repo.importTransactions(entities) }
+            appendChat(ChatItem.Info(nextChatId(), "📥 CSV import: ${entities.size} ta yozuv qo'shildi" + if (bad > 0) " ($bad ta o'tkazib yuborildi)" else ""))
+        }
+    }
+
+    /** Tarix kartasida "Qarzni yopish" — tasdiq oynasini ochadi (debt > 0 bo'lsa). */
+    fun requestCloseDebt(name: String, debt: Long) {
+        if (debt <= 0) return
+        _state.update { it.copy(confirmCloseDebt = name to debt) }
+    }
+
+    fun cancelCloseDebt() { _state.update { it.copy(confirmCloseDebt = null) } }
+
+    /** "Ha" — qarz miqdorida P (to'lov) yozadi, qarz 0 bo'ladi, hisobotga tushadi. */
+    fun confirmCloseDebt() {
+        val pair = _state.value.confirmCloseDebt ?: return
+        val (name, debt) = pair
+        viewModelScope.launch {
+            val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
+            val storedName = cp?.transactions?.firstOrNull()?.clientName ?: DaftarParser.normalizeName(name)
+            val nowStr = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            runCatching {
+                repo.insertTransaction(uz.daftar.app.data.db.entity.TransactionEntity(
+                    userId = userId, clientName = storedName, type = "p", amount = debt.toDouble(), date = nowStr))
+            }
+            _state.update { it.copy(confirmCloseDebt = null) }
+            appendChat(ChatItem.Info(nextChatId(), "💰 ${name.replaceFirstChar { it.uppercase() }} qarzi yopildi: ${debt.formatMoney()} so'm to'lov"))
+            // Ochiq tarix kartalarini yangilash
+            val fresh = runCatching { buildClientPreview(name, null) }.getOrNull()
+            if (fresh != null) {
+                _state.update { st ->
+                    st.copy(chat = st.chat.map { c ->
+                        if (c is ChatItem.History && c.preview.name.equals(name, true)) c.copy(preview = fresh) else c
+                    })
+                }
+                persistChat()
+            }
+        }
     }
 
     /** "delete 02.06" / "delete bugun" / "01.06 x" / "x 01.06" — sanani aniqlaydi (aks holda null). */
