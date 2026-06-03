@@ -333,33 +333,38 @@ class TodayViewModel @Inject constructor(
 
     /** Saqlangan chatni tiklaydi. Tarix to'liq karta sifatida qayta tortiladi. */
     private suspend fun deserializeChat(json: String): List<ChatItem> {
-        val arr = org.json.JSONArray(json)
+        val arr = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return emptyList()
         val list = mutableListOf<ChatItem>()
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            val k = o.optString("k", if (o.has("u")) { if (o.optBoolean("u")) "u" else "i" } else "i")
-            val ts = o.optLong("ts", System.currentTimeMillis())
-            when (k) {
-                "h" -> {
-                    val name = o.optString("name", "")
-                    val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
-                    if (name.isNotBlank()) {
-                        val cp = buildClientPreview(name, month)
-                        if (cp != null) list.add(ChatItem.History(nextChatId(), cp, ts))
-                        else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts))
+        // Faqat oxirgi 120 ta yozuvni tiklaymiz (juda katta tarix sekinlashtirmasin / oq ekran bo'lmasin)
+        val startAt = if (arr.length() > 120) arr.length() - 120 else 0
+        for (i in startAt until arr.length()) {
+            // Har bir element alohida himoyalangan — bittasi buzuq bo'lsa, qolganlari tiklanadi
+            runCatching {
+                val o = arr.getJSONObject(i)
+                val k = o.optString("k", if (o.has("u")) { if (o.optBoolean("u")) "u" else "i" } else "i")
+                val ts = o.optLong("ts", System.currentTimeMillis())
+                when (k) {
+                    "h" -> {
+                        val name = o.optString("name", "")
+                        val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
+                        if (name.isNotBlank()) {
+                            val cp = runCatching { buildClientPreview(name, month) }.getOrNull()
+                            if (cp != null) list.add(ChatItem.History(nextChatId(), cp, ts))
+                            else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts))
+                        }
                     }
-                }
-                "d" -> {
-                    val ds = o.optString("date")
-                    val narx = o.optBoolean("narx", false)
-                    val date = runCatching { LocalDate.parse(ds) }.getOrNull()
-                    if (date != null) {
-                        val r = runCatching { getDateReport(userId, date, null, narx) }.getOrNull()
-                        if (r != null) list.add(ChatItem.DateRep(nextChatId(), r, ts))
+                    "d" -> {
+                        val ds = o.optString("date")
+                        val narx = o.optBoolean("narx", false)
+                        val date = runCatching { LocalDate.parse(ds) }.getOrNull()
+                        if (date != null) {
+                            val r = runCatching { getDateReport(userId, date, null, narx) }.getOrNull()
+                            if (r != null) list.add(ChatItem.DateRep(nextChatId(), r, ts))
+                        }
                     }
+                    "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
+                    else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
                 }
-                "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
-                else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
             }
         }
         return list
