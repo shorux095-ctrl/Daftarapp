@@ -79,6 +79,7 @@ class BackupManager @Inject constructor(
         try {
             tmp.outputStream().use { input.copyTo(it) }
             if (!isSqlite(tmp)) { tmp.delete(); return false }
+            if (!isAppBackup(tmp)) { tmp.delete(); return false }  // begona .db (eski bot) — rad etamiz, crash bo'lmasin
             db.close()
             val target = dbFile()
             // WAL/SHM yordamchi fayllarini o'chirish
@@ -107,5 +108,36 @@ class BackupManager @Inject constructor(
         file.inputStream().use { it.read(header) }
         val sig = "SQLite format 3\u0000"
         return String(header, Charsets.ISO_8859_1) == sig
+    }
+
+    /**
+     * Fayl AYNAN shu ilovaning zaxirasimi tekshiradi.
+     * Room belgisi (room_master_table) + transactions jadvalida 'cost_tier' ustuni bo'lishi shart.
+     * Eski bot .db da bular yo'q — shuning uchun rad etiladi (almashtirilsa ilova ochilmay qoladi).
+     */
+    private fun isAppBackup(file: File): Boolean {
+        val sdb = runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                file.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            )
+        }.getOrNull() ?: return false
+        return try {
+            val hasRoom = sdb.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='room_master_table'", null
+            ).use { it.moveToFirst() }
+            if (!hasRoom) return false
+            var hasCostTier = false
+            sdb.rawQuery("PRAGMA table_info(transactions)", null).use { c ->
+                val idx = c.getColumnIndex("name")
+                while (c.moveToNext()) {
+                    if (idx >= 0 && c.getString(idx) == "cost_tier") { hasCostTier = true; break }
+                }
+            }
+            hasCostTier
+        } catch (e: Exception) {
+            false
+        } finally {
+            runCatching { sdb.close() }
+        }
     }
 }

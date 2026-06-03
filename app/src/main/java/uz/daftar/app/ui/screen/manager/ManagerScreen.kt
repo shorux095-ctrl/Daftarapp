@@ -135,7 +135,7 @@ fun ManagerScreen(
                     context.startActivity(intent)
                     Runtime.getRuntime().exit(0)
                 } else {
-                    Toast.makeText(context, "❌ Bu fayl mos emas", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "❌ Bu fayl ilova zaxirasi emas. Eski bot .db uchun ☰ → Import ishlating", Toast.LENGTH_LONG).show()
                 }
             }
         }
