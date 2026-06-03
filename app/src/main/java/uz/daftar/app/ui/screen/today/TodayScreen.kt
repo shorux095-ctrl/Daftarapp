@@ -280,6 +280,7 @@ fun TodayScreen(
                     onFilterChange = vm::setFilter,
                     onOpenCalendar = { showCalendar = true },
                     onJumpToDate = jumpToDate,
+                    onImport = { csvLauncher.launch("*/*") },
                     onClients = onClients,
                     onQarz = onQarz,
                     onReports = onReports,
@@ -538,6 +539,7 @@ private fun ChatTopBar(
     onSklad: () -> Unit,
     onOpenCalendar: () -> Unit = {},
     onJumpToDate: (java.time.LocalDate) -> Unit = {},
+    onImport: () -> Unit = {},
     onYukType: (String) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
@@ -664,7 +666,7 @@ private fun ChatTopBar(
                     DropdownMenuItem(
                         text = { Text("📥 Import (eski bot .db / .csv)") },
                         leadingIcon = { Icon(Icons.Outlined.Backup, null) },
-                        onClick = { menuOpen = false; csvLauncher.launch("*/*") }
+                        onClick = { menuOpen = false; onImport() }
                     )
                     HorizontalDivider()
                     // ── SOZLAMA (eng pastda) ──
