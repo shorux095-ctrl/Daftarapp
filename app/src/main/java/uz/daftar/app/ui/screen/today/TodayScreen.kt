@@ -192,12 +192,26 @@ fun TodayScreen(
     }
 
     val jumpToDate: (java.time.LocalDate) -> Unit = { target ->
-        val idx = state.chat.indexOfFirst {
-            java.time.Instant.ofEpochMilli(it.ts)
-                .atZone(java.time.ZoneId.systemDefault()).toLocalDate() == target
+        runCatching {
+            val idx = state.chat.indexOfFirst {
+                java.time.Instant.ofEpochMilli(it.ts)
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate() == target
+            }
+            if (idx >= 0) calScope.launch { runCatching { listState.animateScrollToItem(idx.coerceAtLeast(0)) } }
+            else calScope.launch { runCatching { snackbar.showSnackbar("Bu kunda yozuv yo'q") } }
         }
-        if (idx >= 0) calScope.launch { listState.animateScrollToItem(idx) }
-        else calScope.launch { snackbar.showSnackbar("Bu kunda yozuv yo'q") }
+    }
+
+    // Ilova ochilganda — oldingi crash bo'lgan bo'lsa, sababini chatda ko'rsatamiz
+    LaunchedEffect(Unit) {
+        runCatching {
+            val f = java.io.File(csvContext.filesDir, "last_crash.txt")
+            if (f.exists()) {
+                val txt = f.readText()
+                f.delete()
+                if (txt.isNotBlank()) vm.showCrashLog(txt)
+            }
+        }
     }
 
     state.confirmDeleteDate?.let { d ->
@@ -1206,8 +1220,11 @@ private fun PreviewHistoryCard(
                         .toSortedMap(compareBy { it })
                     for ((day, dayTxsRaw) in byDay) {
                         val dayTxs = dayTxsRaw.sortedBy { it.date }
+                        val dayLabel = if (day.length >= 10)
+                            "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}"
+                        else "📅 $day"
                         Text(
-                            "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}",
+                            dayLabel,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
@@ -1367,28 +1384,30 @@ private fun ChatBotBubble(text: String) {
             val errColor = MaterialTheme.colorScheme.error
             val timeColor = MaterialTheme.colorScheme.primary
             val timeRe = Regex("🕒 \\d{1,2}:\\d{2}")
-            val annotated = androidx.compose.ui.text.buildAnnotatedString {
-                var i = 0
-                while (i < text.length) {
-                    val mIdx = text.indexOf(marker, i)
-                    val tm = timeRe.find(text, i)
-                    val tIdx = tm?.range?.first ?: -1
-                    when {
-                        mIdx >= 0 && (tIdx < 0 || mIdx < tIdx) -> {
-                            append(text.substring(i, mIdx))
-                            withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) { append(marker) }
-                            i = mIdx + marker.length
+            val annotated = runCatching {
+                androidx.compose.ui.text.buildAnnotatedString {
+                    var i = 0
+                    while (i < text.length) {
+                        val mIdx = text.indexOf(marker, i)
+                        val tm = timeRe.find(text, i)
+                        val tIdx = tm?.range?.first ?: -1
+                        when {
+                            mIdx >= 0 && (tIdx < 0 || mIdx < tIdx) -> {
+                                append(text.substring(i, mIdx))
+                                withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) { append(marker) }
+                                i = mIdx + marker.length
+                            }
+                            tIdx >= 0 && tm != null -> {
+                                val tv = tm.value
+                                append(text.substring(i, tIdx))
+                                withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tv) }
+                                i = tIdx + tv.length
+                            }
+                            else -> { append(text.substring(i)); i = text.length }
                         }
-                        tIdx >= 0 -> {
-                            val tv = tm!!.value
-                            append(text.substring(i, tIdx))
-                            withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tv) }
-                            i = tIdx + tv.length
-                        }
-                        else -> { append(text.substring(i)); i = text.length }
                     }
                 }
-            }
+            }.getOrElse { androidx.compose.ui.text.AnnotatedString(text) }
             Text(
                 annotated,
                 modifier = Modifier.padding(12.dp),
