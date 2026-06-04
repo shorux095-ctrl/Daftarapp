@@ -1,203 +1,191 @@
 package uz.daftar.app.ui.screen.dashboard
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
 import uz.daftar.app.core.util.formatMoney
-import uz.daftar.app.ui.common.HomeButton
+
+private val Green = Color(0xFF2E7D32)
+private val Red = Color(0xFFC62828)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
+    onNewTx: () -> Unit = {},
+    onDaftar: () -> Unit = {},
+    onDebtors: () -> Unit = {},
+    onReports: () -> Unit = {},
+    onProfile: () -> Unit = {},
     vm: DashboardViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val green = Color(0xFF2E7D32)
-    val red = Color(0xFFC62828)
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("📊 Dashboard") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
-                    }
-                },
-                actions = { HomeButton() }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-
-            // Davr tanlash
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = state.period == DashPeriod.MONTH,
-                    onClick = { vm.setPeriod(DashPeriod.MONTH) },
-                    label = { Text("📅 Oy (kunlik)") }
-                )
-                FilterChip(
-                    selected = state.period == DashPeriod.YEAR,
-                    onClick = { vm.setPeriod(DashPeriod.YEAR) },
-                    label = { Text("🗓 Yil (oylik)") }
-                )
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(selected = true, onClick = {}, icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Bosh sahifa") })
+                NavigationBarItem(selected = false, onClick = onDaftar, icon = { Icon(Icons.Filled.Book, null) }, label = { Text("Daftar") })
+                NavigationBarItem(selected = false, onClick = onReports, icon = { Icon(Icons.Filled.BarChart, null) }, label = { Text("Hisobot") })
+                NavigationBarItem(selected = false, onClick = onProfile, icon = { Icon(Icons.Filled.Person, null) }, label = { Text("Profil") })
             }
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onNewTx, containerColor = MaterialTheme.colorScheme.primary) {
+                Icon(Icons.Filled.Add, contentDescription = "Yangi yozuv")
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center
+    ) { pad ->
+        Column(
+            modifier = Modifier
+                .padding(pad)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            // Sarlavha
+            Text("Bosh sahifa 👋", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(14.dp))
+
+            // Gradient balans kartasi
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier.background(
+                        Brush.linearGradient(listOf(Color(0xFF6C5CE7), Color(0xFF8E7CF0)))
+                    )
+                ) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text("Jami qarz", color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "${state.totalDebt.formatMoney()} so'm",
+                            color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(state.title, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Text("Tezkor amallar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickAction("Yangi\nyozuv", Icons.Filled.Add, MaterialTheme.colorScheme.primary, Modifier.weight(1f), onNewTx)
+                QuickAction("Qarz\u00addorlar", Icons.Filled.CreditCard, Red, Modifier.weight(1f), onDebtors)
+                QuickAction("Hisobot", Icons.Filled.BarChart, Color(0xFF00897B), Modifier.weight(1f), onReports)
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("Foyda", state.totalFoyda, if (state.totalFoyda >= 0) Green else Red, Modifier.weight(1f))
+                StatCard("Savdo", state.totalSavdo, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                StatCard("To'lov", state.totalTolov, Color(0xFF00897B), Modifier.weight(1f))
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Eng ko'p qarzi bor", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                TextButton(onClick = onDebtors) { Text("Barchasi") }
+            }
+            Spacer(Modifier.height(6.dp))
 
             if (state.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                return@Column
-            }
-
-            // Xulosa kartalar
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                StatCard("Foyda", state.totalFoyda, if (state.totalFoyda >= 0) green else red, Modifier.weight(1f))
-                StatCard("Savdo", state.totalSavdo, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                StatCard("To'lov", state.totalTolov, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
-            }
-
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Foyda grafigi  •  ${state.title}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 16.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // Grafik
-            if (state.points.all { it.foyda == 0L }) {
-                Text(
-                    "Bu davrda ma'lumot yo'q.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
+            } else if (state.debtors.isEmpty()) {
+                Text("Qarzdor yo'q ✅", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                BarChart(
-                    points = state.points,
-                    positiveColor = green,
-                    negativeColor = red,
-                    modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 12.dp)
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider()
-
-            // Ro'yxat
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(state.points, key = { it.label }) { p ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(p.label, fontFamily = FontFamily.Monospace)
-                        Text(
-                            (if (p.foyda >= 0) "+" else "") + p.foyda.formatMoney(),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (p.foyda >= 0) green else red
-                        )
-                    }
+                val maxDebt = state.debtors.first().debt.coerceAtLeast(1)
+                state.debtors.take(6).forEach { d ->
+                    DebtBar(d.client, d.debt, d.debt.toFloat() / maxDebt.toFloat())
+                    Spacer(Modifier.height(8.dp))
                 }
             }
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Column(
+            Modifier.padding(vertical = 16.dp, horizontal = 8.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, null, tint = tint)
+            Spacer(Modifier.height(6.dp))
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
 
 @Composable
 private fun StatCard(label: String, value: Long, color: Color, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(
-                value.formatMoney(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                fontFamily = FontFamily.Monospace
-            )
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = modifier) {
+        Column(Modifier.padding(14.dp)) {
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Text(value.formatMoney(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = color)
         }
     }
 }
 
 @Composable
-private fun BarChart(
-    points: List<DashPoint>,
-    positiveColor: Color,
-    negativeColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val maxAbs = (points.maxOfOrNull { kotlin.math.abs(it.foyda) } ?: 1L).coerceAtLeast(1L)
-    Canvas(modifier = modifier) {
-        val n = points.size
-        if (n == 0) return@Canvas
-        val gap = size.width * 0.02f
-        val barW = (size.width - gap * (n + 1)) / n
-        val zeroY = size.height / 2f
-        points.forEachIndexed { i, p ->
-            val x = gap + i * (barW + gap)
-            val h = (kotlin.math.abs(p.foyda).toFloat() / maxAbs) * (size.height / 2f - 4f)
-            val top = if (p.foyda >= 0) zeroY - h else zeroY
-            drawRect(
-                color = if (p.foyda >= 0) positiveColor else negativeColor,
-                topLeft = Offset(x, top),
-                size = Size(barW, h.coerceAtLeast(1f))
+private fun DebtBar(name: String, debt: Long, fraction: Float) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text("${debt.formatMoney()} so'm", color = Red, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier.fillMaxWidth().height(8.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+        ) {
+            Box(
+                Modifier.fillMaxWidth(fraction.coerceIn(0.02f, 1f)).height(8.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
             )
         }
-        // 0 chizig'i
-        drawRect(
-            color = Color.Gray,
-            topLeft = Offset(0f, zeroY - 0.5f),
-            size = Size(size.width, 1f)
-        )
     }
 }
