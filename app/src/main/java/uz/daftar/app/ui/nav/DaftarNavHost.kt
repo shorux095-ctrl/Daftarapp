@@ -53,7 +53,7 @@ fun DaftarNavHost() {
             nav.popBackStack(Routes.TODAY, inclusive = false)
         }
     ) {
-    NavHost(navController = nav, startDestination = Routes.DASHBOARD) {
+    NavHost(navController = nav, startDestination = Routes.TODAY) {
 
         composable(Routes.TODAY) {
             TodayScreen(
@@ -152,14 +152,7 @@ fun DaftarNavHost() {
         composable(Routes.KARZINA) { KarzinaScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.REMINDER) { ReminderLimitScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.MANAGER) { uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.DASHBOARD) { uz.daftar.app.ui.screen.dashboard.DashboardScreen(
-            onBack = { nav.popBackStack() },
-            onNewTx = { nav.navigate(Routes.NEW_TX) },
-            onDaftar = { nav.navigate(Routes.TODAY) },
-            onDebtors = { nav.navigate(Routes.QARZ) },
-            onReports = { nav.navigate(Routes.YUK_REPORT) },
-            onProfile = { nav.navigate(Routes.SETTINGS) }
-        ) }
+        composable(Routes.DASHBOARD) { uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.HELP) { uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.ESLAT) { uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.SKLAD) { uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }

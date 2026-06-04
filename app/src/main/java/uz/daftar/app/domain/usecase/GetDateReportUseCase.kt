@@ -71,14 +71,13 @@ class GetDateReportUseCase @Inject constructor(
 
         // Har mijoz uchun N narxlarini olish (sana boshi bilan)
         val clientLowers = txs.map { it.clientName.lowercase() }.distinct()
-        val nPricesByClient = mutableMapOf<String, MutableMap<String, Double?>>()
+        // Har mijoz uchun N narx TARIXI: type -> sorted [(date, price)] (har yozuv sanasiga qarab tanlash uchun)
+        val nHistByClient = mutableMapOf<String, Map<String, List<Pair<String, Double>>>>()
         val cargoTypes = listOf("a", "b", "c", "d", "k")
         for (cl in clientLowers) {
-            val m = mutableMapOf<String, Double?>()
-            for (t in cargoTypes) {
-                m[t] = priceDao.getPriceAt(userId, cl, t, dayEnd)
-            }
-            nPricesByClient[cl] = m
+            val all = runCatching { priceDao.getAllForClient(userId, cl) }.getOrDefault(emptyList())
+            nHistByClient[cl] = all.groupBy { it.priceType.lowercase() }
+                .mapValues { e -> e.value.map { it.date to it.price }.sortedBy { it.first } }
         }
 
         // Global T narxlar (T va T1)
@@ -89,11 +88,20 @@ class GetDateReportUseCase @Inject constructor(
             t1Prices[t] = yukNarxDao.getLatestGlobal(userId, t, "t1")?.price
         }
 
+        // Sana bo'yicha narx: berilgan sana yoki undan oldingi eng oxirgi; topilmasa eng birinchi (retroaktiv)
+        fun priceAtList(list: List<Pair<String, Double>>?, date: String): Double? {
+            if (list.isNullOrEmpty()) return null
+            val day = date.take(10)
+            var best: Double? = null
+            for ((d, p) in list) { if (d.take(10) <= day) best = p else break }
+            return best ?: list.first().second
+        }
+
         fun effectivePrice(tx: TransactionEntity): Double? {
             val t = tx.type.lowercase()
             return if (useNarx) {
-                // N narx (sotilgan narx): mijoz N narxи → global T
-                nPricesByClient[tx.clientName.lowercase()]?.get(t) ?: tPrices[t]
+                // N narx (sotilgan narx): mijozning O'SHA SANADAGI N narxi → global T
+                priceAtList(nHistByClient[tx.clientName.lowercase()]?.get(t), tx.date) ?: tPrices[t]
             } else {
                 // T narx (J): bir martalik T override → T1 tarif → global T
                 tx.tOverride ?: if (tx.costTier == "t1") (t1Prices[t] ?: tPrices[t]) else tPrices[t]
