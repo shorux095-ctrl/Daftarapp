@@ -1,5 +1,7 @@
 package uz.daftar.app.ui.screen.yukreport
 
+import uz.daftar.app.core.util.formatQty
+import uz.daftar.app.core.util.formatMoney
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -185,9 +187,9 @@ private fun TableRow(row: YukReportRow) {
             .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         Cell(row.label, weight = 1.1f, align = TextAlign.Start)
-        Cell(row.tTotal.toString(), weight = 1f)
-        Cell(row.nTotal.toString(), weight = 1f)
-        Cell(row.pTotal.toString(), weight = 1f)
+        Cell(row.tTotal.formatMoney(), weight = 1f)
+        Cell(row.nTotal.formatMoney(), weight = 1f)
+        Cell(row.pTotal.formatMoney(), weight = 1f)
         FarqCell(row.farq, weight = 1.2f)
     }
 }
@@ -289,7 +291,4 @@ private fun CountTotalRow(totals: Map<String, Double>) {
     }
 }
 
-private fun fmtCount(v: Double): String {
-    val l = v.toLong()
-    return if (v == l.toDouble()) l.toString() else v.toString()
-}
+private fun fmtCount(v: Double): String = v.formatQty()

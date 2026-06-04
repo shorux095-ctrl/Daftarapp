@@ -16,6 +16,9 @@ import uz.daftar.app.data.db.entity.YukNarxEntity
 
 @Dao
 interface PriceHistoryDao {
+    @Query("DELETE FROM price_history WHERE user_id = :userId")
+    suspend fun clearAll(userId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(price: PriceHistoryEntity): Long
 
@@ -48,6 +51,9 @@ interface PriceHistoryDao {
 
 @Dao
 interface ClientPriceDao {
+    @Query("DELETE FROM client_prices WHERE user_id = :userId")
+    suspend fun clearAll(userId: Long)
+
     @Query("SELECT * FROM client_prices WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName)")
     suspend fun get(userId: Long, clientName: String): ClientPriceEntity?
 
@@ -60,6 +66,9 @@ interface ClientPriceDao {
 
 @Dao
 interface YukNarxDao {
+    @Query("DELETE FROM yuk_narx WHERE user_id = :userId")
+    suspend fun clearAll(userId: Long)
+
     @Query("""
         SELECT * FROM yuk_narx
         WHERE user_id = :userId AND client_name IS NULL
@@ -85,6 +94,9 @@ interface YukNarxDao {
 
 @Dao
 interface AliasDao {
+    @Query("DELETE FROM aliases WHERE user_id = :userId")
+    suspend fun clearAll(userId: Long)
+
     @Query("SELECT * FROM aliases WHERE user_id = :userId")
     suspend fun getAll(userId: Long): List<AliasEntity>
 
@@ -97,6 +109,9 @@ interface AliasDao {
 
 @Dao
 interface RasxodDao {
+    @Query("DELETE FROM rasxod WHERE user_id = :userId")
+    suspend fun clearAll(userId: Long)
+
     @Insert
     suspend fun insert(rasxod: RasxodEntity): Long
 

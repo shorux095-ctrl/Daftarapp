@@ -552,7 +552,7 @@ class TodayViewModel @Inject constructor(
                 return@launch
             }
             appendChat(ChatItem.Info(nextChatId(),
-                "📥 Import tugadi:\n" +
+                "📥 Import tugadi (eski import ma'lumotlari tozalanib, qaytadan yozildi):\n" +
                 "• Yozuvlar: ${r.tx} ta\n" +
                 "• Narx tarixi: ${r.price} ta\n" +
                 "• Mijoz narxlari: ${r.clientPrice} ta\n" +

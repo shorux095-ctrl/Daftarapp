@@ -1,6 +1,8 @@
 package uz.daftar.app.domain.usecase
 
+import androidx.room.withTransaction
 import android.database.sqlite.SQLiteDatabase
+import uz.daftar.app.data.db.DaftarDatabase
 import uz.daftar.app.data.db.dao.AliasDao
 import uz.daftar.app.data.db.dao.ClientPriceDao
 import uz.daftar.app.data.db.dao.PriceHistoryDao
@@ -20,6 +22,7 @@ import javax.inject.Inject
  * Har bir jadval alohida himoyalangan — biri xato bo'lsa, qolganlari ko'chadi.
  */
 class ImportOldDbUseCase @Inject constructor(
+    private val db: DaftarDatabase,
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
     private val clientPriceDao: ClientPriceDao,
@@ -36,15 +39,23 @@ class ImportOldDbUseCase @Inject constructor(
 
     suspend operator fun invoke(userId: Long, dbPath: String): Result {
         var nTx = 0; var nPr = 0; var nCp = 0; var nYn = 0; var nR = 0; var nA = 0
-        val db = runCatching {
+        val src = runCatching {
             SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
         }.getOrNull() ?: return Result(ok = false)
 
         try {
+            db.withTransaction {
+            // AVVAL eski (import qilingan) ma'lumotlarni tozalaymiz — takroriy import dublikat yaratmasin
+            runCatching { txDao.clearAll(userId) }
+            runCatching { priceDao.clearAll(userId) }
+            runCatching { clientPriceDao.clearAll(userId) }
+            runCatching { yukNarxDao.clearAll(userId) }
+            runCatching { rasxodDao.clearAll(userId) }
+            runCatching { aliasDao.clearAll(userId) }
             // transactions
             runCatching {
                 val list = mutableListOf<TransactionEntity>()
-                db.rawQuery("SELECT client_name,type,amount,date,t_override FROM transactions", null).use { c ->
+                src.rawQuery("SELECT client_name,type,amount,date,t_override FROM transactions", null).use { c ->
                     while (c.moveToNext()) {
                         val cn = c.getString(0) ?: continue
                         list.add(
@@ -61,7 +72,7 @@ class ImportOldDbUseCase @Inject constructor(
             }
             // price_history
             runCatching {
-                db.rawQuery("SELECT client_name,price_type,price,date FROM price_history", null).use { c ->
+                src.rawQuery("SELECT client_name,price_type,price,date FROM price_history", null).use { c ->
                     while (c.moveToNext()) {
                         priceDao.insert(
                             PriceHistoryEntity(
@@ -75,7 +86,7 @@ class ImportOldDbUseCase @Inject constructor(
             }
             // client_prices
             runCatching {
-                db.rawQuery("SELECT client_name,a_price,b_price,c_price,d_price,k_price,p_price,q_price FROM client_prices", null).use { c ->
+                src.rawQuery("SELECT client_name,a_price,b_price,c_price,d_price,k_price,p_price,q_price FROM client_prices", null).use { c ->
                     fun d(i: Int): Double? = if (c.isNull(i)) null else c.getDouble(i)
                     while (c.moveToNext()) {
                         clientPriceDao.upsert(
@@ -90,7 +101,7 @@ class ImportOldDbUseCase @Inject constructor(
             }
             // yuk_narx
             runCatching {
-                db.rawQuery("SELECT type,price,date,client_name,one_time,price_group FROM yuk_narx", null).use { c ->
+                src.rawQuery("SELECT type,price,date,client_name,one_time,price_group FROM yuk_narx", null).use { c ->
                     while (c.moveToNext()) {
                         yukNarxDao.insert(
                             YukNarxEntity(
@@ -107,7 +118,7 @@ class ImportOldDbUseCase @Inject constructor(
             }
             // rasxod
             runCatching {
-                db.rawQuery("SELECT amount,note,date FROM rasxod", null).use { c ->
+                src.rawQuery("SELECT amount,note,date FROM rasxod", null).use { c ->
                     while (c.moveToNext()) {
                         rasxodDao.insert(
                             RasxodEntity(
@@ -120,7 +131,7 @@ class ImportOldDbUseCase @Inject constructor(
             }
             // aliases
             runCatching {
-                db.rawQuery("SELECT alias,canon FROM aliases", null).use { c ->
+                src.rawQuery("SELECT alias,canon FROM aliases", null).use { c ->
                     while (c.moveToNext()) {
                         aliasDao.upsert(
                             AliasEntity(userId = userId, alias = c.getString(0) ?: "", canon = c.getString(1) ?: "")
@@ -128,8 +139,9 @@ class ImportOldDbUseCase @Inject constructor(
                     }
                 }
             }
+            }
         } finally {
-            runCatching { db.close() }
+            runCatching { src.close() }
         }
         return Result(nTx, nPr, nCp, nYn, nR, nA, true)
     }
