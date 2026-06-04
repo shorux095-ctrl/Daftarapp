@@ -68,7 +68,7 @@ class MainActivity : FragmentActivity() {
 
                 // Qulf yoqilganmi — tekshirish
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    val enabled = lockManager.lockEnabled.first()
+                    val enabled = runCatching { lockManager.lockEnabled.first() }.getOrDefault(false)
                     lockRequired = enabled
                     if (!enabled) {
                         unlocked = true
@@ -92,7 +92,14 @@ class MainActivity : FragmentActivity() {
                                 )
                             }
                         )
-                        else -> { /* yuklanmoqda */ }
+                        else -> {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = androidx.compose.ui.Alignment.Center
+                            ) {
+                                androidx.compose.material3.CircularProgressIndicator()
+                            }
+                        }
                     }
                 }
             }
