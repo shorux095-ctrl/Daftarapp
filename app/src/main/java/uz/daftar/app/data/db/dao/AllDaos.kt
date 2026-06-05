@@ -88,6 +88,10 @@ interface YukNarxDao {
     @Query("SELECT * FROM yuk_narx WHERE user_id = :userId AND client_name IS NULL AND price_group = 't' AND one_time = 0")
     suspend fun getAllGlobal(userId: Long): List<YukNarxEntity>
 
+    /** Berilgan guruh (t yoki t1) uchun global narx TARIXI — har sanaga qarab hisoblash uchun. */
+    @Query("SELECT * FROM yuk_narx WHERE user_id = :userId AND client_name IS NULL AND price_group = :group AND one_time = 0 ORDER BY date ASC")
+    suspend fun getAllGlobalGroup(userId: Long, group: String): List<YukNarxEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(narx: YukNarxEntity): Long
 }

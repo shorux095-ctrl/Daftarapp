@@ -172,14 +172,26 @@ internal suspend fun buildReport(
     var payments = 0.0
     val clientNames = mutableSetOf<String>()
 
-    // Global T narxlar (ulgurji tannarx) — turlar bo'yicha bir marta
+    // Global T narx TARIXI (har yozuv sanasiga qarab) — turlar bo'yicha
     val cargo = setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
-    val tPrices = mutableMapOf<String, Double?>()
-    val t1Prices = mutableMapOf<String, Double?>()
-    for (t in cargo) {
-        val code = t.code.lowercase()
-        tPrices[code] = yukDao.getLatestGlobal(userId, code, "t")?.price
-        t1Prices[code] = yukDao.getLatestGlobal(userId, code, "t1")?.price
+    val tHist = mutableMapOf<String, List<Pair<String, Double>>>()
+    val t1Hist = mutableMapOf<String, List<Pair<String, Double>>>()
+    run {
+        val allT = yukDao.getAllGlobalGroup(userId, "t").groupBy { it.type.lowercase() }
+        val allT1 = yukDao.getAllGlobalGroup(userId, "t1").groupBy { it.type.lowercase() }
+        for (t in cargo) {
+            val code = t.code.lowercase()
+            tHist[code] = (allT[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
+            t1Hist[code] = (allT1[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
+        }
+    }
+    // Berilgan sana (kun) yoki undan oldingi eng oxirgi global narx
+    fun globalAt(list: List<Pair<String, Double>>?, date: String): Double? {
+        if (list.isNullOrEmpty()) return null
+        val day = date.take(10)
+        var best: Double? = null
+        for ((d, p) in list) { if (d.take(10) <= day) best = p else break }
+        return best ?: list.first().second
     }
 
     for (tx in txs) {
@@ -189,17 +201,17 @@ internal suspend fun buildReport(
 
         when (type) {
             TxType.P -> payments += tx.amount
-            TxType.Q -> revenue += tx.amount  // qo'lda qarz ham daromad qismi (tannarxi yo'q)
+            TxType.Q -> { /* qo'lda qarz — sotuv emas; daromad/foydaga KIRMAYDI, faqat qarzga ta'sir qiladi */ }
             in cargo -> {
                 // Sotilgan narx (N): avval N (mijoz uchun), bo'lmasa T (global)
                 val nPrice = findPriceForReport(
                     userId, tx.clientName, tx.type, tx.date, priceDao, yukDao
                 ) ?: tx.tOverride
                 if (nPrice != null) revenue += tx.amount * nPrice
-                // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T
+                // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T (O'SHA SANADAGI)
                 val globalCost = if (tx.costTier == "t1")
-                    (t1Prices[tx.type.lowercase()] ?: tPrices[tx.type.lowercase()])
-                else tPrices[tx.type.lowercase()]
+                    (globalAt(t1Hist[tx.type.lowercase()], tx.date) ?: globalAt(tHist[tx.type.lowercase()], tx.date))
+                else globalAt(tHist[tx.type.lowercase()], tx.date)
                 val tPrice = tx.tOverride ?: globalCost
                 if (tPrice != null) tCost += tx.amount * tPrice
             }
@@ -266,11 +278,22 @@ class GetClientProfitUseCase @Inject constructor(
         val cn = clientName.lowercase()
         val txs = txDao.getByClient(userId, cn)
         val cargo = setOf("a", "b", "c", "d", "k")
-        val tPrices = mutableMapOf<String, Double?>()
-        val t1Prices = mutableMapOf<String, Double?>()
-        for (t in cargo) {
-            tPrices[t] = yukDao.getLatestGlobal(userId, t, "t")?.price
-            t1Prices[t] = yukDao.getLatestGlobal(userId, t, "t1")?.price
+        val tHist = mutableMapOf<String, List<Pair<String, Double>>>()
+        val t1Hist = mutableMapOf<String, List<Pair<String, Double>>>()
+        run {
+            val allT = yukDao.getAllGlobalGroup(userId, "t").groupBy { it.type.lowercase() }
+            val allT1 = yukDao.getAllGlobalGroup(userId, "t1").groupBy { it.type.lowercase() }
+            for (t in cargo) {
+                tHist[t] = (allT[t] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
+                t1Hist[t] = (allT1[t] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
+            }
+        }
+        fun globalAt(list: List<Pair<String, Double>>?, date: String): Double? {
+            if (list.isNullOrEmpty()) return null
+            val day = date.take(10)
+            var best: Double? = null
+            for ((d, p) in list) { if (d.take(10) <= day) best = p else break }
+            return best ?: list.first().second
         }
 
         val nowYear = LocalDate.now().year
@@ -282,10 +305,10 @@ class GetClientProfitUseCase @Inject constructor(
             val d = runCatching { LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate() }.getOrNull() ?: continue
             val profit: Double = when (tx.type) {
                 "p" -> 0.0
-                "q" -> tx.amount
+                "q" -> 0.0  // qo'lda qarz — foyda emas
                 in cargo -> {
                     val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao) ?: tx.tOverride
-                    val globalCost = if (tx.costTier == "t1") (t1Prices[tx.type] ?: tPrices[tx.type]) else tPrices[tx.type]
+                    val globalCost = if (tx.costTier == "t1") (globalAt(t1Hist[tx.type], tx.date) ?: globalAt(tHist[tx.type], tx.date)) else globalAt(tHist[tx.type], tx.date)
                     val t = tx.tOverride ?: globalCost
                     if (n != null && t != null) tx.amount * (n - t)
                     else 0.0
