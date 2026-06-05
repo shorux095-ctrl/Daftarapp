@@ -37,7 +37,7 @@ fun ReportsScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("📊 Hisobotlar") },
+                title = { Text("📊 Hisobotlar · v3") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
