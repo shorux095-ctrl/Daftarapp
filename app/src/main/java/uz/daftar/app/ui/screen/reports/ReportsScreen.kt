@@ -71,10 +71,16 @@ fun ReportsScreen(
                     onClick = { vm.setPeriod(ReportPeriod.YEAR) },
                     text = { Text("Yil") }
                 )
+                Tab(
+                    selected = state.period == ReportPeriod.FOYDA,
+                    onClick = { vm.setPeriod(ReportPeriod.FOYDA) },
+                    text = { Text("Foyda") }
+                )
             }
             Spacer(Modifier.height(12.dp))
 
-            // Date picker button
+            // Date picker button (Foyda'da kerak emas)
+            if (state.period != ReportPeriod.FOYDA) {
             OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { showDatePicker = true }
@@ -92,18 +98,21 @@ fun ReportsScreen(
                             ReportPeriod.DAY -> state.date.format(fmt)
                             ReportPeriod.MONTH -> state.date.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
                             ReportPeriod.YEAR -> state.date.year.toString()
+                            ReportPeriod.FOYDA -> ""
                         },
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
             }
             Spacer(Modifier.height(16.dp))
+            }
 
             when {
                 state.isLoading -> Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
                 state.error != null -> Text("Xato: ${state.error}", color = MaterialTheme.colorScheme.error)
+                state.period == ReportPeriod.FOYDA -> FoydaView(state.monthReport, state.yearReport)
                 state.report != null -> ReportView(state.report!!, state.topDebtors, state.inactiveClients)
                 else -> Text("Hisobot yo'q")
             }
@@ -358,4 +367,46 @@ private fun barColor(type: TxType): androidx.compose.ui.graphics.Color = when (t
     TxType.D -> androidx.compose.ui.graphics.Color(0xFF6A1B9A)  // siyohrang
     TxType.K -> androidx.compose.ui.graphics.Color(0xFF00838F)  // moviy
     else -> androidx.compose.ui.graphics.Color(0xFF757575)      // kulrang
+}
+
+/** Foyda ko'rinishi: joriy oy (tepada) + joriy yil — sof foyda = N − T − rasxod. */
+@Composable
+private fun FoydaView(month: PeriodReport?, year: PeriodReport?) {
+    Column {
+        if (month != null) FoydaCard("📅 Shu oy — ${month.rangeLabel}", month, highlight = true)
+        Spacer(Modifier.height(12.dp))
+        if (year != null) FoydaCard("📆 Yillik — ${year.rangeLabel}", year, highlight = false)
+        if (month == null && year == null) Text("Ma'lumot yo'q")
+    }
+}
+
+@Composable
+private fun FoydaCard(title: String, rep: PeriodReport, highlight: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlight) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            // Katta sof foyda raqami
+            Text(
+                "${rep.profit.formatMoney()} so'm",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (rep.profit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            )
+            Text("Sof foyda (N − T − Rasxod)", style = MaterialTheme.typography.labelSmall)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            MoneyRow("💰 Daromad (N)", rep.revenue, MaterialTheme.colorScheme.primary)
+            MoneyRow("📦 Tannarx (T)", rep.tCost, MaterialTheme.colorScheme.onSurfaceVariant)
+            MoneyRow("📈 Yalpi (N−T)", rep.grossProfit,
+                if (rep.grossProfit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+            MoneyRow("📤 Rasxod", rep.expenses, MaterialTheme.colorScheme.error)
+        }
+    }
 }

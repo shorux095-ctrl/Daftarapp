@@ -140,7 +140,8 @@ fun DaftarNavHost() {
                 onYukNarx = { nav.navigate(Routes.YUK_NARX) },
                 onRasxod = { nav.navigate(Routes.RASXOD) },
                 onKarzina = { nav.navigate(Routes.KARZINA) },
-                onReminder = { nav.navigate(Routes.REMINDER) }
+                onReminder = { nav.navigate(Routes.REMINDER) },
+                onManager = { nav.navigate(Routes.MANAGER) }
             )
         }
 

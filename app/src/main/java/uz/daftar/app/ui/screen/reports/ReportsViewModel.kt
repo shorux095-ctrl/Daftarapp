@@ -18,12 +18,14 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
-enum class ReportPeriod { DAY, MONTH, YEAR }
+enum class ReportPeriod { DAY, MONTH, YEAR, FOYDA }
 
 data class ReportsState(
     val period: ReportPeriod = ReportPeriod.DAY,
     val date: LocalDate = LocalDate.now(),
     val report: PeriodReport? = null,
+    val monthReport: PeriodReport? = null,
+    val yearReport: PeriodReport? = null,
     val topDebtors: List<ClientSummary> = emptyList(),
     val inactiveClients: List<ClientSummary> = emptyList(),
     val isLoading: Boolean = false,
@@ -59,10 +61,21 @@ class ReportsViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
+                if (s.period == ReportPeriod.FOYDA) {
+                    // Foyda: joriy oy (tepada) + joriy yil sof foyda
+                    val now = LocalDate.now()
+                    val monthRep = getMonthly(userId, now.year, now.monthValue)
+                    val yearRep = getYearly(userId, now.year)
+                    _state.update {
+                        it.copy(monthReport = monthRep, yearReport = yearRep, isLoading = false)
+                    }
+                    return@launch
+                }
                 val rep = when (s.period) {
                     ReportPeriod.DAY -> getDaily(userId, s.date)
                     ReportPeriod.MONTH -> getMonthly(userId, s.date.year, s.date.monthValue)
                     ReportPeriod.YEAR -> getYearly(userId, s.date.year)
+                    ReportPeriod.FOYDA -> getDaily(userId, s.date) // erishilmaydi
                 }
                 // Analitika: top qarzdorlar + faolsiz mijozlar
                 val clients = getAllClients(userId)

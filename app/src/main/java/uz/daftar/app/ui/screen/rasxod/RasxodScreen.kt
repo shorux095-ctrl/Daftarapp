@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,6 +61,30 @@ fun RasxodScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
+            // Davr tanlash: Kun / Oy / Yil
+            TabRow(selectedTabIndex = state.period.ordinal) {
+                Tab(selected = state.period == RasxodPeriod.DAY, onClick = { vm.setPeriod(RasxodPeriod.DAY) }, text = { Text("Kun") })
+                Tab(selected = state.period == RasxodPeriod.MONTH, onClick = { vm.setPeriod(RasxodPeriod.MONTH) }, text = { Text("Oy") })
+                Tab(selected = state.period == RasxodPeriod.YEAR, onClick = { vm.setPeriod(RasxodPeriod.YEAR) }, text = { Text("Yil") })
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // ⬅️ Davr ➡️
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { vm.prev() }) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Oldingi")
+                }
+                Text(state.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = { vm.next() }) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Keyingi")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
             // Total card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -67,9 +92,16 @@ fun RasxodScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Shu oylik jami xarajat", style = MaterialTheme.typography.labelMedium)
                     Text(
-                        "${state.monthlyTotal.formatMoney()} so'm",
+                        when (state.period) {
+                            RasxodPeriod.DAY -> "Kunlik jami xarajat"
+                            RasxodPeriod.MONTH -> "Oylik jami xarajat"
+                            RasxodPeriod.YEAR -> "Yillik jami xarajat"
+                        },
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(
+                        "${state.total.formatMoney()} so'm",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onErrorContainer
@@ -117,7 +149,7 @@ fun RasxodScreen(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "Shu oydagi xarajatlar",
+                "Xarajatlar ro'yxati",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )

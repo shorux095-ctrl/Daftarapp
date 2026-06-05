@@ -16,9 +16,14 @@ import uz.daftar.app.domain.usecase.GetRasxodTotalUseCase
 import java.time.LocalDate
 import javax.inject.Inject
 
+enum class RasxodPeriod { DAY, MONTH, YEAR }
+
 data class RasxodState(
+    val period: RasxodPeriod = RasxodPeriod.DAY,
+    val anchor: LocalDate = LocalDate.now(),
     val items: List<RasxodEntity> = emptyList(),
-    val monthlyTotal: Long = 0,
+    val total: Long = 0,
+    val label: String = "",
     val isLoading: Boolean = true,
     val message: String? = null
 )
@@ -37,14 +42,47 @@ class RasxodViewModel @Inject constructor(
 
     init { load() }
 
+    fun setPeriod(p: RasxodPeriod) {
+        _state.update { it.copy(period = p, anchor = LocalDate.now()) }
+        load()
+    }
+
+    fun prev() {
+        _state.update { it.copy(anchor = shift(it.anchor, it.period, -1)) }
+        load()
+    }
+
+    fun next() {
+        _state.update { it.copy(anchor = shift(it.anchor, it.period, +1)) }
+        load()
+    }
+
+    private fun shift(d: LocalDate, p: RasxodPeriod, dir: Int): LocalDate = when (p) {
+        RasxodPeriod.DAY -> d.plusDays(dir.toLong())
+        RasxodPeriod.MONTH -> d.plusMonths(dir.toLong())
+        RasxodPeriod.YEAR -> d.plusYears(dir.toLong())
+    }
+
     fun load() {
+        val s = state.value
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            val today = LocalDate.now()
-            val monthStart = today.withDayOfMonth(1)
-            val items = rangeUC(userId, monthStart, today).sortedByDescending { it.date }
-            val total = totalUC(userId, monthStart, today)
-            _state.update { it.copy(items = items, monthlyTotal = total, isLoading = false) }
+            val (from, to, label) = when (s.period) {
+                RasxodPeriod.DAY -> Triple(s.anchor, s.anchor, s.anchor.format(FMT_DAY))
+                RasxodPeriod.MONTH -> Triple(
+                    s.anchor.withDayOfMonth(1),
+                    s.anchor.withDayOfMonth(s.anchor.lengthOfMonth()),
+                    s.anchor.format(FMT_MONTH)
+                )
+                RasxodPeriod.YEAR -> Triple(
+                    s.anchor.withDayOfYear(1),
+                    s.anchor.withMonth(12).withDayOfMonth(31),
+                    s.anchor.year.toString()
+                )
+            }
+            val items = rangeUC(userId, from, to).sortedByDescending { it.date }
+            val total = totalUC(userId, from, to)
+            _state.update { it.copy(items = items, total = total, label = label, isLoading = false) }
         }
     }
 
@@ -57,6 +95,8 @@ class RasxodViewModel @Inject constructor(
         viewModelScope.launch {
             addUC(userId, amount, note.trim())
             _state.update { it.copy(message = "✅ Rasxod qo'shildi") }
+            // Yangi rasxod bugun, shuning uchun Kunga qaytamiz
+            _state.update { it.copy(period = RasxodPeriod.DAY, anchor = LocalDate.now()) }
             load()
         }
     }
@@ -71,5 +111,10 @@ class RasxodViewModel @Inject constructor(
 
     fun clearMessage() {
         _state.update { it.copy(message = null) }
+    }
+
+    companion object {
+        private val FMT_DAY = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+        private val FMT_MONTH = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy")
     }
 }

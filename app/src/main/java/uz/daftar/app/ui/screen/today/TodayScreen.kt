@@ -574,7 +574,7 @@ private fun ChatTopBar(
                     onDismissRequest = { menuOpen = false },
                     modifier = Modifier.heightIn(max = 460.dp)
                 ) {
-                    // ── YUKLAR (bosganda A B C D K) ──
+                    // ── 1) YUKLAR (bosganda A B C D K) ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuklar") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
@@ -589,101 +589,50 @@ private fun ChatTopBar(
                             )
                         }
                     }
+                    // ── 2) YUK HISOBOTI ──
                     DropdownMenuItem(
                         text = { Text("📦 Yuk hisoboti") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
                         onClick = { menuOpen = false; onYukReport() }
                     )
+                    // ── 3) HISOBOT (N + T narx, bugungi + foyda) ──
                     DropdownMenuItem(
-                        text = { Text("🔢 Hisobot (N narx)") },
-                        leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
-                        onClick = { menuOpen = false; onNReport() }
+                        text = { Text("📊 Hisobot") },
+                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
+                        onClick = { menuOpen = false; onReports() }
                     )
+                    // ── 4) MIJOZLAR ──
                     DropdownMenuItem(
                         text = { Text("👥 Mijozlar") },
                         leadingIcon = { Icon(Icons.Outlined.People, null) },
                         onClick = { menuOpen = false; onClients() }
                     )
+                    // ── 5) QARZDORLAR ──
                     DropdownMenuItem(
                         text = { Text("💳 Qarzdorlar") },
+                        leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
                         onClick = { menuOpen = false; onQarz() }
                     )
+                    // ── 6) NARX QO'YISH (T va T1) ──
                     DropdownMenuItem(
-                        text = { Text("🔍 Qidirish (Al)") },
-                        leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                        onClick = { menuOpen = false; onSearch() }
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("📊 Hisobotlar") },
-                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        trailingIcon = { Icon(if (hisobotOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) },
-                        onClick = { hisobotOpen = !hisobotOpen }
-                    )
-                    if (hisobotOpen) {
-                        DropdownMenuItem(text = { Text("     💰 T narx hisobot") }, onClick = { menuOpen = false; onReports() })
-                        DropdownMenuItem(text = { Text("     🏷 N narx hisobot") }, onClick = { menuOpen = false; onReports() })
-                        DropdownMenuItem(text = { Text("     📅 Oylik / Yillik") }, onClick = { menuOpen = false; onReports() })
-                    }
-                    DropdownMenuItem(
-                        text = { Text("🚛 Narx (T)") },
+                        text = { Text("🚛 Narx qo'yish (T / T1)") },
                         leadingIcon = { Icon(Icons.Outlined.LocalShipping, null) },
                         onClick = { menuOpen = false; onYukNarx() }
                     )
-                    DropdownMenuItem(
-                        text = { Text("📈 Sof foyda") },
-                        leadingIcon = { Icon(Icons.Outlined.TrendingUp, null) },
-                        onClick = { menuOpen = false; onReports() }
-                    )
+                    // ── 7) RASXOD ──
                     DropdownMenuItem(
                         text = { Text("💸 Rasxod") },
                         leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
                         onClick = { menuOpen = false; onRasxod() }
                     )
-                    DropdownMenuItem(
-                        text = { Text("📦 Sklad (ombor)") },
-                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
-                        onClick = { menuOpen = false; onSklad() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("⏰ Eslat (bildirishnoma)") },
-                        leadingIcon = { Icon(Icons.Outlined.Notifications, null) },
-                        onClick = { menuOpen = false; onEslat() }
-                    )
                     HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("🔁 Alias / Nomini o'zgartirish") },
-                        leadingIcon = { Icon(Icons.Outlined.AutoFixHigh, null) },
-                        onClick = { menuOpen = false; onAlias() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("🗑 Karzina") },
-                        leadingIcon = { Icon(Icons.Outlined.Delete, null) },
-                        onClick = { menuOpen = false; onKarzina() }
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("📊 Dashboard") },
-                        leadingIcon = { Icon(Icons.Outlined.BarChart, null) },
-                        onClick = { menuOpen = false; onDashboard() }
-                    )
+                    // ── 8) YORDAM ──
                     DropdownMenuItem(
                         text = { Text("❓ Yordam") },
                         leadingIcon = { Icon(Icons.Outlined.HelpOutline, null) },
                         onClick = { menuOpen = false; onHelp() }
                     )
-                    DropdownMenuItem(
-                        text = { Text("🗂 Zaxira / Backup") },
-                        leadingIcon = { Icon(Icons.Outlined.Backup, null) },
-                        onClick = { menuOpen = false; onManager() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("📥 Import (eski bot .db / .csv)") },
-                        leadingIcon = { Icon(Icons.Outlined.Backup, null) },
-                        onClick = { menuOpen = false; onImport() }
-                    )
-                    HorizontalDivider()
-                    // ── SOZLAMA (eng pastda) ──
+                    // ── 9) SOZLAMALAR (Import, Zaxira, Alias, Barmoq, PIN, Karzina shu yerda) ──
                     DropdownMenuItem(
                         text = { Text("⚙️ Sozlamalar") },
                         leadingIcon = { Icon(Icons.Outlined.Settings, null) },

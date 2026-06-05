@@ -16,11 +16,11 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.MoneyOff
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,14 +61,46 @@ fun SettingsScreen(
     onRasxod: () -> Unit = {},
     onKarzina: () -> Unit = {},
     onReminder: () -> Unit = {},
+    onManager: () -> Unit = {},
     vm: SettingsViewModel = hiltViewModel()
 ) {
     val lockEnabled by vm.lockEnabled.collectAsStateWithLifecycle()
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
+    val importMsg by vm.importMsg.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Import launcher (.db yoki .csv)
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val res = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        val tmp = java.io.File(context.cacheDir, "import_tmp.bin")
+                        context.contentResolver.openInputStream(uri)?.use { inp -> tmp.outputStream().use { o -> inp.copyTo(o) } }
+                        val header = ByteArray(16)
+                        tmp.inputStream().use { it.read(header) }
+                        if (String(header).startsWith("SQLite format 3")) tmp.absolutePath to true
+                        else tmp.readText() to false
+                    }.getOrNull()
+                }
+                if (res != null) { if (res.second) vm.importDb(res.first) else vm.importCsv(res.first) }
+            }
+        }
+    }
+
+    // Import natijasi — Toast
+    androidx.compose.runtime.LaunchedEffect(importMsg) {
+        importMsg?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            if (!it.startsWith("⏳")) vm.clearImportMsg()
+        }
+    }
+
     val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -109,44 +141,29 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // 1) Import (eski bot .db yoki .csv)
             SettingsItem(
-                icon = Icons.Outlined.Search,
-                title = "Qidirish",
-                subtitle = "Mijoz, sana yoki oraliq bo'yicha",
-                onClick = onSearch
+                icon = Icons.Outlined.Download,
+                title = "📥 Import",
+                subtitle = "Eski bot .db yoki .csv fayldan ma'lumot ko'chirish",
+                onClick = { importLauncher.launch("*/*") }
             )
+            // 2) Zaxira (DB backup / fayldan tiklash)
             SettingsItem(
-                icon = Icons.Outlined.LocalShipping,
-                title = "Yuk narxlari (T)",
-                subtitle = "Global T narx — barcha mijozlar uchun",
-                onClick = onYukNarx
+                icon = Icons.Outlined.Backup,
+                title = "🗂 Zaxira",
+                subtitle = "Bazani zaxiralash yoki fayldan tiklash",
+                onClick = onManager
             )
-            SettingsItem(
-                icon = Icons.Outlined.MoneyOff,
-                title = "Rasxod",
-                subtitle = "Kunlik xarajatlar",
-                onClick = onRasxod
-            )
-            SettingsItem(
-                icon = Icons.Outlined.Notifications,
-                title = "Eslatma va Limit",
-                subtitle = "Qarz eslatmasi va limit ogohlantirishi",
-                onClick = onReminder
-            )
+            // 3) Alias
             SettingsItem(
                 icon = Icons.Outlined.Edit,
                 title = "Alias va Rename",
                 subtitle = "Mijoz nomlarini birlashtirish yoki o'zgartirish",
                 onClick = onAlias
             )
-            SettingsItem(
-                icon = Icons.Outlined.Edit,
-                title = "Karzina",
-                subtitle = "O'chirilgan yozuvlarni tiklash",
-                onClick = onKarzina
-            )
 
-            // Biometric toggle
+            // 4) Barmoq izi qulf
             ToggleItem(
                 icon = Icons.Outlined.Fingerprint,
                 title = "Barmoq izi qulf",
@@ -155,7 +172,7 @@ fun SettingsScreen(
                 onCheckedChange = { vm.setLockEnabled(it) }
             )
 
-            // PIN kod
+            // 5) PIN kod
             SettingsItem(
                 icon = Icons.Outlined.Lock,
                 title = "PIN kod",
@@ -163,15 +180,23 @@ fun SettingsScreen(
                 onClick = { showPinDialog = true }
             )
 
-            // Backup (CSV eksport)
+            // 6) Backup (CSV eksport)
             SettingsItem(
-                icon = Icons.Outlined.Lock,
-                title = "💾 Backup (zaxira)",
+                icon = Icons.Outlined.Save,
+                title = "💾 Backup",
                 subtitle = "Barcha yozuvlarni CSV faylga saqlash",
                 onClick = {
                     val stamp = java.time.LocalDate.now().toString()
                     backupLauncher.launch("daftar_backup_$stamp.csv")
                 }
+            )
+
+            // 7) Karzina
+            SettingsItem(
+                icon = Icons.Outlined.Delete,
+                title = "Karzina",
+                subtitle = "O'chirilgan yozuvlarni tiklash",
+                onClick = onKarzina
             )
 
             Spacer(Modifier.height(16.dp))
