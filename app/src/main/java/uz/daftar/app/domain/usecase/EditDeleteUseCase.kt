@@ -19,7 +19,8 @@ class EditTransactionUseCase @Inject constructor(
         type: TxType,
         amount: Double,
         date: String,
-        tOverride: Double? = null
+        tOverride: Double? = null,
+        costTier: String? = null
     ) {
         txDao.insert(
             TransactionEntity(
@@ -29,7 +30,8 @@ class EditTransactionUseCase @Inject constructor(
                 type = type.code,
                 amount = amount,
                 date = date,
-                tOverride = tOverride
+                tOverride = tOverride,
+                costTier = costTier
             )
         )
     }
