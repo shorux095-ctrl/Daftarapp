@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
@@ -460,23 +461,56 @@ fun TodayScreen(
                                         month = item.preview.month,
                                         onPrev = { vm.shiftHistoryMonth(item.id, -1) },
                                         onNext = { vm.shiftHistoryMonth(item.id, 1) },
-                                        onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) }
+                                        onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) },
+                                        onEditTx = onEditTx,
+                                        onDeleteTx = { vm.deleteOne(it) }
                                     )
                                 }
                                 if (deleteChatId == item.id) {
-                                    Surface(
-                                        onClick = { vm.removeChat(item.id); deleteChatId = null },
-                                        shape = androidx.compose.foundation.shape.CircleShape,
-                                        color = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                                    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+                                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                                    val copyText = when (item) {
+                                        is ChatItem.User -> item.text
+                                        is ChatItem.Info -> item.text
+                                        else -> null
+                                    }
+                                    Row(
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        if (copyText != null) {
+                                            Surface(
+                                                onClick = {
+                                                    clip.setText(androidx.compose.ui.text.AnnotatedString(copyText))
+                                                    android.widget.Toast.makeText(ctx, "📋 Nusxa olindi", android.widget.Toast.LENGTH_SHORT).show()
+                                                    deleteChatId = null
+                                                },
+                                                shape = androidx.compose.foundation.shape.CircleShape,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                                ) {
+                                                    Icon(Icons.Outlined.ContentCopy, contentDescription = "Nusxa", tint = androidx.compose.ui.graphics.Color.White)
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text("Nusxa", color = androidx.compose.ui.graphics.Color.White, fontSize = 13.sp)
+                                                }
+                                            }
+                                        }
+                                        Surface(
+                                            onClick = { vm.removeChat(item.id); deleteChatId = null },
+                                            shape = androidx.compose.foundation.shape.CircleShape,
+                                            color = MaterialTheme.colorScheme.error
                                         ) {
-                                            Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = androidx.compose.ui.graphics.Color.White)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("O'chirish", color = androidx.compose.ui.graphics.Color.White, fontSize = 13.sp)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = androidx.compose.ui.graphics.Color.White)
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("O'chirish", color = androidx.compose.ui.graphics.Color.White, fontSize = 13.sp)
+                                            }
                                         }
                                     }
                                 }
@@ -562,7 +596,7 @@ private fun ChatTopBar(
     var hisobotOpen by remember { mutableStateOf(false) }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v3", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1099,8 +1133,12 @@ private fun PreviewHistoryCard(
     month: java.time.YearMonth,
     onPrev: () -> Unit,
     onNext: () -> Unit,
-    onCloseDebt: () -> Unit = {}
+    onCloseDebt: () -> Unit = {},
+    onEditTx: (Long) -> Unit = {},
+    onDeleteTx: (Long) -> Unit = {}
 ) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var actionTx by remember { mutableStateOf<uz.daftar.app.data.db.entity.TransactionEntity?>(null) }
     val monthPrefix = "%04d-%02d".format(month.year, month.monthValue)
     val monthTxs = allTxs.filter { it.date.startsWith(monthPrefix) }
     val monthLabel = "${MONTHS_UZ_TODAY[month.monthValue - 1]} ${month.year}"
@@ -1198,6 +1236,7 @@ private fun PreviewHistoryCard(
                             val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
                             Text(
                                 "  $main  $time$bal",
+                                modifier = Modifier.fillMaxWidth().clickable { actionTx = tx },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 color = if (isPayment) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -1266,6 +1305,37 @@ private fun PreviewHistoryCard(
                 }
             }
         }
+    }
+
+    // Yozuvga bosilganda — Nusxa / Tahrirlash / O'chirish
+    actionTx?.let { tx ->
+        val typeUp = tx.type.uppercase()
+        val up = priceByTx[tx.id]
+        val lineText = if (tx.type.lowercase() == "p")
+            "P: ${tx.amount.formatMoney()}"
+        else if (up != null)
+            "$typeUp: ${tx.amount.formatQty()} × ${up.formatQty()} = ${(tx.amount * up).formatMoney()}"
+        else "$typeUp: ${tx.amount.formatQty()}"
+        AlertDialog(
+            onDismissRequest = { actionTx = null },
+            title = { Text("📝 $lineText") },
+            text = { Text("${tx.date.take(10)} — nima qilamiz?") },
+            confirmButton = {
+                Column {
+                    TextButton(onClick = {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(lineText))
+                        actionTx = null
+                    }) { Text("📋 Nusxa olish") }
+                    TextButton(onClick = { val id = tx.id; actionTx = null; onEditTx(id) }) {
+                        Text("✏️ Tahrirlash")
+                    }
+                    TextButton(onClick = { val id = tx.id; actionTx = null; onDeleteTx(id) }) {
+                        Text("🗑 O'chirish", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { actionTx = null }) { Text("Bekor") } }
+        )
     }
 }
 

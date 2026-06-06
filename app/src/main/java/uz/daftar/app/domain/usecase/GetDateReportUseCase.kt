@@ -3,6 +3,7 @@ package uz.daftar.app.domain.usecase
 import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.dao.TransactionDao
 import uz.daftar.app.data.db.dao.YukNarxDao
+import uz.daftar.app.data.db.dao.ClientPriceDao
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import java.time.LocalDate
@@ -35,7 +36,8 @@ data class DateReportEntry(
 class GetDateReportUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val yukNarxDao: YukNarxDao,
-    private val priceDao: PriceHistoryDao
+    private val priceDao: PriceHistoryDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false): DateReport {
         val title = date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))
@@ -80,6 +82,16 @@ class GetDateReportUseCase @Inject constructor(
                 .mapValues { e -> e.value.map { it.date to it.price }.sortedBy { it.first } }
         }
 
+        // Mijozning JORIY narxi (client_prices) — price_history bo'sh bo'lsa zaxira
+        val cPriceByClient = mutableMapOf<String, Map<String, Double?>>()
+        for (cl in clientLowers) {
+            val cp = runCatching { clientPriceDao.get(userId, cl) }.getOrNull()
+            cPriceByClient[cl] = mapOf(
+                "a" to cp?.aPrice, "b" to cp?.bPrice, "c" to cp?.cPrice,
+                "d" to cp?.dPrice, "k" to cp?.kPrice
+            )
+        }
+
         // Global T narxlar (T va T1)
         val tPrices = mutableMapOf<String, Double?>()
         val t1Prices = mutableMapOf<String, Double?>()
@@ -100,8 +112,10 @@ class GetDateReportUseCase @Inject constructor(
         fun effectivePrice(tx: TransactionEntity): Double? {
             val t = tx.type.lowercase()
             return if (useNarx) {
-                // N narx (sotilgan narx): mijozning O'SHA SANADAGI N narxi → global T
-                priceAtList(nHistByClient[tx.clientName.lowercase()]?.get(t), tx.date) ?: tPrices[t]
+                // N narx (sotilgan narx): O'SHA SANADAGI narx → joriy narx (client_prices) → global T
+                priceAtList(nHistByClient[tx.clientName.lowercase()]?.get(t), tx.date)
+                    ?: cPriceByClient[tx.clientName.lowercase()]?.get(t)
+                    ?: tPrices[t]
             } else {
                 // T narx (J): bir martalik T override → T1 tarif → global T
                 tx.tOverride ?: if (tx.costTier == "t1") (t1Prices[t] ?: tPrices[t]) else tPrices[t]
