@@ -1,10 +1,13 @@
 package uz.daftar.app.ui.screen.edit
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,6 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.domain.model.TxType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,12 +33,10 @@ fun EditTransactionScreen(
     vm: EditTransactionViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val fmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.isSaved) {
-        if (state.isSaved) {
-            onSaved()
-        }
-    }
+    LaunchedEffect(state.isSaved) { if (state.isSaved) onSaved() }
 
     Scaffold(
         topBar = {
@@ -47,19 +52,18 @@ fun EditTransactionScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState())
         ) {
             when {
-                state.isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.isLoading -> Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
                 state.error != null && state.original == null -> Text(
-                    "Xato: ${state.error}",
-                    color = MaterialTheme.colorScheme.error
+                    "Xato: ${state.error}", color = MaterialTheme.colorScheme.error
                 )
                 state.original != null -> {
                     val orig = state.original!!
-                    // Info card
+                    // Mijoz
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -68,46 +72,76 @@ fun EditTransactionScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text("Mijoz:", style = MaterialTheme.typography.labelSmall)
                             Text(
-                                orig.clientName.replaceFirstChar {
-                                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                                orig.clientName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text("Sana: ${orig.date.take(10)}", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     Spacer(Modifier.height(16.dp))
 
+                    // Tur
                     Text("Tur", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K, TxType.P, TxType.Q)) {
-                            FilterChip(
-                                selected = state.type == t,
-                                onClick = { vm.setType(t) },
-                                label = { Text(t.label) }
-                            )
+                    FlowRowChips(state.type) { vm.setType(it) }
+                    Spacer(Modifier.height(16.dp))
+
+                    // Sana
+                    Text("Sana", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedCard(modifier = Modifier.fillMaxWidth(), onClick = { showDatePicker = true }) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(state.date.format(fmt), style = MaterialTheme.typography.titleMedium)
                         }
                     }
                     Spacer(Modifier.height(16.dp))
 
+                    // Miqdor (yuk yoki pul)
                     OutlinedTextField(
                         value = state.amount,
                         onValueChange = vm::setAmount,
-                        label = { Text("Miqdor") },
+                        label = { Text(if (state.isCargo) "Yuk miqdori" else "Summa (pul)") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         isError = state.error != null
                     )
 
+                    // Faqat yuk uchun: N narx, T narx, T1
+                    if (state.isCargo) {
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = state.nNarx,
+                            onValueChange = vm::setNNarx,
+                            label = { Text("N narx — sotuv narxi") },
+                            supportingText = { Text("Bu sanadan boshlab shu mijoz uchun narx") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = state.tNarx,
+                            onValueChange = vm::setTNarx,
+                            label = { Text("T narx — tannarx (ixtiyoriy)") },
+                            supportingText = { Text("Bo'sh = global T narx ishlatiladi") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = state.isT1, onCheckedChange = { vm.setIsT1(it) })
+                            Text("T1 tarif (ikkinchi tannarx)")
+                        }
+                    }
+
                     state.error?.let {
                         Spacer(Modifier.height(8.dp))
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(20.dp))
 
                     Button(
                         onClick = vm::save,
@@ -118,8 +152,38 @@ fun EditTransactionScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Saqlash")
                     }
+                    Spacer(Modifier.height(24.dp))
                 }
             }
+        }
+    }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        val d = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate()
+                        vm.setDate(d)
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Bekor") } }
+        ) { DatePicker(state = pickerState) }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlowRowChips(selected: TxType, onSelect: (TxType) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K, TxType.P, TxType.Q)) {
+            FilterChip(selected = selected == t, onClick = { onSelect(t) }, label = { Text(t.label) })
         }
     }
 }

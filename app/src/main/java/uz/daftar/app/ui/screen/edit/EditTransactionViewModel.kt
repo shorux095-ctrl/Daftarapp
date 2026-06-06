@@ -9,10 +9,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.dao.TransactionDao
+import uz.daftar.app.data.db.entity.PriceHistoryEntity
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.EditTransactionUseCase
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class EditState(
@@ -20,14 +23,21 @@ data class EditState(
     val original: TransactionEntity? = null,
     val type: TxType = TxType.A,
     val amount: String = "",
+    val date: LocalDate = LocalDate.now(),
+    val nNarx: String = "",
+    val tNarx: String = "",
+    val isT1: Boolean = false,
     val isSaved: Boolean = false,
     val error: String? = null
-)
+) {
+    val isCargo: Boolean get() = type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+}
 
 @HiltViewModel
 class EditTransactionViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val txDao: TransactionDao,
+    private val priceDao: PriceHistoryDao,
     private val editUC: EditTransactionUseCase
 ) : ViewModel() {
 
@@ -39,24 +49,36 @@ class EditTransactionViewModel @Inject constructor(
 
     init { load() }
 
+    private fun fmtNum(d: Double): String =
+        if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
+
     private fun load() {
         viewModelScope.launch {
             try {
-                // Bitta tx olish uchun barcha tx orasidan topamiz (kichik trade-off — alohida getById ham qo'shish mumkin)
                 val all = txDao.getRange(userId, "0000-00-00 00:00:00", "9999-12-31 23:59:59")
                 val tx = all.firstOrNull { it.id == txId }
-                if (tx != null) {
-                    val type = TxType.fromCode(tx.type) ?: TxType.A
-                    _state.update {
-                        it.copy(
-                            isLoading = false,
-                            original = tx,
-                            type = type,
-                            amount = if (tx.amount == tx.amount.toLong().toDouble()) tx.amount.toLong().toString() else tx.amount.toString()
-                        )
-                    }
-                } else {
+                if (tx == null) {
                     _state.update { it.copy(isLoading = false, error = "Yozuv topilmadi") }
+                    return@launch
+                }
+                val type = TxType.fromCode(tx.type) ?: TxType.A
+                val day = runCatching { LocalDate.parse(tx.date.take(10)) }.getOrDefault(LocalDate.now())
+                var nNarx = ""
+                if (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                    val p = runCatching { priceDao.getPriceAt(userId, tx.clientName, tx.type, tx.date) }.getOrNull()
+                    if (p != null) nNarx = fmtNum(p)
+                }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        original = tx,
+                        type = type,
+                        amount = fmtNum(tx.amount),
+                        date = day,
+                        nNarx = nNarx,
+                        tNarx = tx.tOverride?.let { v -> fmtNum(v) } ?: "",
+                        isT1 = tx.costTier == "t1"
+                    )
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -64,22 +86,25 @@ class EditTransactionViewModel @Inject constructor(
         }
     }
 
-    fun setType(t: TxType) {
-        _state.update { it.copy(type = t) }
-    }
-
-    fun setAmount(s: String) {
-        _state.update { it.copy(amount = s) }
-    }
+    fun setType(t: TxType) = _state.update { it.copy(type = t) }
+    fun setAmount(s: String) = _state.update { it.copy(amount = s) }
+    fun setDate(d: LocalDate) = _state.update { it.copy(date = d) }
+    fun setNNarx(s: String) = _state.update { it.copy(nNarx = s) }
+    fun setTNarx(s: String) = _state.update { it.copy(tNarx = s) }
+    fun setIsT1(b: Boolean) = _state.update { it.copy(isT1 = b) }
 
     fun save() {
         val s = state.value
         val orig = s.original ?: return
         val amt = s.amount.replace(",", ".").toDoubleOrNull()
         if (amt == null || amt <= 0) {
-            _state.update { it.copy(error = "Noto'g'ri summa") }
+            _state.update { it.copy(error = "Noto'g'ri miqdor") }
             return
         }
+        val timePart = if (orig.date.length > 10) orig.date.substring(10) else " 12:00:00"
+        val newDate = s.date.toString() + timePart
+        val tOv = s.tNarx.replace(",", ".").toDoubleOrNull()
+
         viewModelScope.launch {
             try {
                 editUC(
@@ -88,9 +113,24 @@ class EditTransactionViewModel @Inject constructor(
                     clientName = orig.clientName,
                     type = s.type,
                     amount = amt,
-                    date = orig.date,
-                    tOverride = orig.tOverride
+                    date = newDate,
+                    tOverride = if (s.isCargo) tOv else null,
+                    costTier = if (s.isCargo && s.isT1) "t1" else null
                 )
+                if (s.isCargo) {
+                    val n = s.nNarx.replace(",", ".").toDoubleOrNull()
+                    if (n != null && n > 0) {
+                        priceDao.insert(
+                            PriceHistoryEntity(
+                                userId = orig.userId,
+                                clientName = orig.clientName.lowercase(),
+                                priceType = s.type.code,
+                                price = n,
+                                date = newDate
+                            )
+                        )
+                    }
+                }
                 _state.update { it.copy(isSaved = true, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
