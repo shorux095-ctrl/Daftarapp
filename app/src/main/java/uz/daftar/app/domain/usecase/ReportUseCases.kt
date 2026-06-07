@@ -4,6 +4,7 @@ import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.dao.RasxodDao
 import uz.daftar.app.data.db.dao.TransactionDao
 import uz.daftar.app.data.db.dao.YukNarxDao
+import uz.daftar.app.data.db.dao.ClientPriceDao
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import java.time.LocalDate
@@ -43,14 +44,15 @@ class GetDailyReportUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
     private val yukDao: YukNarxDao,
-    private val rasxodDao: RasxodDao
+    private val rasxodDao: RasxodDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, date: LocalDate): PeriodReport {
         val start = date.atStartOfDay().format(ISO)
         val end = date.plusDays(1).atStartOfDay().format(ISO)
         val txs = txDao.getRange(userId, start, end)
         val rasxodTotal = (rasxodDao.getTotalRange(userId, start, end) ?: 0.0).roundToLong()
-        val report = buildReport(userId, txs, yukDao, priceDao, rasxodTotal)
+        val report = buildReport(userId, txs, yukDao, priceDao, clientPriceDao, rasxodTotal)
         return report.copy(
             title = "Kunlik hisobot",
             rangeLabel = date.format(LABEL_DATE)
@@ -67,7 +69,8 @@ class GetMonthlyReportUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
     private val yukDao: YukNarxDao,
-    private val rasxodDao: RasxodDao
+    private val rasxodDao: RasxodDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, year: Int, month: Int): PeriodReport {
         val ym = YearMonth.of(year, month)
@@ -75,7 +78,7 @@ class GetMonthlyReportUseCase @Inject constructor(
         val e = ym.atEndOfMonth().plusDays(1).atStartOfDay().format(GetDailyReportUseCase.ISO)
         val txs = txDao.getRange(userId, s, e)
         val rasxodTotal = (rasxodDao.getTotalRange(userId, s, e) ?: 0.0).roundToLong()
-        val report = buildReport(userId, txs, yukDao, priceDao, rasxodTotal)
+        val report = buildReport(userId, txs, yukDao, priceDao, clientPriceDao, rasxodTotal)
         return report.copy(
             title = "Oylik hisobot",
             rangeLabel = "${MONTH_UZ[month - 1]} $year"
@@ -87,14 +90,15 @@ class GetYearlyReportUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
     private val yukDao: YukNarxDao,
-    private val rasxodDao: RasxodDao
+    private val rasxodDao: RasxodDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, year: Int): PeriodReport {
         val s = LocalDate.of(year, 1, 1).atStartOfDay().format(GetDailyReportUseCase.ISO)
         val e = LocalDate.of(year + 1, 1, 1).atStartOfDay().format(GetDailyReportUseCase.ISO)
         val txs = txDao.getRange(userId, s, e)
         val rasxodTotal = (rasxodDao.getTotalRange(userId, s, e) ?: 0.0).roundToLong()
-        val report = buildReport(userId, txs, yukDao, priceDao, rasxodTotal)
+        val report = buildReport(userId, txs, yukDao, priceDao, clientPriceDao, rasxodTotal)
         return report.copy(
             title = "Yillik hisobot",
             rangeLabel = "$year yil"
@@ -121,7 +125,8 @@ data class MonthDebtReport(
 class GetMonthClientDebtUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
-    private val yukDao: YukNarxDao
+    private val yukDao: YukNarxDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, year: Int, month: Int): MonthDebtReport {
         val ym = YearMonth.of(year, month)
@@ -137,7 +142,7 @@ class GetMonthClientDebtUseCase @Inject constructor(
                 TxType.P -> arr[1] += tx.amount
                 TxType.Q -> arr[0] += tx.amount
                 in cargo -> {
-                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao)
+                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao)
                         ?: tx.tOverride
                     if (n != null) arr[0] += tx.amount * n
                 }
@@ -164,6 +169,7 @@ internal suspend fun buildReport(
     txs: List<TransactionEntity>,
     yukDao: YukNarxDao,
     priceDao: PriceHistoryDao,
+    clientPriceDao: ClientPriceDao,
     rasxodTotal: Long
 ): PeriodReport {
     val totals = mutableMapOf<TxType, Double>()
@@ -205,7 +211,7 @@ internal suspend fun buildReport(
             in cargo -> {
                 // Sotilgan narx (N): avval N (mijoz uchun), bo'lmasa T (global)
                 val nPrice = findPriceForReport(
-                    userId, tx.clientName, tx.type, tx.date, priceDao, yukDao
+                    userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao
                 ) ?: tx.tOverride
                 if (nPrice != null) revenue += tx.amount * nPrice
                 // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T (O'SHA SANADAGI)
@@ -241,16 +247,28 @@ private suspend fun findPriceForReport(
     type: String,
     date: String,
     priceDao: PriceHistoryDao,
-    yukDao: YukNarxDao
+    yukDao: YukNarxDao,
+    clientPriceDao: ClientPriceDao
 ): Double? {
     // Kun darajasida: shu kunning oxirigacha — bugun qo'yilgan narx bugungi yuklarga ham tegishli
     val dayEnd = date.take(10) + " 23:59:59"
-    // 1) Client uchun N narx
+    // 1) Client uchun N narx (price_history)
     val nPrice = priceDao.getPriceAt(userId, clientName, type, dayEnd)
     if (nPrice != null) return nPrice
     val nNext = priceDao.getNextPrice(userId, clientName, type, dayEnd)
     if (nNext != null) return nNext
-    // 2) Global T narx
+    // 2) Mijozning JORIY narxi (client_prices) — global T dan OLDIN
+    val cp = runCatching { clientPriceDao.get(userId, clientName) }.getOrNull()
+    val cpPrice = when (type.lowercase()) {
+        "a" -> cp?.aPrice
+        "b" -> cp?.bPrice
+        "c" -> cp?.cPrice
+        "d" -> cp?.dPrice
+        "k" -> cp?.kPrice
+        else -> null
+    }
+    if (cpPrice != null && cpPrice > 0.0) return cpPrice
+    // 3) Global T narx
     val tEntry = yukDao.getLatestGlobal(userId, type, "t") ?: return null
     return tEntry.price
 }
@@ -272,7 +290,8 @@ data class ClientProfitReport(
 class GetClientProfitUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
-    private val yukDao: YukNarxDao
+    private val yukDao: YukNarxDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, clientName: String): ClientProfitReport {
         val cn = clientName.lowercase()
@@ -307,7 +326,7 @@ class GetClientProfitUseCase @Inject constructor(
                 "p" -> 0.0
                 "q" -> 0.0  // qo'lda qarz — foyda emas
                 in cargo -> {
-                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao) ?: tx.tOverride
+                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao) ?: tx.tOverride
                     val globalCost = if (tx.costTier == "t1") (globalAt(t1Hist[tx.type], tx.date) ?: globalAt(tHist[tx.type], tx.date)) else globalAt(tHist[tx.type], tx.date)
                     val t = tx.tOverride ?: globalCost
                     if (n != null && t != null) tx.amount * (n - t)
