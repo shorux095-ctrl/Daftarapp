@@ -610,7 +610,7 @@ private fun ChatTopBar(
     val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v8", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v9", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {

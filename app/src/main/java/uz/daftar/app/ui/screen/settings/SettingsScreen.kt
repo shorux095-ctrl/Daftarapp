@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,6 +70,8 @@ fun SettingsScreen(
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
     val importMsg by vm.importMsg.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
+    var showLogDialog by remember { mutableStateOf(false) }
+    var logText by remember { mutableStateOf("") }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -199,6 +203,34 @@ fun SettingsScreen(
                 onClick = onKarzina
             )
 
+            // 8) Xato loglari — oq ekran/xato sababini ko'rish (Termuxdek)
+            SettingsItem(
+                icon = Icons.Outlined.BugReport,
+                title = "🐞 Xato loglari",
+                subtitle = "Oq ekran yoki xato sababini ko'rish",
+                onClick = {
+                    scope.launch {
+                        logText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val sb = StringBuilder()
+                            runCatching {
+                                val f = java.io.File(context.filesDir, "last_crash.txt")
+                                if (f.exists()) sb.append("=== OXIRGI CRASH ===\n").append(f.readText()).append("\n\n")
+                            }
+                            runCatching {
+                                val p = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time", "-t", "500"))
+                                sb.append("=== LOGCAT (oxirgi) ===\n").append(p.inputStream.bufferedReader().readText())
+                            }
+                            runCatching {
+                                val f = java.io.File(context.filesDir, "app_log.txt")
+                                if (f.exists()) sb.append("\n\n=== app_log.txt ===\n").append(f.readText())
+                            }
+                            if (sb.isBlank()) "Log bo'sh — hali xato yozilmagan." else sb.toString()
+                        }
+                        showLogDialog = true
+                    }
+                }
+            )
+
             Spacer(Modifier.height(16.dp))
             Text(
                 "Daftar — solo qarz va yuk daftari",
@@ -206,6 +238,43 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (showLogDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLogDialog = false },
+                    title = { Text("🐞 Xato loglari") },
+                    text = {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(
+                                logText,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(380.dp)
+                                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            runCatching {
+                                val clip = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clip.setPrimaryClip(android.content.ClipData.newPlainText("log", logText))
+                                android.widget.Toast.makeText(context, "Nusxa olindi", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }) { Text("📋 Nusxa olish") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            runCatching {
+                                java.io.File(context.filesDir, "app_log.txt").delete()
+                                java.io.File(context.filesDir, "last_crash.txt").delete()
+                            }
+                            showLogDialog = false
+                        }) { Text("Tozalash") }
+                    }
+                )
+            }
 
             if (showPinDialog) {
                 PinDialog(
