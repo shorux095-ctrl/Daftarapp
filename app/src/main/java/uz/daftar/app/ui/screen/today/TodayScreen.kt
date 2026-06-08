@@ -178,11 +178,14 @@ fun TodayScreen(
     var bottomMenuOpen by remember { mutableStateOf(false) }
     // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
+    var crashText by remember { mutableStateOf<String?>(null) }
 
     // Yangi xabar qo'shilsa, chat oxiriga scroll
     LaunchedEffect(state.chat.size) {
-        if (state.chat.isNotEmpty()) {
-            listState.animateScrollToItem(state.chat.size - 1)
+        runCatching {
+            if (state.chat.isNotEmpty()) {
+                listState.animateScrollToItem(state.chat.size - 1)
+            }
         }
     }
     LaunchedEffect(state.justSentSummary) {
@@ -210,9 +213,18 @@ fun TodayScreen(
             if (f.exists()) {
                 val txt = f.readText()
                 f.delete()
-                if (txt.isNotBlank()) vm.showCrashLog(txt)
+                if (txt.isNotBlank()) crashText = txt
             }
         }
+    }
+
+    crashText?.let { ct ->
+        AlertDialog(
+            onDismissRequest = { crashText = null },
+            title = { Text("⚠️ Oxirgi xato (skrinshot qiling)") },
+            text = { Text(ct.take(1600), style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { crashText = null }) { Text("Yopish") } }
+        )
     }
 
     state.confirmDeleteDate?.let { d ->
@@ -596,7 +608,7 @@ private fun ChatTopBar(
     var hisobotOpen by remember { mutableStateOf(false) }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v5", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v6", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -605,7 +617,7 @@ private fun ChatTopBar(
                 }
                 DropdownMenu(
                     expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
+                    onDismissRequest = { menuOpen = false; yuklarOpen = false; hisobotOpen = false },
                     modifier = Modifier.heightIn(max = 460.dp)
                 ) {
                     // ── 1) YUKLAR (bosganda A B C D K) ──
