@@ -43,9 +43,42 @@ class DaftarApplication : Application(), Configuration.Provider {
             }
         }
         createReminderChannel(this)
+        // Ilova o'z loglarini (xato/warning) faylga yozadi — "🐞 Xato loglari" menyusida ko'rinadi.
+        startLogCapture()
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
         // scheduleDailyReminder()
         // scheduleDailyAutoReport()
+    }
+
+    /** Ilovaning o'z logcat chiqishini (faqat shu ilova) faylga yozib boradi.
+     *  OQ EKRAN yoki boshqa muammo bo'lsa — "🐞 Xato loglari" menyusida aniq sabab ko'rinadi. */
+    private fun startLogCapture() {
+        Thread {
+            runCatching {
+                val logFile = java.io.File(filesDir, "app_log.txt")
+                // Eski jarayonning logini ham olish uchun avval dump (-d emas, davomiy o'qiymiz)
+                val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-v", "time"))
+                val reader = proc.inputStream.bufferedReader()
+                val buf = StringBuilder()
+                var lastWrite = 0L
+                reader.forEachLine { line ->
+                    val important = line.contains("E/") || line.contains("Exception") ||
+                            line.contains("AndroidRuntime") || line.contains("FATAL") ||
+                            line.contains("Error")
+                    val keep = important || line.contains("W/") ||
+                            line.contains("daftar", true) || line.contains("Compose")
+                    if (keep) {
+                        buf.append(line).append('\n')
+                        if (buf.length > 90000) buf.delete(0, buf.length - 60000)
+                        val now = System.currentTimeMillis()
+                        if (important || now - lastWrite > 2000) {
+                            lastWrite = now
+                            runCatching { logFile.writeText(buf.toString()) }
+                        }
+                    }
+                }
+            }
+        }.apply { isDaemon = true }.start()
     }
 
     /** Har kuni 08:00 — zaxira + kechagi/haftalik/oylik hisobot */
