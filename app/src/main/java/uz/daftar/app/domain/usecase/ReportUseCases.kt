@@ -1,3 +1,4 @@
+// VERSIYA-MARKER-v4-cpPrice
 package uz.daftar.app.domain.usecase
 
 import uz.daftar.app.data.db.dao.PriceHistoryDao
