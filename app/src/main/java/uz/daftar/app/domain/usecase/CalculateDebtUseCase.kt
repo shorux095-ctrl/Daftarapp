@@ -37,6 +37,7 @@ class CalculateDebtUseCase @Inject constructor(
         val allPrices = priceDao.getAllForClient(userId, cn)
         val pricesByType: Map<String, List<PriceHistoryEntity>> =
             allPrices.groupBy { it.priceType }
+                .mapValues { e -> e.value.sortedBy { it.date } }
 
         // 3) Har tranzaksiya uchun qarzga qo'shamiz/ayiramiz
         var debt = 0.0
@@ -45,7 +46,9 @@ class CalculateDebtUseCase @Inject constructor(
                 TxType.P.code -> debt -= tx.amount
                 TxType.Q.code -> debt += tx.amount
                 else -> {
-                    val price = tx.tOverride ?: findPriceFor(pricesByType[tx.type], tx.date)
+                    // QARZ = N narx (SOTUV narxi). tOverride (tannarx/T) QARZDA ISHLATILMAYDI!
+                    // tannarx faqat foyda hisobida kerak, qarzda emas.
+                    val price = findPriceFor(pricesByType[tx.type], tx.date)
                     if (price != null) {
                         debt += (tx.amount * price).roundToLong()
                     }
