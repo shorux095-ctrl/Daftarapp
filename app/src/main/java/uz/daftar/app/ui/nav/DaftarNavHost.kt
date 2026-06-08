@@ -48,6 +48,17 @@ object Routes {
 @Composable
 fun DaftarNavHost() {
     val nav = rememberNavController()
+    // Har navigatsiyada (oldinga/orqaga) klaviatura va fokusni tozalaymiz.
+    // Bu IME (klaviatura insets) sababli yuzaga keladigan OQ EKRAN bug'ini barcha ekranda oldini oladi.
+    val imeFocusMgr = androidx.compose.ui.platform.LocalFocusManager.current
+    val imeKb = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    androidx.compose.runtime.DisposableEffect(nav) {
+        val listener = androidx.navigation.NavController.OnDestinationChangedListener { _, _, _ ->
+            runCatching { imeKb?.hide(); imeFocusMgr.clearFocus(true) }
+        }
+        nav.addOnDestinationChangedListener(listener)
+        onDispose { nav.removeOnDestinationChangedListener(listener) }
+    }
     androidx.compose.runtime.CompositionLocalProvider(
         uz.daftar.app.ui.common.LocalGoHome provides {
             nav.popBackStack(Routes.TODAY, inclusive = false)

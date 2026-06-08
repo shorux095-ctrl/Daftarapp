@@ -606,19 +606,20 @@ private fun ChatTopBar(
     var menuOpen by remember { mutableStateOf(false) }
     var yuklarOpen by remember { mutableStateOf(false) }
     var hisobotOpen by remember { mutableStateOf(false) }
+    val kbCtrl = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v6", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v8", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
-                IconButton(onClick = { menuOpen = true }) {
+                IconButton(onClick = { runCatching { kbCtrl?.hide(); focusMgr.clearFocus() }; menuOpen = true }) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menyu")
                 }
                 DropdownMenu(
                     expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false; yuklarOpen = false; hisobotOpen = false },
-                    modifier = Modifier.heightIn(max = 460.dp)
+                    onDismissRequest = { menuOpen = false; yuklarOpen = false; hisobotOpen = false }
                 ) {
                     // ── 1) YUKLAR (bosganda A B C D K) ──
                     DropdownMenuItem(
