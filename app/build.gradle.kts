@@ -125,8 +125,8 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.work.compiler)
 
-    // LeakCanary — faqat debug
-    debugImplementation(libs.leakcanary)
+    // LeakCanary O'CHIRILDI — heap dump ilovani muzlatib OQ EKRAN qilardi.
+    // debugImplementation(libs.leakcanary)
 
     // Tests
     testImplementation(libs.junit)
