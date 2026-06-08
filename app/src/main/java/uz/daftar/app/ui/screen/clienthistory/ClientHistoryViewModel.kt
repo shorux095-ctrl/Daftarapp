@@ -58,7 +58,7 @@ class ClientHistoryViewModel @Inject constructor(
                 // Per-tx narx (tarixiy)
                 val priceByTx = mutableMapOf<Long, Double?>()
                 for (tx in h.transactions) {
-                    priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
+                    priceByTx[tx.id] = findPriceAtDate(pricesByType[tx.type], tx.date)  // N narx (tannarx emas)
                 }
 
                 // Running debt — payment'дan keyingi qoldiqни hisoblash

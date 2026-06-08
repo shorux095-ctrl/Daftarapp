@@ -228,7 +228,7 @@ class TodayViewModel @Inject constructor(
                             TxType.P -> -tx.amount
                             TxType.Q -> tx.amount
                             else -> {
-                                val price = tx.tOverride ?: pm[tx.type]
+                                val price = pm[tx.type]  // N narx (tannarx emas)
                                 if (price != null) tx.amount * price else 0.0
                             }
                         }
@@ -780,7 +780,7 @@ class TodayViewModel @Inject constructor(
                 TxType.P -> sb.append("  P: ${tx.amount.formatMoney()}\n")
                 TxType.Q -> sb.append("  Q: ${tx.amount.formatMoney()}\n")
                 else -> {
-                    val p = tx.tOverride ?: prices[tx.type]
+                    val p = prices[tx.type]  // N narx (tannarx emas)
                     if (p != null) sb.append("  ${tx.type.code.uppercase()}: ${tx.amount.formatQty()} × ${p.formatQty()} = ${(tx.amount * p).formatMoney()}\n")
                     else sb.append("  ${tx.type.code.uppercase()}: ${tx.amount.formatQty()}  (narx yo'q)\n")
                 }
@@ -1501,7 +1501,7 @@ class TodayViewModel @Inject constructor(
         val pricesByType = allPrices.groupBy { it.priceType }
         val priceByTx = mutableMapOf<Long, Double?>()
         for (tx in history.transactions) {
-            priceByTx[tx.id] = tx.tOverride ?: findPriceAtDate(pricesByType[tx.type], tx.date)
+            priceByTx[tx.id] = findPriceAtDate(pricesByType[tx.type], tx.date)  // N narx (tannarx emas)
         }
         val asc = history.transactions.sortedBy { it.date }
         var running = 0.0

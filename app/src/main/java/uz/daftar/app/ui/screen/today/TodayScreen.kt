@@ -596,7 +596,7 @@ private fun ChatTopBar(
     var hisobotOpen by remember { mutableStateOf(false) }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v3", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v5", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -832,7 +832,7 @@ private fun ClientDayCard(
                 Spacer(Modifier.height(2.dp))
                 for (tx in txs) {
                     val isSelected = tx.id in selected
-                    val unitPrice = tx.tOverride ?: clientPrices?.get(tx.type)
+                    val unitPrice = clientPrices?.get(tx.type)  // N narx (tannarx emas)
                     val noPrice = unitPrice == null &&
                         tx.type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
                     val lineText = when {
