@@ -329,7 +329,7 @@ fun TodayScreen(
             }
         },
         bottomBar = {
-            Column {
+            Column(Modifier.imePadding()) {
                 // Pastki menyu paneli (toggle bilan ochiladi/yashirinadi)
                 if (bottomMenuOpen) {
                     Surface(tonalElevation = 2.dp) {
@@ -618,7 +618,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v15", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v17", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
