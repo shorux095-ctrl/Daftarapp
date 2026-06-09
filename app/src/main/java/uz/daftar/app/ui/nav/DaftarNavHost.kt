@@ -59,6 +59,17 @@ object Routes {
     const val SKLAD = "sklad"
 }
 
+// ── DIAGNOSTIKA: ekran HAQIQATAN kompozitsiyaga kirdimi? ──
+private var DIAG_LAST_IN: String = "start"
+@androidx.compose.runtime.Composable
+private fun DiagIn(name: String) {
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        DIAG_LAST_IN = name
+        android.util.Log.w("daftar", "IN:$name")
+        onDispose { android.util.Log.w("daftar", "OUT:$name") }
+    }
+}
+
 @Composable
 fun DaftarNavHost() {
     val nav = rememberNavController()
@@ -82,7 +93,7 @@ fun DaftarNavHost() {
     Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = Routes.TODAY) {
 
-        composable(Routes.TODAY) {
+        composable(Routes.TODAY) { DiagIn("today");
             TodayScreen(
                 onNewTx = { nav.navigate(Routes.NEW_TX) },
                 onClients = { nav.navigate(Routes.CLIENTS) },
@@ -104,11 +115,11 @@ fun DaftarNavHost() {
             )
         }
 
-        composable(Routes.NEW_TX) {
+        composable(Routes.NEW_TX) { DiagIn("new_tx");
             NewTransactionScreen(onBack = { nav.popBackStack() })
         }
 
-        composable(Routes.CLIENTS) {
+        composable(Routes.CLIENTS) { DiagIn("clients");
             ClientsScreen(
                 onBack = { nav.popBackStack() },
                 onClientClick = { name ->
@@ -117,7 +128,7 @@ fun DaftarNavHost() {
             )
         }
 
-        composable(Routes.QARZ) {
+        composable(Routes.QARZ) { DiagIn("qarz");
             ClientsScreen(
                 onBack = { nav.popBackStack() },
                 onClientClick = { name ->
@@ -155,11 +166,11 @@ fun DaftarNavHost() {
             )
         }
 
-        composable(Routes.REPORTS) {
+        composable(Routes.REPORTS) { DiagIn("reports");
             ReportsScreen(onBack = { nav.popBackStack() })
         }
 
-        composable(Routes.SETTINGS) {
+        composable(Routes.SETTINGS) { DiagIn("settings");
             SettingsScreen(
                 onBack = { nav.popBackStack() },
                 onAlias = { nav.navigate(Routes.ALIAS) },
@@ -172,18 +183,18 @@ fun DaftarNavHost() {
             )
         }
 
-        composable(Routes.ALIAS) { AliasScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SEARCH) { SearchScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.YUK_NARX) { YukNarxScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.YUK_REPORT) { uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.RASXOD) { RasxodScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.KARZINA) { KarzinaScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.REMINDER) { ReminderLimitScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.MANAGER) { uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.DASHBOARD) { uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.HELP) { uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.ESLAT) { uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SKLAD) { uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.ALIAS) { DiagIn("alias"); AliasScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.SEARCH) { DiagIn("search"); SearchScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.YUK_NARX) { DiagIn("yuk_narx"); YukNarxScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.REMINDER) { DiagIn("reminder"); ReminderLimitScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.MANAGER) { DiagIn("manager"); uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.DASHBOARD) { DiagIn("dashboard"); uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }
     }
     // ── DIAGNOSTIKA: oq ekranda ham ko'rinadi — qaysi route + jonli sanagich ──
     // Agar oq ekran paytida shu yozuv KO'RINSA → o'sha "route" ekrani bo'sh chizyapti.
@@ -193,7 +204,7 @@ fun DaftarNavHost() {
     val dbgTick = remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); dbgTick.intValue++ } }
     Text(
-        "\u2B24 ${dbgRoute} \u00B7 ${dbgTick.intValue}s",
+        "\u2B24 ${dbgRoute} \u00B7 in:${DIAG_LAST_IN} \u00B7 ${dbgTick.intValue}s",
         modifier = Modifier
             .align(Alignment.BottomStart)
             .padding(3.dp)

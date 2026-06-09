@@ -621,7 +621,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v13", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v14", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
