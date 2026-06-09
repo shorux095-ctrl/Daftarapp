@@ -47,6 +47,9 @@ interface PriceHistoryDao {
         ORDER BY price_type, date ASC, id ASC
     """)
     suspend fun getAllForClient(userId: Long, clientName: String): List<PriceHistoryEntity>
+
+    @Query("SELECT * FROM price_history WHERE user_id = :userId")
+    suspend fun getAllForUser(userId: Long): List<PriceHistoryEntity>
 }
 
 @Dao
@@ -59,6 +62,9 @@ interface ClientPriceDao {
 
     @Query("SELECT * FROM client_prices WHERE user_id = :userId")
     fun observeAll(userId: Long): Flow<List<ClientPriceEntity>>
+
+    @Query("SELECT * FROM client_prices WHERE user_id = :userId")
+    suspend fun getAllForUser(userId: Long): List<ClientPriceEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(cp: ClientPriceEntity)

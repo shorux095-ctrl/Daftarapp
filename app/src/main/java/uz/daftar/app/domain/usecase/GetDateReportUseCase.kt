@@ -77,16 +77,21 @@ class GetDateReportUseCase @Inject constructor(
         // Har mijoz uchun N narx TARIXI: type -> sorted [(date, price)] (har yozuv sanasiga qarab tanlash uchun)
         val nHistByClient = mutableMapOf<String, Map<String, List<Pair<String, Double>>>>()
         val cargoTypes = listOf("a", "b", "c", "d", "k")
+        // OPTIMALLASHTIRILDI: barcha narxlar BIR so'rovda (N+1 emas)
+        val allPricesForUser = runCatching { priceDao.getAllForUser(userId) }.getOrDefault(emptyList())
+        val pricesGroupedByClient = allPricesForUser.groupBy { it.clientName.lowercase() }
         for (cl in clientLowers) {
-            val all = runCatching { priceDao.getAllForClient(userId, cl) }.getOrDefault(emptyList())
+            val all = pricesGroupedByClient[cl] ?: emptyList()
             nHistByClient[cl] = all.groupBy { it.priceType.lowercase() }
                 .mapValues { e -> e.value.map { it.date to it.price }.sortedBy { it.first } }
         }
 
         // Mijozning JORIY narxi (client_prices) — price_history bo'sh bo'lsa zaxira
         val cPriceByClient = mutableMapOf<String, Map<String, Double?>>()
+        val allCpForUser = runCatching { clientPriceDao.getAllForUser(userId) }.getOrDefault(emptyList())
+        val cpGrouped = allCpForUser.associateBy { it.clientName.lowercase() }
         for (cl in clientLowers) {
-            val cp = runCatching { clientPriceDao.get(userId, cl) }.getOrNull()
+            val cp = cpGrouped[cl]
             cPriceByClient[cl] = mapOf(
                 "a" to cp?.aPrice, "b" to cp?.bPrice, "c" to cp?.cPrice,
                 "d" to cp?.dPrice, "k" to cp?.kPrice
