@@ -293,7 +293,9 @@ fun TodayScreen(
     }
 
     Scaffold(
-        modifier = Modifier.imePadding(),
+        // imePadding() OLIB TASHLANDI — manifestdagi adjustResize klaviaturani o'zi
+        // boshqaradi. imePadding + ☰ popup IME churn butun Scaffold'ni nolga yig'ib
+        // OQ EKRAN qilardi (route=today bo'lib turib kontent yo'qolardi).
         topBar = {
             if (state.isSelectionMode) {
                 SelectionTopBar(
@@ -619,7 +621,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v12", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v13", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
