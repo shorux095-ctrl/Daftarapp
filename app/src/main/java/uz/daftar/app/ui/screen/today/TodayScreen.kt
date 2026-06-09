@@ -293,9 +293,7 @@ fun TodayScreen(
     }
 
     Scaffold(
-        // imePadding() OLIB TASHLANDI — manifestdagi adjustResize klaviaturani o'zi
-        // boshqaradi. imePadding + ☰ popup IME churn butun Scaffold'ni nolga yig'ib
-        // OQ EKRAN qilardi (route=today bo'lib turib kontent yo'qolardi).
+        // imePadding() olib tashlandi — adjustResize klaviaturani o'zi boshqaradi (oq ekran sababi edi).
         topBar = {
             if (state.isSelectionMode) {
                 SelectionTopBar(
@@ -610,8 +608,7 @@ private fun ChatTopBar(
     var hisobotOpen by remember { mutableStateOf(false) }
     val kbCtrl = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
-    // Menyu yopilgach navigatsiyani bir lahza KEYIN bajaramiz.
-    // "menyu yopilishi + navigatsiya bir kadrda" poygasi OQ EKRAN qilardi — shu bartaraf etiladi.
+    // Menyu yopilgach navigatsiyani bir lahza KEYIN bajaramiz (popup+nav poygasi => oq ekran).
     var pendingNav by remember { mutableStateOf<(() -> Unit)?>(null) }
     androidx.compose.runtime.LaunchedEffect(pendingNav) {
         val action = pendingNav ?: return@LaunchedEffect
@@ -621,7 +618,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v14", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v15", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {

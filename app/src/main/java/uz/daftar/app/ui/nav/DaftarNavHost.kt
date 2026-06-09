@@ -73,6 +73,12 @@ private fun DiagIn(name: String) {
 @Composable
 fun DaftarNavHost() {
     val nav = rememberNavController()
+    // Tez-tez bosishni to'sish (rapid-nav race => OQ EKRAN). 400ms ichida 2-chi navigatsiya e'tiborsiz.
+    val lastNav = remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    val canNav: () -> Boolean = {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastNav.longValue >= 400L) { lastNav.longValue = now; true } else false
+    }
     // Har navigatsiyada (oldinga/orqaga) klaviatura va fokusni tozalaymiz.
     // Bu IME (klaviatura insets) sababli yuzaga keladigan OQ EKRAN bug'ini barcha ekranda oldini oladi.
     val imeFocusMgr = androidx.compose.ui.platform.LocalFocusManager.current
@@ -87,52 +93,59 @@ fun DaftarNavHost() {
     }
     androidx.compose.runtime.CompositionLocalProvider(
         uz.daftar.app.ui.common.LocalGoHome provides {
-            nav.popBackStack(Routes.TODAY, inclusive = false)
+            if (canNav()) nav.popBackStack(Routes.TODAY, inclusive = false)
         }
     ) {
     Box(Modifier.fillMaxSize()) {
-    NavHost(navController = nav, startDestination = Routes.TODAY) {
+    NavHost(
+        navController = nav,
+        startDestination = Routes.TODAY,
+        enterTransition = { androidx.compose.animation.EnterTransition.None },
+        exitTransition = { androidx.compose.animation.ExitTransition.None },
+        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+        popExitTransition = { androidx.compose.animation.ExitTransition.None }
+    ) {
 
         composable(Routes.TODAY) { DiagIn("today");
             TodayScreen(
-                onNewTx = { nav.navigate(Routes.NEW_TX) },
-                onClients = { nav.navigate(Routes.CLIENTS) },
-                onReports = { nav.navigate(Routes.REPORTS) },
-                onSettings = { nav.navigate(Routes.SETTINGS) },
-                onEditTx = { txId -> nav.navigate("${Routes.EDIT_TX}/$txId") },
-                onSearch = { nav.navigate(Routes.SEARCH) },
-                onYukNarx = { nav.navigate(Routes.YUK_NARX) },
-                onYukReport = { nav.navigate(Routes.YUK_REPORT) },
-                onAlias = { nav.navigate(Routes.ALIAS) },
-                onRasxod = { nav.navigate(Routes.RASXOD) },
-                onKarzina = { nav.navigate(Routes.KARZINA) },
-                onQarz = { nav.navigate(Routes.QARZ) },
-                onManager = { nav.navigate(Routes.MANAGER) },
-                onDashboard = { nav.navigate(Routes.DASHBOARD) },
-                onHelp = { nav.navigate(Routes.HELP) },
-                onEslat = { nav.navigate(Routes.ESLAT) },
-                onSklad = { nav.navigate(Routes.SKLAD) }
+                onNewTx = { if (canNav()) nav.navigate(Routes.NEW_TX) },
+                onClients = { if (canNav()) nav.navigate(Routes.CLIENTS) },
+                onReports = { if (canNav()) nav.navigate(Routes.REPORTS) },
+                onSettings = { if (canNav()) nav.navigate(Routes.SETTINGS) },
+                onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") },
+                onSearch = { if (canNav()) nav.navigate(Routes.SEARCH) },
+                onYukNarx = { if (canNav()) nav.navigate(Routes.YUK_NARX) },
+                onYukReport = { if (canNav()) nav.navigate(Routes.YUK_REPORT) },
+                onAlias = { if (canNav()) nav.navigate(Routes.ALIAS) },
+                onRasxod = { if (canNav()) nav.navigate(Routes.RASXOD) },
+                onKarzina = { if (canNav()) nav.navigate(Routes.KARZINA) },
+                onQarz = { if (canNav()) nav.navigate(Routes.QARZ) },
+                onManager = { if (canNav()) nav.navigate(Routes.MANAGER) },
+                onDashboard = { if (canNav()) nav.navigate(Routes.DASHBOARD) },
+                onHelp = { if (canNav()) nav.navigate(Routes.HELP) },
+                onEslat = { if (canNav()) nav.navigate(Routes.ESLAT) },
+                onSklad = { if (canNav()) nav.navigate(Routes.SKLAD) }
             )
         }
 
         composable(Routes.NEW_TX) { DiagIn("new_tx");
-            NewTransactionScreen(onBack = { nav.popBackStack() })
+            NewTransactionScreen(onBack = { if (canNav()) nav.popBackStack() })
         }
 
         composable(Routes.CLIENTS) { DiagIn("clients");
             ClientsScreen(
-                onBack = { nav.popBackStack() },
+                onBack = { if (canNav()) nav.popBackStack() },
                 onClientClick = { name ->
-                    nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
                 }
             )
         }
 
         composable(Routes.QARZ) { DiagIn("qarz");
             ClientsScreen(
-                onBack = { nav.popBackStack() },
+                onBack = { if (canNav()) nav.popBackStack() },
                 onClientClick = { name ->
-                    nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
                 },
                 debtorsOnly = true
             )
@@ -143,9 +156,9 @@ fun DaftarNavHost() {
             arguments = listOf(navArgument("clientName") { type = NavType.StringType })
         ) {
             ClientHistoryScreen(
-                onBack = { nav.popBackStack() },
-                onEditTx = { txId -> nav.navigate("${Routes.EDIT_TX}/$txId") },
-                onSetNarx = { name -> nav.navigate("${Routes.CLIENT_NARX}/$name") }
+                onBack = { if (canNav()) nav.popBackStack() },
+                onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") },
+                onSetNarx = { name -> if (canNav()) nav.navigate("${Routes.CLIENT_NARX}/$name") }
             )
         }
 
@@ -153,7 +166,7 @@ fun DaftarNavHost() {
             route = "${Routes.CLIENT_NARX}/{clientName}",
             arguments = listOf(navArgument("clientName") { type = NavType.StringType })
         ) {
-            ClientNarxScreen(onBack = { nav.popBackStack() })
+            ClientNarxScreen(onBack = { if (canNav()) nav.popBackStack() })
         }
 
         composable(
@@ -161,40 +174,40 @@ fun DaftarNavHost() {
             arguments = listOf(navArgument("txId") { type = NavType.StringType })
         ) {
             EditTransactionScreen(
-                onBack = { nav.popBackStack() },
-                onSaved = { nav.popBackStack() }
+                onBack = { if (canNav()) nav.popBackStack() },
+                onSaved = { if (canNav()) nav.popBackStack() }
             )
         }
 
         composable(Routes.REPORTS) { DiagIn("reports");
-            ReportsScreen(onBack = { nav.popBackStack() })
+            ReportsScreen(onBack = { if (canNav()) nav.popBackStack() })
         }
 
         composable(Routes.SETTINGS) { DiagIn("settings");
             SettingsScreen(
-                onBack = { nav.popBackStack() },
-                onAlias = { nav.navigate(Routes.ALIAS) },
-                onSearch = { nav.navigate(Routes.SEARCH) },
-                onYukNarx = { nav.navigate(Routes.YUK_NARX) },
-                onRasxod = { nav.navigate(Routes.RASXOD) },
-                onKarzina = { nav.navigate(Routes.KARZINA) },
-                onReminder = { nav.navigate(Routes.REMINDER) },
-                onManager = { nav.navigate(Routes.MANAGER) }
+                onBack = { if (canNav()) nav.popBackStack() },
+                onAlias = { if (canNav()) nav.navigate(Routes.ALIAS) },
+                onSearch = { if (canNav()) nav.navigate(Routes.SEARCH) },
+                onYukNarx = { if (canNav()) nav.navigate(Routes.YUK_NARX) },
+                onRasxod = { if (canNav()) nav.navigate(Routes.RASXOD) },
+                onKarzina = { if (canNav()) nav.navigate(Routes.KARZINA) },
+                onReminder = { if (canNav()) nav.navigate(Routes.REMINDER) },
+                onManager = { if (canNav()) nav.navigate(Routes.MANAGER) }
             )
         }
 
-        composable(Routes.ALIAS) { DiagIn("alias"); AliasScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SEARCH) { DiagIn("search"); SearchScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.YUK_NARX) { DiagIn("yuk_narx"); YukNarxScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.REMINDER) { DiagIn("reminder"); ReminderLimitScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.MANAGER) { DiagIn("manager"); uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.DASHBOARD) { DiagIn("dashboard"); uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.ALIAS) { DiagIn("alias"); AliasScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.SEARCH) { DiagIn("search"); SearchScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.YUK_NARX) { DiagIn("yuk_narx"); YukNarxScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.REMINDER) { DiagIn("reminder"); ReminderLimitScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.MANAGER) { DiagIn("manager"); uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.DASHBOARD) { DiagIn("dashboard"); uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { if (canNav()) nav.popBackStack() }) }
     }
     // ── DIAGNOSTIKA: oq ekranda ham ko'rinadi — qaysi route + jonli sanagich ──
     // Agar oq ekran paytida shu yozuv KO'RINSA → o'sha "route" ekrani bo'sh chizyapti.
