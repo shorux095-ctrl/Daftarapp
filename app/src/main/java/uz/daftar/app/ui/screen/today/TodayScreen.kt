@@ -608,9 +608,18 @@ private fun ChatTopBar(
     var hisobotOpen by remember { mutableStateOf(false) }
     val kbCtrl = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusMgr = androidx.compose.ui.platform.LocalFocusManager.current
+    // Menyu yopilgach navigatsiyani bir lahza KEYIN bajaramiz.
+    // "menyu yopilishi + navigatsiya bir kadrda" poygasi OQ EKRAN qilardi — shu bartaraf etiladi.
+    var pendingNav by remember { mutableStateOf<(() -> Unit)?>(null) }
+    androidx.compose.runtime.LaunchedEffect(pendingNav) {
+        val action = pendingNav ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(90)
+        action()
+        pendingNav = null
+    }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v11", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v12", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -632,7 +641,7 @@ private fun ChatTopBar(
                         listOf("A", "B", "C", "D", "K").forEach { t ->
                             DropdownMenuItem(
                                 text = { Text("     $t — bugun") },
-                                onClick = { menuOpen = false; yuklarOpen = false; onYukType(t) }
+                                onClick = { menuOpen = false; yuklarOpen = false; pendingNav = { onYukType(t) } }
                             )
                         }
                     }
@@ -640,50 +649,50 @@ private fun ChatTopBar(
                     DropdownMenuItem(
                         text = { Text("📦 Yuk hisoboti") },
                         leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
-                        onClick = { menuOpen = false; onYukReport() }
+                        onClick = { menuOpen = false; pendingNav = onYukReport }
                     )
                     // ── 3) HISOBOT (N + T narx, bugungi + foyda) ──
                     DropdownMenuItem(
                         text = { Text("📊 Hisobot") },
                         leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        onClick = { menuOpen = false; onReports() }
+                        onClick = { menuOpen = false; pendingNav = onReports }
                     )
                     // ── 4) MIJOZLAR ──
                     DropdownMenuItem(
                         text = { Text("👥 Mijozlar") },
                         leadingIcon = { Icon(Icons.Outlined.People, null) },
-                        onClick = { menuOpen = false; onClients() }
+                        onClick = { menuOpen = false; pendingNav = onClients }
                     )
                     // ── 5) QARZDORLAR ──
                     DropdownMenuItem(
                         text = { Text("💳 Qarzdorlar") },
                         leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
-                        onClick = { menuOpen = false; onQarz() }
+                        onClick = { menuOpen = false; pendingNav = onQarz }
                     )
                     // ── 6) NARX QO'YISH (T va T1) ──
                     DropdownMenuItem(
                         text = { Text("🚛 Narx qo'yish (T / T1)") },
                         leadingIcon = { Icon(Icons.Outlined.LocalShipping, null) },
-                        onClick = { menuOpen = false; onYukNarx() }
+                        onClick = { menuOpen = false; pendingNav = onYukNarx }
                     )
                     // ── 7) RASXOD ──
                     DropdownMenuItem(
                         text = { Text("💸 Rasxod") },
                         leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
-                        onClick = { menuOpen = false; onRasxod() }
+                        onClick = { menuOpen = false; pendingNav = onRasxod }
                     )
                     HorizontalDivider()
                     // ── 8) YORDAM ──
                     DropdownMenuItem(
                         text = { Text("❓ Yordam") },
                         leadingIcon = { Icon(Icons.Outlined.HelpOutline, null) },
-                        onClick = { menuOpen = false; onHelp() }
+                        onClick = { menuOpen = false; pendingNav = onHelp }
                     )
                     // ── 9) SOZLAMALAR (Import, Zaxira, Alias, Barmoq, PIN, Karzina shu yerda) ──
                     DropdownMenuItem(
                         text = { Text("⚙️ Sozlamalar") },
                         leadingIcon = { Icon(Icons.Outlined.Settings, null) },
-                        onClick = { menuOpen = false; onSettings() }
+                        onClick = { menuOpen = false; pendingNav = onSettings }
                     )
                 }
             }

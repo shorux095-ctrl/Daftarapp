@@ -4,8 +4,22 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import uz.daftar.app.ui.screen.alias.AliasScreen
 import uz.daftar.app.ui.screen.clienthistory.ClientHistoryScreen
 import uz.daftar.app.ui.screen.clients.ClientsScreen
@@ -53,7 +67,8 @@ fun DaftarNavHost() {
     val imeFocusMgr = androidx.compose.ui.platform.LocalFocusManager.current
     val imeKb = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     androidx.compose.runtime.DisposableEffect(nav) {
-        val listener = androidx.navigation.NavController.OnDestinationChangedListener { _, _, _ ->
+        val listener = androidx.navigation.NavController.OnDestinationChangedListener { _, dest, _ ->
+            android.util.Log.w("daftar", "NAV → ${dest.route}")
             runCatching { imeKb?.hide(); imeFocusMgr.clearFocus(true) }
         }
         nav.addOnDestinationChangedListener(listener)
@@ -64,6 +79,7 @@ fun DaftarNavHost() {
             nav.popBackStack(Routes.TODAY, inclusive = false)
         }
     ) {
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = Routes.TODAY) {
 
         composable(Routes.TODAY) {
@@ -168,6 +184,24 @@ fun DaftarNavHost() {
         composable(Routes.HELP) { uz.daftar.app.ui.screen.help.HelpScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.ESLAT) { uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.SKLAD) { uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { nav.popBackStack() }) }
+    }
+    // ── DIAGNOSTIKA: oq ekranda ham ko'rinadi — qaysi route + jonli sanagich ──
+    // Agar oq ekran paytida shu yozuv KO'RINSA → o'sha "route" ekrani bo'sh chizyapti.
+    // Agar yozuv ham YO'QOLSA → butun composition (root) o'lgan.
+    val dbgEntry = nav.currentBackStackEntryAsState()
+    val dbgRoute = dbgEntry.value?.destination?.route ?: "—"
+    val dbgTick = remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); dbgTick.intValue++ } }
+    Text(
+        "\u2B24 ${dbgRoute} \u00B7 ${dbgTick.intValue}s",
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .padding(3.dp)
+            .background(Color(0x66000000))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        color = Color(0xFFFF5252),
+        fontSize = 10.sp
+    )
     }
     }
 }
