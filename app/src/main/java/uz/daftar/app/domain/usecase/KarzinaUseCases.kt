@@ -83,6 +83,12 @@ class DeleteToKarzinaUseCase @Inject constructor(
         return true
     }
 
+    /** id orqali — yozuvni topib, karzinaga ko'chiradi. */
+    suspend operator fun invoke(userId: Long, id: Long): Boolean {
+        val tx = txDao.getById(id) ?: return false
+        return invoke(tx)
+    }
+
     companion object {
         private val ZONE = ZoneId.of("Asia/Tashkent")
         private val ISO: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")

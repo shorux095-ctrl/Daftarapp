@@ -101,6 +101,32 @@ class BackupManager @Inject constructor(
         return ins.use { restoreFrom(it) }
     }
 
+    // ── Avto-zaxira: bir marta fayl tanlanadi, chiqishda avtomatik yoziladi ──
+    private val autoPrefs by lazy { context.getSharedPreferences("autobackup", Context.MODE_PRIVATE) }
+
+    fun setAutoBackupUri(uri: Uri?) {
+        autoPrefs.edit().also { e -> if (uri == null) e.remove("uri") else e.putString("uri", uri.toString()) }.apply()
+    }
+    fun getAutoBackupUri(): Uri? = autoPrefs.getString("uri", null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    fun isAutoBackupEnabled(): Boolean = getAutoBackupUri() != null
+
+    /** Takroriy yozishda faylni TO'LIQ qayta yozadi ("wt" — truncate, eski dumcha qolmasin). */
+    private fun exportToTruncating(uri: Uri) {
+        checkpoint()
+        context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
+            dbFile().inputStream().use { it.copyTo(out) }
+        }
+    }
+
+    /** Fayl tanlanganda: uri saqlanadi va birinchi zaxira darhol yoziladi. */
+    fun enableAutoBackup(uri: Uri) { setAutoBackupUri(uri); runCatching { exportToTruncating(uri) } }
+
+    /** Saqlangan uri bo'lsa — bazani o'sha faylga yozadi (ilovadan chiqishda). */
+    fun autoBackup(): Boolean {
+        val uri = getAutoBackupUri() ?: return false
+        return runCatching { exportToTruncating(uri) }.isSuccess
+    }
+
     /** Faylning haqiqiy SQLite bazasi ekanini sarlavhasidan tekshiradi */
     private fun isSqlite(file: File): Boolean {
         if (file.length() < 16) return false

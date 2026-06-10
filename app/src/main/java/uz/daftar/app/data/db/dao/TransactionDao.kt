@@ -101,6 +101,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE user_id = :userId")
     suspend fun getAllForUser(userId: Long): List<TransactionEntity>
 
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): TransactionEntity?
+
     @Query("SELECT DISTINCT LOWER(client_name) FROM transactions WHERE user_id = :userId ORDER BY client_name")
     fun observeAllClientNames(userId: Long): Flow<List<String>>
 

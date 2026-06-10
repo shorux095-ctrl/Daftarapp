@@ -1,6 +1,8 @@
 package uz.daftar.app
 
 import android.os.Bundle
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
@@ -42,6 +44,17 @@ import javax.inject.Inject
 class MainActivity : FragmentActivity() {
 
     @Inject lateinit var lockManager: LockManager
+    @Inject lateinit var backupManager: uz.daftar.app.core.backup.BackupManager
+    @Inject lateinit var themeManager: uz.daftar.app.core.theme.ThemeManager
+
+    override fun onStop() {
+        super.onStop()
+        if (backupManager.isAutoBackupEnabled()) {
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { backupManager.autoBackup() }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -61,7 +74,9 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            DaftarTheme {
+            val themeMode by themeManager.themeMode.collectAsState(initial = 0)
+            val dark = when (themeMode) { 1 -> false; 2 -> true; else -> isSystemInDarkTheme() }
+            DaftarTheme(darkTheme = dark) {
                 // Qulf holatini boshlang'ich tekshirish state orqali
                 var unlocked by remember { mutableStateOf(false) }
                 var lockRequired by remember { mutableStateOf<Boolean?>(null) }
