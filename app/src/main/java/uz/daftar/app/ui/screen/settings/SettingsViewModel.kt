@@ -22,7 +22,9 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val lockManager: LockManager,
     private val repo: TransactionRepository,
-    private val importOldDb: ImportOldDbUseCase
+    private val importOldDb: ImportOldDbUseCase,
+    private val backup: uz.daftar.app.core.backup.BackupManager,
+    private val themeManager: uz.daftar.app.core.theme.ThemeManager
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -30,6 +32,25 @@ class SettingsViewModel @Inject constructor(
     private val _importMsg = MutableStateFlow<String?>(null)
     val importMsg: StateFlow<String?> = _importMsg.asStateFlow()
     fun clearImportMsg() { _importMsg.value = null }
+
+    // ── Mavzu (ko'rinish): 0=Tizim, 1=Yorug', 2=Tungi ──
+    val themeMode: StateFlow<Int> =
+        themeManager.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    fun setThemeMode(m: Int) { viewModelScope.launch { themeManager.setThemeMode(m) } }
+
+    // ── Avto-zaxira (fayl) ──
+    private val _autoBackup = MutableStateFlow(backup.isAutoBackupEnabled())
+    val autoBackup: StateFlow<Boolean> = _autoBackup.asStateFlow()
+    fun enableAutoBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { backup.enableAutoBackup(uri) } }
+            _autoBackup.value = true
+        }
+    }
+    fun disableAutoBackup() {
+        backup.setAutoBackupUri(null)
+        _autoBackup.value = false
+    }
 
     /** Eski bot .db ni import qiladi (Sozlamalardan) */
     fun importDb(path: String) {

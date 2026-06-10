@@ -1,6 +1,10 @@
 package uz.daftar.app.ui.screen.rasxod
 
 import androidx.compose.foundation.layout.*
+import uz.daftar.app.core.voice.rememberVoiceInput
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,12 +79,12 @@ fun RasxodScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = { vm.prev() }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Oldingi")
+                IconButton(onClick = { vm.prev() }, modifier = Modifier.size(52.dp)) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Oldingi", modifier = Modifier.size(30.dp))
                 }
                 Text(state.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                IconButton(onClick = { vm.next() }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Keyingi")
+                IconButton(onClick = { vm.next() }, modifier = Modifier.size(52.dp)) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Keyingi", modifier = Modifier.size(30.dp))
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -127,13 +131,19 @@ fun RasxodScreen(
                         singleLine = true
                     )
                     Spacer(Modifier.height(8.dp))
+                    val voiceNote = rememberVoiceInput { note = it }
                     OutlinedTextField(
                         value = note,
                         onValueChange = { note = it },
                         label = { Text("Izoh (ixtiyoriy)") },
                         placeholder = { Text("yoqilg'i, ovqat, va h.k.") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { voiceNote("uz-UZ") }) {
+                                Icon(Icons.Outlined.Mic, contentDescription = "Ovoz")
+                            }
+                        }
                     )
                     Spacer(Modifier.height(8.dp))
                     Button(

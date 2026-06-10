@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.today
 
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.domain.usecase.DeleteToKarzinaUseCase
 import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.core.util.formatPrice
 import androidx.lifecycle.ViewModel
@@ -150,6 +151,7 @@ class TodayViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val addTx: AddTransactionUseCase,
     private val deleteTx: DeleteTransactionUseCase,
+    private val delToKarzina: DeleteToKarzinaUseCase,
     private val calcDebt: CalculateDebtUseCase,
     private val templateStore: TemplateStore,
     private val getUnitPrices: GetClientUnitPricesUseCase,
@@ -188,6 +190,11 @@ class TodayViewModel @Inject constructor(
 
     init {
         restoreChat()
+        // Har qanday tranzaksiya o'zgarsa (edit/o'chirish ham) — History kartalarni jonli DB bilan yangilash
+        viewModelScope.launch {
+            repo.observeBetween(userId, java.time.LocalDate.of(2000, 1, 1), java.time.LocalDate.of(2100, 1, 1))
+                .collectLatest { refreshHistoryCards() }
+        }
         // Tezkor shablonlarni kuzatish
         viewModelScope.launch {
             templateStore.templates.collectLatest { list ->
@@ -281,6 +288,22 @@ class TodayViewModel @Inject constructor(
         val snapshot = _state.value.chat
         viewModelScope.launch {
             runCatching { chatStore.save(serializeChat(snapshot)) }
+        }
+    }
+
+    /** Chatdagi History kartalarni JONLI DB bilan qayta yasaydi (edit/o'chirishdan keyin eski qiymat qolmasin). */
+    private fun refreshHistoryCards() {
+        viewModelScope.launch {
+            val cur = _state.value.chat
+            if (cur.none { it is ChatItem.History }) return@launch
+            val updated = cur.map { item ->
+                if (item is ChatItem.History) {
+                    val fresh = runCatching { buildClientPreview(item.preview.name, item.preview.month) }.getOrNull()
+                    if (fresh != null) ChatItem.History(item.id, fresh, item.ts) else item
+                } else item
+            }
+            _state.update { it.copy(chat = updated) }
+            persistChat()
         }
     }
 
@@ -384,6 +407,7 @@ class TodayViewModel @Inject constructor(
                 if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
             }
             runCatching { maybeShowAutoReports() }
+            refreshHistoryCards()
         }
     }
 
@@ -1887,7 +1911,7 @@ class TodayViewModel @Inject constructor(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             try {
-                ids.forEach { deleteTx(it) }
+                ids.forEach { delToKarzina(userId, it) }
                 _state.update {
                     it.copy(
                         selected = emptySet(),
@@ -1904,7 +1928,7 @@ class TodayViewModel @Inject constructor(
     fun deleteOne(id: Long) {
         viewModelScope.launch {
             try {
-                deleteTx(id)
+                delToKarzina(userId, id)
                 _state.update { it.copy(justSentSummary = "🗑 O'chirildi (karzinaga)") }
             } catch (e: Exception) {
                 _state.update { it.copy(errorMessage = "O'chirishda xato: ${e.message}") }

@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -69,12 +70,28 @@ fun SettingsScreen(
     val lockEnabled by vm.lockEnabled.collectAsStateWithLifecycle()
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
     val importMsg by vm.importMsg.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
     var showLogDialog by remember { mutableStateOf(false) }
     var logText by remember { mutableStateOf("") }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val autoBackupOn by vm.autoBackup.collectAsStateWithLifecycle()
+    val autoBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            vm.enableAutoBackup(uri)
+            android.widget.Toast.makeText(context, "☁️ Avto-zaxira yoqildi", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Import launcher (.db yoki .csv)
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -152,12 +169,34 @@ fun SettingsScreen(
                 subtitle = "Eski bot .db yoki .csv fayldan ma'lumot ko'chirish",
                 onClick = { importLauncher.launch("*/*") }
             )
+            // Ko'rinish (mavzu)
+            Text(
+                "🎨 Ko'rinish",
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                FilterChip(selected = themeMode == 0, onClick = { vm.setThemeMode(0) }, label = { Text("Tizim") })
+                FilterChip(selected = themeMode == 1, onClick = { vm.setThemeMode(1) }, label = { Text("Yorug'") })
+                FilterChip(selected = themeMode == 2, onClick = { vm.setThemeMode(2) }, label = { Text("Tungi") })
+            }
             // 2) Zaxira (DB backup / fayldan tiklash)
             SettingsItem(
                 icon = Icons.Outlined.Backup,
                 title = "🗂 Zaxira",
                 subtitle = "Bazani zaxiralash yoki fayldan tiklash",
                 onClick = onManager
+            )
+            // 2b) Avto-zaxira (fayl) — ilovadan chiqqanda avtomatik saqlash
+            ToggleItem(
+                icon = Icons.Outlined.Backup,
+                title = "☁️ Avto-zaxira (fayl)",
+                subtitle = if (autoBackupOn) "Yoqilgan ✓ — chiqishda avto saqlanadi" else "Fayl tanlang — chiqishda avto saqlanadi",
+                checked = autoBackupOn,
+                onCheckedChange = { on -> if (on) autoBackupLauncher.launch("daftar_avto_backup.db") else vm.disableAutoBackup() }
             )
             // 3) Alias
             SettingsItem(

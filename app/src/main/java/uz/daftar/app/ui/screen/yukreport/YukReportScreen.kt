@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.yukreport
 
 import uz.daftar.app.core.util.formatQty
+import androidx.compose.foundation.layout.size
 import uz.daftar.app.core.util.formatMoney
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -67,8 +68,8 @@ fun YukReportScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(onClick = vm::prev) {
-                    Text("⬅️", fontSize = 20.sp)
+                IconButton(onClick = vm::prev, modifier = Modifier.size(52.dp)) {
+                    Text("⬅️", fontSize = 30.sp)
                 }
                 FilterChip(
                     selected = !state.yearly,
@@ -80,8 +81,8 @@ fun YukReportScreen(
                     onClick = vm::showYearly,
                     label = { Text("📊 Yillik") }
                 )
-                IconButton(onClick = vm::next) {
-                    Text("➡️", fontSize = 20.sp)
+                IconButton(onClick = vm::next, modifier = Modifier.size(52.dp)) {
+                    Text("➡️", fontSize = 30.sp)
                 }
             }
             // ── Pul / Soni toggle ──

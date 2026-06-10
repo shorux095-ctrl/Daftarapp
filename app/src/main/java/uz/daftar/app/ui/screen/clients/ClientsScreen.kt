@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.clients
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,7 +63,7 @@ fun ClientsScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
-                actions = { uz.daftar.app.ui.common.HomeButton() }
+                actions = { IconButton(onClick = { vm.load() }) { Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash") }; uz.daftar.app.ui.common.HomeButton() }
             )
         }
     ) { padding ->

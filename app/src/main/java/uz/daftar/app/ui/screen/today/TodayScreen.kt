@@ -129,6 +129,8 @@ fun TodayScreen(
     onSearch: () -> Unit = onSettings,
     onYukNarx: () -> Unit = onSettings,
     onYukReport: () -> Unit = onSettings,
+    onToliq: () -> Unit = onSettings,
+    onGrafik: () -> Unit = onSettings,
     onNReport: () -> Unit = {},
     onAlias: () -> Unit = onSettings,
     onRasxod: () -> Unit = onSettings,
@@ -314,6 +316,8 @@ fun TodayScreen(
                     onSearch = onSearch,
                     onYukNarx = onYukNarx,
                     onYukReport = onYukReport,
+                    onToliq = onToliq,
+                    onGrafik = onGrafik,
                     onNReport = { vm.showDateReportButton(java.time.LocalDate.now(), useNarx = true) },
                     onAlias = onAlias,
                     onRasxod = onRasxod,
@@ -587,6 +591,8 @@ private fun ChatTopBar(
     onSearch: () -> Unit,
     onYukNarx: () -> Unit,
     onYukReport: () -> Unit,
+    onToliq: () -> Unit,
+    onGrafik: () -> Unit,
     onNReport: () -> Unit,
     onAlias: () -> Unit,
     onRasxod: () -> Unit,
@@ -618,7 +624,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v17", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v25", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -655,6 +661,18 @@ private fun ChatTopBar(
                         text = { Text("📊 Hisobot") },
                         leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
                         onClick = { menuOpen = false; pendingNav = onReports }
+                    )
+                    // ── To'liq hisobot ──
+                    DropdownMenuItem(
+                        text = { Text("📋 To'liq hisobot") },
+                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
+                        onClick = { menuOpen = false; pendingNav = onToliq }
+                    )
+                    // ── Grafik ──
+                    DropdownMenuItem(
+                        text = { Text("📈 Grafik") },
+                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
+                        onClick = { menuOpen = false; pendingNav = onGrafik }
                     )
                     // ── 4) MIJOZLAR ──
                     DropdownMenuItem(
@@ -1079,11 +1097,11 @@ private fun InputBar(
                 // Pastki menyu toggle (Telegram'day — bosganda ochiladi/yashirinadi)
                 IconButton(
                     onClick = onToggleMenu,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(60.dp)
                 ) {
                     Text(
                         if (menuOpen) "✕" else "☰",
-                        style = MaterialTheme.typography.titleLarge,
+                        fontSize = 30.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }

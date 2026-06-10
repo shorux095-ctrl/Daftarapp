@@ -1,6 +1,8 @@
 package uz.daftar.app.ui.screen.search
 
 import androidx.compose.foundation.layout.Arrangement
+import uz.daftar.app.core.voice.rememberVoiceInput
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -175,6 +177,7 @@ private fun ClientSearchInputs(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit
 ) {
+    val voiceQuery = rememberVoiceInput { onQueryChange(it) }
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -182,7 +185,12 @@ private fun ClientSearchInputs(
         label = { Text("Mijoz nomi") },
         placeholder = { Text("ali (qisman ham bo'ladi)") },
         singleLine = true,
-        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) }
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+        trailingIcon = {
+            IconButton(onClick = { voiceQuery("uz-UZ") }) {
+                Icon(Icons.Outlined.Mic, contentDescription = "Ovoz")
+            }
+        }
     )
     Spacer(Modifier.height(12.dp))
     Button(

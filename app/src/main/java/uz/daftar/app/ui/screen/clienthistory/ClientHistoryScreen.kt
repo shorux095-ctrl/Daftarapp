@@ -1,6 +1,8 @@
 package uz.daftar.app.ui.screen.clienthistory
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -91,7 +93,7 @@ fun ClientHistoryScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { vm.prevMonth() }) { Text("⬅️", style = MaterialTheme.typography.titleLarge) }
+                IconButton(onClick = { vm.prevMonth() }, modifier = Modifier.size(52.dp)) { Text("⬅️", fontSize = 30.sp) }
                 Text(
                     "${MONTHS_UZ[state.selectedMonth.monthValue - 1]} ${state.selectedMonth.year}",
                     modifier = Modifier.weight(1f),
@@ -99,7 +101,7 @@ fun ClientHistoryScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                IconButton(onClick = { vm.nextMonth() }) { Text("➡️", style = MaterialTheme.typography.titleLarge) }
+                IconButton(onClick = { vm.nextMonth() }, modifier = Modifier.size(52.dp)) { Text("➡️", fontSize = 30.sp) }
             }
 
             val monthPrefix = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
