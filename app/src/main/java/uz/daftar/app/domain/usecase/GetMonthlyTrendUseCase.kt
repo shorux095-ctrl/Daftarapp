@@ -26,7 +26,7 @@ class GetMonthlyTrendUseCase @Inject constructor(
                 val ym = now.minusMonths(back.toLong())
                 val r = runCatching { getMonthly(userId, ym.year, ym.monthValue) }.getOrNull()
                 MonthPoint(
-                    label = "${ym.monthValue}.${ym.year % 100}",
+                    label = SHORT_UZ[ym.monthValue - 1],
                     year = ym.year,
                     month = ym.monthValue,
                     revenue = r?.revenue ?: 0L,
@@ -35,4 +35,8 @@ class GetMonthlyTrendUseCase @Inject constructor(
                 )
             }
         }
+
+    private companion object {
+        val SHORT_UZ = listOf("Yan", "Fev", "Mar", "Apr", "May", "Iyn", "Iyl", "Avg", "Sen", "Okt", "Noy", "Dek")
+    }
 }

@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uz.daftar.app.domain.usecase.GetMonthlyReportUseCase
 import uz.daftar.app.domain.usecase.GetMonthlyTrendUseCase
+import uz.daftar.app.domain.usecase.PeriodReport
 import uz.daftar.app.domain.usecase.MonthPoint
 import javax.inject.Inject
 
@@ -16,12 +18,17 @@ data class GrafikState(
     val isLoading: Boolean = true,
     val points: List<MonthPoint> = emptyList(),
     val months: Int = 6,
-    val error: String? = null
+    val error: String? = null,
+    /** Bosilgan oy ("yil-oy") va uning to'liq hisoboti */
+    val detailKey: String? = null,
+    val detail: PeriodReport? = null,
+    val detailLoading: Boolean = false
 )
 
 @HiltViewModel
 class GrafikViewModel @Inject constructor(
-    private val getTrend: GetMonthlyTrendUseCase
+    private val getTrend: GetMonthlyTrendUseCase,
+    private val getMonthly: GetMonthlyReportUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -39,6 +46,21 @@ class GrafikViewModel @Inject constructor(
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
+        }
+    }
+
+    /** Oy ustiga bosilganda — to'liq hisobotni ochish/yopish */
+    fun toggleDetail(year: Int, month: Int) {
+        val key = "$year-$month"
+        if (_state.value.detailKey == key) {
+            _state.update { it.copy(detailKey = null, detail = null, detailLoading = false) }
+            return
+        }
+        _state.update { it.copy(detailKey = key, detail = null, detailLoading = true) }
+        viewModelScope.launch {
+            val r = runCatching { getMonthly(userId, year, month) }.getOrNull()
+            if (_state.value.detailKey == key)
+                _state.update { it.copy(detail = r, detailLoading = false) }
         }
     }
 

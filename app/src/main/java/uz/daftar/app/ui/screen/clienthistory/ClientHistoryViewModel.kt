@@ -13,7 +13,7 @@ import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.entity.PriceHistoryEntity
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
-import uz.daftar.app.domain.usecase.DeleteTransactionUseCase
+import uz.daftar.app.domain.usecase.DeleteToKarzinaUseCase
 import uz.daftar.app.domain.usecase.GetClientHistoryUseCase
 import java.time.YearMonth
 import javax.inject.Inject
@@ -36,7 +36,7 @@ class ClientHistoryViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val getHistory: GetClientHistoryUseCase,
     private val priceDao: PriceHistoryDao,
-    private val deleteTx: DeleteTransactionUseCase
+    private val deleteTx: DeleteToKarzinaUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -121,7 +121,7 @@ class ClientHistoryViewModel @Inject constructor(
     fun deleteTransaction(id: Long) {
         viewModelScope.launch {
             try {
-                deleteTx(id)
+                deleteTx(userId, id)
                 load()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }

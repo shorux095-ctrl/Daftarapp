@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -18,8 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,11 +37,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uz.daftar.app.core.parser.DaftarParser
 import uz.daftar.app.core.parser.ParseResult
 import uz.daftar.app.core.theme.DaftarTheme
+import uz.daftar.app.data.repository.TransactionRepository
 import uz.daftar.app.domain.usecase.AddTransactionUseCase
 import javax.inject.Inject
 
@@ -50,6 +56,7 @@ import javax.inject.Inject
 class QuickAddActivity : ComponentActivity() {
 
     @Inject lateinit var addTx: AddTransactionUseCase
+    @Inject lateinit var repo: TransactionRepository
     private val userId: Long = 1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +65,18 @@ class QuickAddActivity : ComponentActivity() {
             DaftarTheme {
                 var text by remember { mutableStateOf("") }
                 var saving by remember { mutableStateOf(false) }
+                var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+
+                // Oxirgi qatordagi ism bo'yicha takliflar (chatdagi bilan bir xil)
+                LaunchedEffect(text) {
+                    delay(120)
+                    val lastLine = text.substringAfterLast('\n').trimStart()
+                    val word = lastLine.substringBefore(' ').trim()
+                    suggestions = if (word.isNotBlank() && word.all { it.isLetter() || it == '\'' })
+                        runCatching { repo.suggestClients(userId, word) }.getOrDefault(emptyList())
+                            .filter { it != word.lowercase() }.take(6)
+                    else emptyList()
+                }
 
                 Box(
                     modifier = Modifier
@@ -82,6 +101,26 @@ class QuickAddActivity : ComponentActivity() {
                                 placeholder = { Text("ali aka a5 a10   yoki   ali p 50000") },
                                 minLines = 2
                             )
+                            if (suggestions.isNotEmpty()) {
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    suggestions.forEach { name ->
+                                        SuggestionChip(
+                                            onClick = {
+                                                val prefix = if (text.contains('\n')) text.substringBeforeLast('\n') + "\n" else ""
+                                                val lastLine = text.substringAfterLast('\n').trimStart()
+                                                val rest = lastLine.substringAfter(' ', missingDelimiterValue = "")
+                                                val tail = if (rest.isBlank()) "$name " else "$name $rest"
+                                                text = prefix + tail
+                                            },
+                                            label = { Text(name.replaceFirstChar { it.uppercase() }) }
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = { finish() }) { Text("Bekor") }

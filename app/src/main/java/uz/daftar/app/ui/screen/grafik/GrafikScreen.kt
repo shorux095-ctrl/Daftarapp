@@ -1,6 +1,8 @@
 package uz.daftar.app.ui.screen.grafik
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatQty
+import uz.daftar.app.domain.model.TxType
+import uz.daftar.app.domain.usecase.PeriodReport
 import uz.daftar.app.domain.usecase.MonthPoint
 
 private val BLUE = Color(0xFF1976D2)
@@ -142,7 +147,22 @@ private fun Content(state: GrafikState, vm: GrafikViewModel) {
 
         // Aniq qiymatlar
         Text("Oylik qiymatlar", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-        points.reversed().forEach { p -> MonthRow(p) }
+        Text(
+            "Oy ustiga bossangiz — o'sha oyning to'liq hisoboti ochiladi",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        points.reversed().forEach { p ->
+            val key = "${p.year}-${p.month}"
+            MonthRow(
+                p = p,
+                expanded = state.detailKey == key,
+                detail = if (state.detailKey == key) state.detail else null,
+                loading = state.detailKey == key && state.detailLoading,
+                onClick = { vm.toggleDetail(p.year, p.month) }
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
     }
@@ -159,10 +179,19 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 @Composable
-private fun MonthRow(p: MonthPoint) {
-    Card(Modifier.fillMaxWidth()) {
+private fun MonthRow(
+    p: MonthPoint,
+    expanded: Boolean,
+    detail: PeriodReport?,
+    loading: Boolean,
+    onClick: () -> Unit
+) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(12.dp)) {
-            Text("${monthName(p.month)} ${p.year}", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${monthName(p.month)} ${p.year}", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(if (expanded) "▲" else "▼", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Daromad", fontSize = 13.sp, color = BLUE)
@@ -176,7 +205,44 @@ private fun MonthRow(p: MonthPoint) {
                 Text("To'lov (P)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(p.payments.formatMoney(), fontSize = 13.sp)
             }
+            if (expanded) {
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                when {
+                    loading -> Text("Yuklanmoqda…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    detail == null -> Text("Hisobot topilmadi", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else -> DetailBlock(detail)
+                }
+            }
         }
+    }
+}
+
+/** Bosilgan oyning TO'LIQ hisoboti (Hisobot ekrani bilan bir xil raqamlar) */
+@Composable
+private fun DetailBlock(r: PeriodReport) {
+    val cargo = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+    val yukLine = cargo.mapNotNull { t ->
+        val q = r.totals[t] ?: return@mapNotNull null
+        if (q == 0.0) null else "${t.code.uppercase()} ${q.formatQty()}"
+    }.joinToString(" · ")
+    Column {
+        if (yukLine.isNotBlank()) DRow("\ud83d\udce6 Yuklar", yukLine)
+        DRow("Daromad (N)", r.revenue.formatMoney())
+        DRow("Tannarx (T)", r.tCost.formatMoney())
+        DRow("Yalpi foyda", r.grossProfit.formatMoney())
+        DRow("Rasxod", r.expenses.formatMoney())
+        DRow("Sof foyda", r.profit.formatMoney(), bold = true)
+        DRow("To'lovlar (P)", r.payments.formatMoney())
+        DRow("Mijozlar", "${r.clientCount} ta")
+        DRow("Yozuvlar", "${r.transactionCount} ta")
+    }
+}
+
+@Composable
+private fun DRow(label: String, value: String, bold: Boolean = false) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontSize = 13.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold)
     }
 }
 

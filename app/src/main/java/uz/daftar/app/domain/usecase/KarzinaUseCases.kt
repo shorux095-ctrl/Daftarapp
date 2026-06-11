@@ -89,6 +89,22 @@ class DeleteToKarzinaUseCase @Inject constructor(
         return invoke(tx)
     }
 
+    /** Bir kunning BARCHA yozuvlarini karzinaga ko'chiradi. */
+    suspend fun byDate(userId: Long, date: java.time.LocalDate): Int {
+        val day = date.toString()
+        val list = txDao.getAllForUser(userId).filter { it.date.take(10) == day }
+        list.forEach { invoke(it) }
+        return list.size
+    }
+
+    /** Mijozning BUTUN tarixini karzinaga ko'chiradi. */
+    suspend fun byClient(userId: Long, clientName: String): Int {
+        val cn = clientName.lowercase()
+        val list = txDao.getAllForUser(userId).filter { it.clientName.lowercase() == cn }
+        list.forEach { invoke(it) }
+        return list.size
+    }
+
     companion object {
         private val ZONE = ZoneId.of("Asia/Tashkent")
         private val ISO: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")

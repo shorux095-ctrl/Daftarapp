@@ -192,6 +192,35 @@ internal suspend fun buildReport(
             t1Hist[code] = (allT1[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
         }
     }
+    // PRELOAD: N narx tarixi + mijoz joriy narxlari — BIR MARTA (N+1 emas)
+    val phByKey = priceDao.getAllForUser(userId)
+        .groupBy { it.clientName.lowercase() to it.priceType.lowercase() }
+        .mapValues { (_, v) -> v.sortedWith(compareBy({ it.date }, { it.id })) }
+    val cpByName = clientPriceDao.getAllForUser(userId).associateBy { it.clientName.lowercase() }
+
+    // findPriceForReport bilan AYNAN bir xil mantiq — lekin xotirada
+    fun nPriceFor(clientName: String, type: String, date: String): Double? {
+        val dayEnd = date.take(10) + " 23:59:59"
+        val list = phByKey[clientName.lowercase() to type.lowercase()]
+        if (!list.isNullOrEmpty()) {
+            val at = list.lastOrNull { it.date <= dayEnd }?.price
+            if (at != null) return at
+            val next = list.firstOrNull { it.date > dayEnd }?.price
+            if (next != null) return next
+        }
+        val cp = cpByName[clientName.lowercase()]
+        val cpPrice = when (type.lowercase()) {
+            "a" -> cp?.aPrice
+            "b" -> cp?.bPrice
+            "c" -> cp?.cPrice
+            "d" -> cp?.dPrice
+            "k" -> cp?.kPrice
+            else -> null
+        }
+        if (cpPrice != null && cpPrice > 0.0) return cpPrice
+        return tHist[type.lowercase()]?.lastOrNull()?.second
+    }
+
     // Berilgan sana (kun) yoki undan oldingi eng oxirgi global narx
     fun globalAt(list: List<Pair<String, Double>>?, date: String): Double? {
         if (list.isNullOrEmpty()) return null
@@ -211,9 +240,7 @@ internal suspend fun buildReport(
             TxType.Q -> { /* qo'lda qarz — sotuv emas; daromad/foydaga KIRMAYDI, faqat qarzga ta'sir qiladi */ }
             in cargo -> {
                 // Sotilgan narx (N): avval N (mijoz uchun), bo'lmasa T (global)
-                val nPrice = findPriceForReport(
-                    userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao
-                ) ?: tx.tOverride
+                val nPrice = nPriceFor(tx.clientName, tx.type, tx.date) ?: tx.tOverride
                 if (nPrice != null) revenue += tx.amount * nPrice
                 // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T (O'SHA SANADAGI)
                 val globalCost = if (tx.costTier == "t1")

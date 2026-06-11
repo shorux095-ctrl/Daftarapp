@@ -663,10 +663,10 @@ class TodayViewModel @Inject constructor(
     fun confirmDeleteAll() {
         val d = _state.value.confirmDeleteDate ?: return
         viewModelScope.launch {
-            val n = runCatching { repo.deleteByDate(userId, d) }.getOrDefault(0)
+            val n = runCatching { delToKarzina.byDate(userId, d) }.getOrDefault(0)
             _state.update { it.copy(confirmDeleteDate = null) }
             val label = d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $label — $n ta yozuv o'chirildi" else "$label — o'chiriladigan yozuv yo'q"))
+            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $label — $n ta yozuv karzinaga tushdi" else "$label — o'chiriladigan yozuv yo'q"))
         }
     }
 
@@ -681,10 +681,10 @@ class TodayViewModel @Inject constructor(
         val name = _state.value.confirmDeleteClient ?: return
         viewModelScope.launch {
             val cn = DaftarParser.normalizeName(name)
-            val n = runCatching { repo.deleteByClientAll(userId, cn) }.getOrDefault(0)
+            val n = runCatching { delToKarzina.byClient(userId, cn) }.getOrDefault(0)
             _state.update { it.copy(confirmDeleteClient = null) }
             val disp = name.replaceFirstChar { it.uppercase() }
-            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $disp — butun tarix o'chirildi ($n ta yozuv)" else "$disp — o'chiriladigan yozuv yo'q"))
+            appendChat(ChatItem.Info(nextChatId(), if (n > 0) "🗑 $disp — butun tarix karzinaga tushdi ($n ta yozuv)" else "$disp — o'chiriladigan yozuv yo'q"))
         }
     }
 
@@ -1091,8 +1091,9 @@ class TodayViewModel @Inject constructor(
                 errorMessage = if (parsedList.isEmpty() && !isNameOnly) firstError?.error?.message else null
             )
         }
-        // Autocomplete — birinchi so'z (ism)
-        val firstWord = text.trimStart().substringBefore(' ').substringBefore('\n').trim()
+        // Autocomplete — OXIRGI qatordagi birinchi so'z (ko'p qatorda ham ishlaydi)
+        val lastLine0 = text.substringAfterLast('\n').trimStart()
+        val firstWord = lastLine0.substringBefore(' ').trim()
         val onlyName = firstWord.isNotBlank() && firstWord.all { it.isLetter() || it == '\'' }
         updateSuggestions(if (onlyName) firstWord else "")
 
@@ -1594,9 +1595,11 @@ class TodayViewModel @Inject constructor(
     /** Avtotaklif chip bosildi — input'da birinchi so'zni almashtiramiz */
     fun applySuggestion(name: String) {
         val cur = state.value.input
-        val rest = cur.trimStart().substringAfter(' ', missingDelimiterValue = "")
-        val newInput = if (rest.isBlank()) "$name " else "$name $rest"
-        onInputChange(newInput)
+        val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
+        val lastLine = cur.substringAfterLast('\n').trimStart()
+        val rest = lastLine.substringAfter(' ', missingDelimiterValue = "")
+        val tail = if (rest.isBlank()) "$name " else "$name $rest"
+        onInputChange(prefix + tail)
     }
 
     fun send() {
