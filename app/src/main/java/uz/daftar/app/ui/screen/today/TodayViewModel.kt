@@ -292,6 +292,9 @@ class TodayViewModel @Inject constructor(
     }
 
     /** Chatdagi History kartalarni JONLI DB bilan qayta yasaydi (edit/o'chirishdan keyin eski qiymat qolmasin). */
+    /** 🔄 Bosh ekran yangilash — kartalarni jonli DB bilan qayta yasaydi. */
+    fun refresh() { refreshHistoryCards() }
+
     private fun refreshHistoryCards() {
         viewModelScope.launch {
             val cur = _state.value.chat

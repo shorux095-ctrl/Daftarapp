@@ -8,19 +8,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import uz.daftar.app.domain.usecase.FullReport
-import uz.daftar.app.domain.usecase.GetFullReportUseCase
+import uz.daftar.app.domain.usecase.GetDailyReportUseCase
+import uz.daftar.app.domain.usecase.GetMonthlyReportUseCase
+import uz.daftar.app.domain.usecase.PeriodReport
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class ToliqState(
     val isLoading: Boolean = true,
-    val report: FullReport? = null,
+    val mode: Int = 0,                 // 0 = Bugun, 1 = Shu oy
+    val report: PeriodReport? = null,
     val error: String? = null
 )
 
 @HiltViewModel
 class ToliqHisobotViewModel @Inject constructor(
-    private val getFullReport: GetFullReportUseCase
+    private val getDaily: GetDailyReportUseCase,
+    private val getMonthly: GetMonthlyReportUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -30,11 +34,19 @@ class ToliqHisobotViewModel @Inject constructor(
 
     init { load() }
 
+    fun setMode(m: Int) {
+        if (_state.value.mode == m) return
+        _state.update { it.copy(mode = m) }
+        load()
+    }
+
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             try {
-                val r = getFullReport(userId)
+                val today = LocalDate.now()
+                val r = if (_state.value.mode == 0) getDaily(userId, today)
+                        else getMonthly(userId, today.year, today.monthValue)
                 _state.update { it.copy(isLoading = false, report = r, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }

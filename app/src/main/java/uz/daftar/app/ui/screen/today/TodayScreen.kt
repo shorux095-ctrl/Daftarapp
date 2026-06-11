@@ -1,6 +1,9 @@
 package uz.daftar.app.ui.screen.today
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -307,6 +310,7 @@ fun TodayScreen(
                 ChatTopBar(
                     filter = state.filter,
                     onFilterChange = vm::setFilter,
+                    onRefresh = { vm.refresh() },
                     onOpenCalendar = { showCalendar = true },
                     onJumpToDate = jumpToDate,
                     onImport = { csvLauncher.launch("*/*") },
@@ -585,6 +589,7 @@ fun TodayScreen(
 private fun ChatTopBar(
     filter: Filter,
     onFilterChange: (Filter) -> Unit,
+    onRefresh: () -> Unit,
     onClients: () -> Unit,
     onQarz: () -> Unit,
     onReports: () -> Unit,
@@ -624,97 +629,20 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v26", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v29", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
                 IconButton(onClick = { runCatching { kbCtrl?.hide(); focusMgr.clearFocus() }; menuOpen = true }) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menyu")
                 }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false; yuklarOpen = false; hisobotOpen = false }
-                ) {
-                    // ── 1) YUKLAR (bosganda A B C D K) ──
-                    DropdownMenuItem(
-                        text = { Text("📦 Yuklar") },
-                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
-                        trailingIcon = { Icon(if (yuklarOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) },
-                        onClick = { yuklarOpen = !yuklarOpen }
-                    )
-                    if (yuklarOpen) {
-                        listOf("A", "B", "C", "D", "K").forEach { t ->
-                            DropdownMenuItem(
-                                text = { Text("     $t — bugun") },
-                                onClick = { menuOpen = false; yuklarOpen = false; pendingNav = { onYukType(t) } }
-                            )
-                        }
-                    }
-                    // ── 2) YUK HISOBOTI ──
-                    DropdownMenuItem(
-                        text = { Text("📦 Yuk hisoboti") },
-                        leadingIcon = { Icon(Icons.Outlined.Inventory2, null) },
-                        onClick = { menuOpen = false; pendingNav = onYukReport }
-                    )
-                    // ── 3) HISOBOT (N + T narx, bugungi + foyda) ──
-                    DropdownMenuItem(
-                        text = { Text("📊 Hisobot") },
-                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        onClick = { menuOpen = false; pendingNav = onReports }
-                    )
-                    // ── To'liq hisobot ──
-                    DropdownMenuItem(
-                        text = { Text("📋 To'liq hisobot") },
-                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        onClick = { menuOpen = false; pendingNav = onToliq }
-                    )
-                    // ── Grafik ──
-                    DropdownMenuItem(
-                        text = { Text("📈 Grafik") },
-                        leadingIcon = { Icon(Icons.Outlined.Assessment, null) },
-                        onClick = { menuOpen = false; pendingNav = onGrafik }
-                    )
-                    // ── 4) MIJOZLAR ──
-                    DropdownMenuItem(
-                        text = { Text("👥 Mijozlar") },
-                        leadingIcon = { Icon(Icons.Outlined.People, null) },
-                        onClick = { menuOpen = false; pendingNav = onClients }
-                    )
-                    // ── 5) QARZDORLAR ──
-                    DropdownMenuItem(
-                        text = { Text("💳 Qarzdorlar") },
-                        leadingIcon = { Icon(Icons.Outlined.Receipt, null) },
-                        onClick = { menuOpen = false; pendingNav = onQarz }
-                    )
-                    // ── 6) NARX QO'YISH (T va T1) ──
-                    DropdownMenuItem(
-                        text = { Text("🚛 Narx qo'yish (T / T1)") },
-                        leadingIcon = { Icon(Icons.Outlined.LocalShipping, null) },
-                        onClick = { menuOpen = false; pendingNav = onYukNarx }
-                    )
-                    // ── 7) RASXOD ──
-                    DropdownMenuItem(
-                        text = { Text("💸 Rasxod") },
-                        leadingIcon = { Icon(Icons.Outlined.MoneyOff, null) },
-                        onClick = { menuOpen = false; pendingNav = onRasxod }
-                    )
-                    HorizontalDivider()
-                    // ── 8) YORDAM ──
-                    DropdownMenuItem(
-                        text = { Text("❓ Yordam") },
-                        leadingIcon = { Icon(Icons.Outlined.HelpOutline, null) },
-                        onClick = { menuOpen = false; pendingNav = onHelp }
-                    )
-                    // ── 9) SOZLAMALAR (Import, Zaxira, Alias, Barmoq, PIN, Karzina shu yerda) ──
-                    DropdownMenuItem(
-                        text = { Text("⚙️ Sozlamalar") },
-                        leadingIcon = { Icon(Icons.Outlined.Settings, null) },
-                        onClick = { menuOpen = false; pendingNav = onSettings }
-                    )
-                }
+// ☰ menyu endi pastdan chiqadi (ModalBottomSheet — quyida)
             }
         },
         actions = {
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash")
+            }
             // Bugun + Kalendar (Kecha olib tashlandi)
             TextButton(onClick = { onJumpToDate(java.time.LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Text("Bugun")
@@ -724,6 +652,89 @@ private fun ChatTopBar(
             }
         }
     )
+
+    // ── Ikonkali to'r menyu (pastdan chiqadi) ──
+    if (menuOpen) {
+        ModalBottomSheet(onDismissRequest = { menuOpen = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                Text(
+                    "Tez yuk (bugun)",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("A", "B", "C", "D", "K").forEach { t ->
+                        AssistChip(
+                            onClick = { menuOpen = false; pendingNav = { onYukType(t) } },
+                            label = { Text(t) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                val tiles = listOf(
+                    Triple("\uD83D\uDCE6", "Yuk hisoboti", onYukReport),
+                    Triple("\uD83D\uDCCA", "Hisobot", onReports),
+                    Triple("\uD83D\uDCCB", "To'liq", onToliq),
+                    Triple("\uD83D\uDCC8", "Grafik", onGrafik),
+                    Triple("\uD83D\uDC65", "Mijozlar", onClients),
+                    Triple("\uD83D\uDCB3", "Qarzdorlar", onQarz),
+                    Triple("\uD83D\uDE9A", "Narx", onYukNarx),
+                    Triple("\uD83D\uDCB8", "Rasxod", onRasxod),
+                    Triple("\u2753", "Yordam", onHelp),
+                    Triple("\u2699\uFE0F", "Sozlamalar", onSettings),
+                )
+                tiles.chunked(3).forEach { rowTiles ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowTiles.forEach { (emoji, label, action) ->
+                            MenuTile(emoji, label, Modifier.weight(1f)) {
+                                menuOpen = false; pendingNav = action
+                            }
+                        }
+                        repeat(3 - rowTiles.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuTile(emoji: String, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(emoji, fontSize = 30.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                lineHeight = 13.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

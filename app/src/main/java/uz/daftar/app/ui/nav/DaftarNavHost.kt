@@ -215,23 +215,7 @@ fun DaftarNavHost() {
         composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { if (canNav()) nav.popBackStack() }) }
     }
-    // ── DIAGNOSTIKA: oq ekranda ham ko'rinadi — qaysi route + jonli sanagich ──
-    // Agar oq ekran paytida shu yozuv KO'RINSA → o'sha "route" ekrani bo'sh chizyapti.
-    // Agar yozuv ham YO'QOLSA → butun composition (root) o'lgan.
-    val dbgEntry = nav.currentBackStackEntryAsState()
-    val dbgRoute = dbgEntry.value?.destination?.route ?: "—"
-    val dbgTick = remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); dbgTick.intValue++ } }
-    Text(
-        "\u2B24 ${dbgRoute} \u00B7 in:${DIAG_LAST_IN} \u00B7 ${dbgTick.intValue}s",
-        modifier = Modifier
-            .align(Alignment.BottomStart)
-            .padding(3.dp)
-            .background(Color(0x66000000))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        color = Color(0xFFFF5252),
-        fontSize = 10.sp
-    )
+    // (diagnostika olib tashlandi)
     }
     }
 }
