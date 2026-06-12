@@ -754,11 +754,29 @@ class TodayViewModel @Inject constructor(
                 provider = "gemini"; key = rest
             }
             if (key.isBlank()) return "⚠️ Kalit bo'sh."
-            aiSettings.setKey(provider, key)
-            return "✅ $provider kaliti saqlandi. Endi: gpt <savol> yoki prognoz."
+            if (key.equals("ochir", true) || key.equals("o'chir", true)) {
+                aiSettings.setKey(provider, "")
+                return "🗑 $provider kaliti o'chirildi."
+            }
+            // Nusxalashda tushib qolgan probel/yangi qatorlarni tozalaymiz
+            val clean = key.replace(Regex("\\s+"), "")
+            aiSettings.setKey(provider, clean)
+            return "✅ $provider kaliti saqlandi (${clean.take(8)}…, ${clean.length} belgi).\nTekshirish: gpt holat"
+        }
+        if (q.lowercase() == "holat") {
+            val sb = StringBuilder("🔑 Kalitlar holati:\n")
+            for (p in uz.daftar.app.core.ai.AiProviders.ALL) {
+                val k = aiSettings.getKey(p.id)
+                sb.append(
+                    if (k.isBlank()) "• ${p.displayName}: yo'q\n"
+                    else "• ${p.displayName}: ${k.take(8)}… (${k.length} belgi)\n"
+                )
+            }
+            sb.append("\nQo'shish: gpt kalit <provider> <KALIT>\nO'chirish: gpt kalit <provider> ochir")
+            return sb.toString()
         }
         if (q.lowercase() == "yordam") {
-            return "🤖 GPT yordam:\n\n• gpt kalit <provider> <KALIT>\n   provayderlar: gemini, groq, cerebras, openrouter\n   (bir nechtasini qo'shsangiz — biri tugasa keyingisi ishlaydi)\n• gpt <savol> — biznesingiz bo'yicha savol\n• prognoz — keyingi oy taxmini\n\nBepul kalit: aistudio.google.com/apikey (Gemini), console.groq.com (Groq), cloud.cerebras.ai (Cerebras), openrouter.ai (OpenRouter)"
+            return "🤖 GPT yordam:\n\n• gpt kalit <provider> <KALIT>\n   provayderlar: gemini, groq, cerebras, openrouter\n   (bir nechtasini qo'shsangiz — biri tugasa keyingisi ishlaydi)\n• gpt holat — qaysi kalitlar saqlanganini ko'rish\n• gpt <savol> — biznesingiz bo'yicha savol\n• prognoz — keyingi oy taxmini\n\nBepul kalit: aistudio.google.com/apikey (Gemini), console.groq.com (Groq), cloud.cerebras.ai (Cerebras), openrouter.ai (OpenRouter)"
         }
         val context = runCatching { buildBusinessContext() }.getOrDefault("")
         val prompt = if (q.lowercase() == "prognoz") {
