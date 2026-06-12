@@ -136,6 +136,7 @@ fun TodayScreen(
     onYukReport: () -> Unit = onSettings,
     onToliq: () -> Unit = onSettings,
     onGrafik: () -> Unit = onSettings,
+    onCalc: () -> Unit = onSettings,
     onNReport: () -> Unit = {},
     onAlias: () -> Unit = onSettings,
     onRasxod: () -> Unit = onSettings,
@@ -324,6 +325,7 @@ fun TodayScreen(
                     onYukReport = onYukReport,
                     onToliq = onToliq,
                     onGrafik = onGrafik,
+                    onCalc = onCalc,
                     onNReport = { vm.showDateReportButton(java.time.LocalDate.now(), useNarx = true) },
                     onAlias = onAlias,
                     onRasxod = onRasxod,
@@ -390,10 +392,6 @@ fun TodayScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                AssistChip(
-                                    onClick = { vm.saveCurrentAsTemplate() },
-                                    label = { Text("⭐ Saqlash") }
-                                )
                                 state.templates.forEach { t ->
                                     AssistChip(
                                         onClick = { vm.applyTemplate(t) },
@@ -600,6 +598,7 @@ private fun ChatTopBar(
     onYukReport: () -> Unit,
     onToliq: () -> Unit,
     onGrafik: () -> Unit,
+    onCalc: () -> Unit,
     onNReport: () -> Unit,
     onAlias: () -> Unit,
     onRasxod: () -> Unit,
@@ -631,7 +630,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v31", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v32", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -689,6 +688,7 @@ private fun ChatTopBar(
                     Triple("\uD83D\uDCB3", "Qarzdorlar", onQarz),
                     Triple("\uD83D\uDE9A", "Narx", onYukNarx),
                     Triple("\uD83D\uDCB8", "Rasxod", onRasxod),
+                    Triple("\uD83E\uDDEE", "Kalkulyator", onCalc),
                     Triple("\u2753", "Yordam", onHelp),
                     Triple("\u2699\uFE0F", "Sozlamalar", onSettings),
                 )

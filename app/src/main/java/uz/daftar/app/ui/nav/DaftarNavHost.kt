@@ -59,6 +59,7 @@ object Routes {
     const val SKLAD = "sklad"
     const val TOLIQ = "toliq"
     const val GRAFIK = "grafik"
+    const val CALC = "calc"
 }
 
 // ── DIAGNOSTIKA: ekran HAQIQATAN kompozitsiyaga kirdimi? ──
@@ -120,6 +121,7 @@ fun DaftarNavHost() {
                 onYukReport = { if (canNav()) nav.navigate(Routes.YUK_REPORT) },
                 onToliq = { if (canNav()) nav.navigate(Routes.TOLIQ) },
                 onGrafik = { if (canNav()) nav.navigate(Routes.GRAFIK) },
+                onCalc = { if (canNav()) nav.navigate(Routes.CALC) },
                 onAlias = { if (canNav()) nav.navigate(Routes.ALIAS) },
                 onRasxod = { if (canNav()) nav.navigate(Routes.RASXOD) },
                 onKarzina = { if (canNav()) nav.navigate(Routes.KARZINA) },
@@ -206,6 +208,7 @@ fun DaftarNavHost() {
         composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.TOLIQ) { DiagIn("toliq"); uz.daftar.app.ui.screen.toliq.ToliqHisobotScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.GRAFIK) { DiagIn("grafik"); uz.daftar.app.ui.screen.grafik.GrafikScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.CALC) { DiagIn("calc"); uz.daftar.app.ui.screen.calc.CalcScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.REMINDER) { DiagIn("reminder"); ReminderLimitScreen(onBack = { if (canNav()) nav.popBackStack() }) }
