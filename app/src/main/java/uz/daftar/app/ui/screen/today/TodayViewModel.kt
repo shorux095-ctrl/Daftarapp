@@ -1597,7 +1597,16 @@ class TodayViewModel @Inject constructor(
         val cur = state.value.input
         val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
         val lastLine = cur.substringAfterLast('\n').trimStart()
-        val rest = lastLine.substringAfter(' ', missingDelimiterValue = "")
+        // Yozilgan ism qismini topamiz (ko'p so'zli ismlar uchun ham): "olim shash" -> butun shu qism almashadi
+        val lname = name.lowercase()
+        var typed = ""
+        for (w in lastLine.split(" ")) {
+            if (w.isBlank()) break
+            val cand = if (typed.isEmpty()) w else "$typed $w"
+            if (lname.startsWith(cand.lowercase())) typed = cand else break
+        }
+        val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
+                   else lastLine.removePrefix(typed).trimStart()
         val tail = if (rest.isBlank()) "$name " else "$name $rest"
         onInputChange(prefix + tail)
     }

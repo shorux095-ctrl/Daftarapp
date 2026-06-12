@@ -13,6 +13,9 @@ import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.entity.PriceHistoryEntity
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
+import uz.daftar.app.core.parser.DaftarParser
+import uz.daftar.app.core.parser.ParseResult
+import uz.daftar.app.domain.usecase.AddTransactionUseCase
 import uz.daftar.app.domain.usecase.DeleteToKarzinaUseCase
 import uz.daftar.app.domain.usecase.GetClientHistoryUseCase
 import java.time.YearMonth
@@ -36,7 +39,8 @@ class ClientHistoryViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val getHistory: GetClientHistoryUseCase,
     private val priceDao: PriceHistoryDao,
-    private val deleteTx: DeleteToKarzinaUseCase
+    private val deleteTx: DeleteToKarzinaUseCase,
+    private val addTx: AddTransactionUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -116,6 +120,25 @@ class ClientHistoryViewModel @Inject constructor(
 
     fun nextMonth() {
         _state.update { it.copy(selectedMonth = it.selectedMonth.plusMonths(1)) }
+    }
+
+    /** Shu ekranning o'zida yozish: "a5", "p 50000", "05.06 a5 a10" — mijoz nomi avtomatik qo'shiladi */
+    fun addEntry(text: String) {
+        val t = text.trim()
+        if (t.isBlank()) return
+        viewModelScope.launch {
+            val dateRe = Regex("^(\\d{1,2}[.,]\\d{1,2}(?:[.,]\\d{2,4})?)\\s+(.+)$")
+            val m = dateRe.find(t)
+            val line = if (m != null) "${m.groupValues[1]} $clientName ${m.groupValues[2]}" else "$clientName $t"
+            when (val r = DaftarParser.parse(line)) {
+                is ParseResult.Success -> {
+                    runCatching { addTx(userId, r.entry) }
+                        .onSuccess { _state.update { it.copy(error = null) }; load() }
+                        .onFailure { e -> _state.update { it.copy(error = e.message) } }
+                }
+                else -> _state.update { it.copy(error = "Tushunarsiz: $t") }
+            }
+        }
     }
 
     fun deleteTransaction(id: Long) {

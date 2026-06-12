@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.BarChart
@@ -114,6 +115,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
 import uz.daftar.app.core.util.formatQty
+import uz.daftar.app.core.voice.rememberVoiceInput
 import uz.daftar.app.core.parser.ParsedEntry
 import uz.daftar.app.domain.model.Transaction
 import uz.daftar.app.domain.model.TxType
@@ -629,7 +631,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v30", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v31", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1116,6 +1118,12 @@ private fun InputBar(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                val voiceIn = rememberVoiceInput { spoken ->
+                    val cur = tfv.text
+                    val newText = if (cur.isBlank()) spoken else "$cur $spoken"
+                    tfv = TextFieldValue(newText, selection = TextRange(newText.length))
+                    onChange(newText)
+                }
                 OutlinedTextField(
                     value = tfv,
                     onValueChange = { newV ->
@@ -1126,6 +1134,11 @@ private fun InputBar(
                         .weight(1f)
                         .onFocusChanged { inputFocused = it.isFocused },
                     placeholder = { Text("Yozuv...") },
+                    trailingIcon = {
+                        IconButton(onClick = { voiceIn("uz-UZ") }) {
+                            Icon(Icons.Outlined.Mic, contentDescription = "Ovoz")
+                        }
+                    },
                     minLines = 1,
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(

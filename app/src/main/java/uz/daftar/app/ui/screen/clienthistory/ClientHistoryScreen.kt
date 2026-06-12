@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AttachMoney
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +51,7 @@ import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import java.util.Locale
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -86,7 +90,30 @@ fun ClientHistoryScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            DebtCard(debt = state.debt, txCount = state.transactions.size)
+            val monthPrefix = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
+            // Tanlangan OY OXIRIDAGI qarz qoldig'i (shu oygacha hammasi hisobida)
+            val monthDebt = androidx.compose.runtime.remember(state.transactions, state.priceByTx, state.selectedMonth) {
+                var d = 0.0
+                for (tx in state.transactions) {
+                    if (tx.date.take(7) > monthPrefix) continue
+                    when (TxType.fromCode(tx.type)) {
+                        TxType.P -> d -= tx.amount
+                        TxType.Q -> d += tx.amount
+                        TxType.A, TxType.B, TxType.C, TxType.D, TxType.K -> {
+                            val p = state.priceByTx[tx.id]
+                            if (p != null) d += tx.amount * p
+                        }
+                        else -> {}
+                    }
+                }
+                d.roundToLong()
+            }
+            DebtCard(
+                debt = state.debt,
+                txCount = state.transactions.size,
+                monthLabel = MONTHS_UZ[state.selectedMonth.monthValue - 1],
+                monthDebt = monthDebt
+            )
 
             // Oy navigatsiyasi ⬅️ May 2026 ➡️
             Row(
@@ -104,28 +131,27 @@ fun ClientHistoryScreen(
                 IconButton(onClick = { vm.nextMonth() }, modifier = Modifier.size(52.dp)) { Text("➡️", fontSize = 30.sp) }
             }
 
-            val monthPrefix = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
             val monthTxs = state.transactions.filter { it.date.startsWith(monthPrefix) }
 
             when {
                 state.isLoading -> Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) { CircularProgressIndicator() }
 
                 monthTxs.isEmpty() -> Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Bu oyda yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp)
                 ) {
                     // Kun bo'yicha guruh (eng yangi tepada)
                     val byDay = monthTxs.groupBy { it.date.take(10) }
-                        .toSortedMap(compareBy { it })
+                        .toSortedMap(compareByDescending { it })
                     byDay.forEach { (day, dayTxsRaw) ->
                         val dayTxs = dayTxsRaw.sortedBy { it.date }
                         item(key = "day-$day") {
@@ -152,6 +178,17 @@ fun ClientHistoryScreen(
                     }
                 }
             }
+
+            // ➕ Shu yerning o'zida yozish (ism kerak emas)
+            if (state.error != null) {
+                Text(
+                    state.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+            AddEntryBar(onSend = { vm.addEntry(it) })
         }
     }
 
@@ -176,7 +213,7 @@ fun ClientHistoryScreen(
 }
 
 @Composable
-private fun DebtCard(debt: Long, txCount: Int) {
+private fun DebtCard(debt: Long, txCount: Int, monthLabel: String, monthDebt: Long) {
     Card(
         modifier = Modifier.padding(16.dp).fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -203,6 +240,38 @@ private fun DebtCard(debt: Long, txCount: Int) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "📅 $monthLabel oxirida: ${monthDebt.formatMoney()} so'm",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (monthDebt > 0) DebtColor else PaidColor
+            )
+        }
+    }
+}
+
+/** Pastdagi yozish paneli — "a5", "p 50000", "05.06 a5 a10" */
+@Composable
+private fun AddEntryBar(onSend: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier.weight(1f),
+            placeholder = { Text("a5 · p 50000 · 05.06 a5") },
+            singleLine = true,
+            shape = RoundedCornerShape(20.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        IconButton(onClick = {
+            if (text.isNotBlank()) { onSend(text); text = "" }
+        }) {
+            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Saqlash")
         }
     }
 }

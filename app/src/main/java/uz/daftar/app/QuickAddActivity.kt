@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,14 +65,14 @@ class QuickAddActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             DaftarTheme {
-                var text by remember { mutableStateOf("") }
+                var tfv by remember { mutableStateOf(TextFieldValue("")) }
                 var saving by remember { mutableStateOf(false) }
                 var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
 
                 // Oxirgi qatordagi ism bo'yicha takliflar (chatdagi bilan bir xil)
-                LaunchedEffect(text) {
+                LaunchedEffect(tfv.text) {
                     delay(120)
-                    val lastLine = text.substringAfterLast('\n').trimStart()
+                    val lastLine = tfv.text.substringAfterLast('\n').trimStart()
                     val word = lastLine.substringBefore(' ').trim()
                     suggestions = if (word.isNotBlank() && word.all { it.isLetter() || it == '\'' })
                         runCatching { repo.suggestClients(userId, word) }.getOrDefault(emptyList())
@@ -95,10 +97,9 @@ class QuickAddActivity : ComponentActivity() {
                             Text("⚡ Tezkor qo'shish", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             Spacer(Modifier.height(12.dp))
                             OutlinedTextField(
-                                value = text,
-                                onValueChange = { text = it },
+                                value = tfv,
+                                onValueChange = { tfv = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("ali aka a5 a10   yoki   ali p 50000") },
                                 minLines = 2
                             )
                             if (suggestions.isNotEmpty()) {
@@ -110,11 +111,22 @@ class QuickAddActivity : ComponentActivity() {
                                     suggestions.forEach { name ->
                                         SuggestionChip(
                                             onClick = {
-                                                val prefix = if (text.contains('\n')) text.substringBeforeLast('\n') + "\n" else ""
-                                                val lastLine = text.substringAfterLast('\n').trimStart()
-                                                val rest = lastLine.substringAfter(' ', missingDelimiterValue = "")
+                                                val cur = tfv.text
+                                                val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
+                                                val lastLine = cur.substringAfterLast('\n').trimStart()
+                                                // Yozilgan ism qismini topamiz (ko'p so'zli ismlar ham)
+                                                val lname = name.lowercase()
+                                                var typed = ""
+                                                for (w in lastLine.split(" ")) {
+                                                    if (w.isBlank()) break
+                                                    val cand = if (typed.isEmpty()) w else "$typed $w"
+                                                    if (lname.startsWith(cand.lowercase())) typed = cand else break
+                                                }
+                                                val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
+                                                           else lastLine.removePrefix(typed).trimStart()
                                                 val tail = if (rest.isBlank()) "$name " else "$name $rest"
-                                                text = prefix + tail
+                                                val newText = prefix + tail
+                                                tfv = TextFieldValue(newText, selection = TextRange(newText.length))
                                             },
                                             label = { Text(name.replaceFirstChar { it.uppercase() }) }
                                         )
@@ -128,10 +140,10 @@ class QuickAddActivity : ComponentActivity() {
                                 Button(
                                     enabled = !saving,
                                     onClick = {
-                                        if (text.isBlank()) return@Button
+                                        if (tfv.text.isBlank()) return@Button
                                         saving = true
                                         lifecycleScope.launch {
-                                            val n = withContext(Dispatchers.IO) { saveText(text) }
+                                            val n = withContext(Dispatchers.IO) { saveText(tfv.text) }
                                             android.widget.Toast.makeText(
                                                 this@QuickAddActivity,
                                                 if (n > 0) "✅ $n yozuv saqlandi" else "❌ Tushunarsiz format",
