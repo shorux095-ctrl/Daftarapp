@@ -17,7 +17,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.material.icons.outlined.AttachMoney
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import uz.daftar.app.core.pdf.DebtPdf
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -63,6 +69,7 @@ fun ClientHistoryScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var toDelete by remember { mutableStateOf<TransactionEntity?>(null) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -78,6 +85,57 @@ fun ClientHistoryScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        runCatching {
+                            val mp = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
+                            val monthName = MONTHS_UZ[state.selectedMonth.monthValue - 1]
+                            val txs = state.transactions
+                                .filter { it.date.startsWith(mp) }
+                                .sortedBy { it.date }
+                            val body = mutableListOf<String>()
+                            txs.groupBy { it.date.take(10) }.toSortedMap().forEach { (day, list) ->
+                                body.add("${day.substring(8, 10)}.${day.substring(5, 7)}")
+                                list.forEach { tx ->
+                                    val unitPrice = state.priceByTx[tx.id]
+                                    val ln = when {
+                                        tx.type.equals("p", true) -> "To'lov (P): ${tx.amount.formatMoney()} so'm"
+                                        tx.type.equals("q", true) -> "Qarz (Q): ${tx.amount.formatMoney()} so'm"
+                                        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} x ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
+                                        else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
+                                    }
+                                    body.add("    $ln")
+                                }
+                            }
+                            if (body.isEmpty()) body.add("Bu oyda yozuv yo'q")
+                            val mDebt = monthEndDebt(state.transactions, state.priceByTx, mp)
+                            val now = java.time.LocalDate.now()
+                            val disp = state.clientName.replaceFirstChar { it.uppercase() }
+                            val file = DebtPdf.create(
+                                context = context,
+                                title = "QARZ XATI — $disp",
+                                headerLines = listOf(
+                                    "Davr: $monthName ${state.selectedMonth.year}",
+                                    "Tayyorlandi: %02d.%02d.%04d".format(now.dayOfMonth, now.monthValue, now.year)
+                                ),
+                                bodyLines = body,
+                                footerLines = listOf(
+                                    "$monthName oxirida qarz: ${mDebt.formatMoney()} so'm",
+                                    "UMUMIY QARZ (bugun): ${state.debt.formatMoney()} so'm"
+                                )
+                            )
+                            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/pdf"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(send, "Qarz xatini yuborish"))
+                        }.onFailure {
+                            Toast.makeText(context, "PDF xato: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }) {
+                        Icon(Icons.Outlined.PictureAsPdf, contentDescription = "Qarz xati (PDF)")
+                    }
                     IconButton(onClick = { onSetNarx(state.clientName) }) {
                         Icon(
                             Icons.Outlined.AttachMoney,
@@ -93,20 +151,7 @@ fun ClientHistoryScreen(
             val monthPrefix = "%04d-%02d".format(state.selectedMonth.year, state.selectedMonth.monthValue)
             // Tanlangan OY OXIRIDAGI qarz qoldig'i (shu oygacha hammasi hisobida)
             val monthDebt = androidx.compose.runtime.remember(state.transactions, state.priceByTx, state.selectedMonth) {
-                var d = 0.0
-                for (tx in state.transactions) {
-                    if (tx.date.take(7) > monthPrefix) continue
-                    when (TxType.fromCode(tx.type)) {
-                        TxType.P -> d -= tx.amount
-                        TxType.Q -> d += tx.amount
-                        TxType.A, TxType.B, TxType.C, TxType.D, TxType.K -> {
-                            val p = state.priceByTx[tx.id]
-                            if (p != null) d += tx.amount * p
-                        }
-                        else -> {}
-                    }
-                }
-                d.roundToLong()
+                monthEndDebt(state.transactions, state.priceByTx, monthPrefix)
             }
             DebtCard(
                 debt = state.debt,
@@ -391,3 +436,25 @@ private val MONTHS_UZ = listOf(
     "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
     "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
 )
+
+/** Tanlangan oy OXIRIDAGI qarz qoldig'i (shu oygacha hammasi hisobida) */
+private fun monthEndDebt(
+    transactions: List<TransactionEntity>,
+    priceByTx: Map<Long, Double>,
+    monthPrefix: String
+): Long {
+    var d = 0.0
+    for (tx in transactions) {
+        if (tx.date.take(7) > monthPrefix) continue
+        when (TxType.fromCode(tx.type)) {
+            TxType.P -> d -= tx.amount
+            TxType.Q -> d += tx.amount
+            TxType.A, TxType.B, TxType.C, TxType.D, TxType.K -> {
+                val p = priceByTx[tx.id]
+                if (p != null) d += tx.amount * p
+            }
+            else -> {}
+        }
+    }
+    return d.roundToLong()
+}

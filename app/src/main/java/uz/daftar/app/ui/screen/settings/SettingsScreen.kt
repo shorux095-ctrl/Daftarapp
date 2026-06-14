@@ -195,7 +195,7 @@ fun SettingsScreen(
             ToggleItem(
                 icon = Icons.Outlined.Backup,
                 title = "☁️ Avto-zaxira (fayl)",
-                subtitle = if (autoBackupOn) "Yoqilgan ✓ — chiqishda avto saqlanadi" else "Fayl tanlang — chiqishda avto saqlanadi",
+                subtitle = if (autoBackupOn) "Yoqilgan ✓ — chiqishda avto saqlanadi" else "Faylni Google Drive'da yarating — bulutga avto saqlanadi",
                 checked = autoBackupOn,
                 onCheckedChange = { on -> if (on) autoBackupLauncher.launch("daftar_avto_backup.db") else vm.disableAutoBackup() }
             )

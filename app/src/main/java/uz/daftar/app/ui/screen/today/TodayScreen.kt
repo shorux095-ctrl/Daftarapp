@@ -226,6 +226,29 @@ fun TodayScreen(
         }
     }
 
+    state.voiceConfirm?.let { vtxt ->
+        AlertDialog(
+            onDismissRequest = { vm.voiceConfirmNo() },
+            title = { Text("\ud83c\udfa4 Saqlansinmi?") },
+            text = {
+                Column {
+                    Text("\"$vtxt\"", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    state.parsed.take(5).forEach { e ->
+                        val items = e.items.entries.joinToString("  ") { (t, a) -> "${t.label}:${a.formatQty()}" }
+                        Text("\u2022 ${e.clientName}  $items", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.voiceConfirmYes() }) { Text("\u2705 HA \u2014 saqlash") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.voiceConfirmNo() }) { Text("\u274c YO'Q") }
+            }
+        )
+    }
+
     crashText?.let { ct ->
         AlertDialog(
             onDismissRequest = { crashText = null },
@@ -383,22 +406,6 @@ fun TodayScreen(
                                     label = { Text("📦 Yuk") }
                                 )
                             }
-                            // Tezkor shablonlar
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                state.templates.forEach { t ->
-                                    AssistChip(
-                                        onClick = { vm.applyTemplate(t) },
-                                        label = { Text(t) }
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -408,6 +415,7 @@ fun TodayScreen(
                     onChange = vm::onInputChange,
                     suggestions = state.suggestions,
                     onSuggestionClick = vm::applySuggestion,
+                    onVoice = vm::onVoiceInput,
                     onSend = {
                         bottomMenuOpen = false
                         keyboardController?.hide(); focusManager.clearFocus()
@@ -630,7 +638,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v33", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v35", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -961,6 +969,7 @@ private fun InputBar(
     onChange: (String) -> Unit,
     suggestions: List<String>,
     onSuggestionClick: (String) -> Unit,
+    onVoice: (String) -> Unit,
     onSend: () -> Unit,
     canSend: Boolean,
     isSending: Boolean,
@@ -1118,12 +1127,7 @@ private fun InputBar(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                val voiceIn = rememberVoiceInput { spoken ->
-                    val cur = tfv.text
-                    val newText = if (cur.isBlank()) spoken else "$cur $spoken"
-                    tfv = TextFieldValue(newText, selection = TextRange(newText.length))
-                    onChange(newText)
-                }
+                val voiceIn = rememberVoiceInput { spoken -> onVoice(spoken) }
                 OutlinedTextField(
                     value = tfv,
                     onValueChange = { newV ->

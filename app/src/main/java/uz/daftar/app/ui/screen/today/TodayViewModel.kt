@@ -83,6 +83,8 @@ data class TodayUiState(
 
     /** Tezkor shablonlar */
     val templates: List<String> = emptyList(),
+    /** 🎤 Ovoz orqali yozuv — HA/YO'Q tasdiq kutilmoqda */
+    val voiceConfirm: String? = null,
 
     /** Input "x" o'chirish komandasimi (x / 12.03 x + ismlar) */
     val isDeleteCommand: Boolean = false,
@@ -1627,6 +1629,47 @@ class TodayViewModel @Inject constructor(
                    else lastLine.removePrefix(typed).trimStart()
         val tail = if (rest.isBlank()) "$name " else "$name $rest"
         onInputChange(prefix + tail)
+    }
+
+    /**
+     * 🎤 Ovoz natijasi:
+     * 1) Yozuv (ism + yuk/pul) tushunarli bo'lsa — HA/YO'Q tasdiq oynasi.
+     * 2) Aniq mijoz nomi bo'lsa — tarixni darhol ko'rsatadi.
+     * 3) Aks holda — matn maydonga tushadi, qo'lda tuzatasiz.
+     */
+    fun onVoiceInput(spoken: String) {
+        val t = spoken.trim()
+        if (t.isBlank()) return
+        viewModelScope.launch {
+            val lines = t.lines().map { it.trim() }.filter { it.isNotBlank() }
+            val allParsed = lines.isNotEmpty() && lines.all { ln ->
+                val r = DaftarParser.parse(ln)
+                r is ParseResult.Success && r.entry.items.isNotEmpty()
+            }
+            if (allParsed) {
+                onInputChange(t)
+                _state.update { it.copy(voiceConfirm = t) }
+                return@launch
+            }
+            // Aniq mijoz nomi bo'lsa — tarix
+            val names = runCatching { repo.suggestClients(userId, t) }.getOrDefault(emptyList())
+            if (names.any { it.equals(t, ignoreCase = true) }) {
+                onInputChange(t)
+                send()
+                return@launch
+            }
+            onInputChange(t)
+        }
+    }
+
+    fun voiceConfirmYes() {
+        _state.update { it.copy(voiceConfirm = null) }
+        send()
+    }
+
+    fun voiceConfirmNo() {
+        // Matn maydonда qoladi — xohlasangiz qo'lda tuzatib yuborasiz
+        _state.update { it.copy(voiceConfirm = null) }
     }
 
     fun send() {
