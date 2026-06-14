@@ -638,7 +638,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v40", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v42", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1581,13 +1581,8 @@ private fun DateReportCard(
                 return@Column
             }
 
-            // Raqamlangan mijoz qatorlari (uzun bo'lsa scroll)
-            val scroll = rememberScrollState()
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 340.dp)
-                    .verticalScroll(scroll)
-            ) {
+            // Raqamlangan mijoz qatorlari — HAMMASI ko'rinadi (chat o'zi scroll qiladi)
+            Column(modifier = Modifier.fillMaxWidth()) {
                 for ((idx, line) in report.clientLines.withIndex()) {
                     val capitalized = line.clientName.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()

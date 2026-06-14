@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,7 @@ import java.util.Locale
 @Composable
 fun CalcScreen(onBack: () -> Unit) {
     var expr by remember { mutableStateOf("") }
+    var memory by remember { mutableStateOf(0.0) }
     val res = remember(expr) { evalExpr(expr) }
 
     Scaffold(
@@ -68,7 +70,46 @@ fun CalcScreen(onBack: () -> Unit) {
                 fontSize = 24.sp,
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(Modifier.height(10.dp))
+            if (memory != 0.0) {
+                Text(
+                    "M = ${fmt(memory)}",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // Xotira qatori: MC tozalash, MR chaqirish, M+ qo'shish, M- ayirish
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("MC", "MR", "M+", "M-").forEach { mk ->
+                    Button(
+                        onClick = {
+                            when (mk) {
+                                "MC" -> memory = 0.0
+                                "MR" -> {
+                                    val m = if (memory % 1.0 == 0.0) memory.toLong().toString() else memory.toString()
+                                    expr += m
+                                }
+                                "M+" -> { val v = evalExpr(expr); if (v != null) memory += v }
+                                "M-" -> { val v = evalExpr(expr); if (v != null) memory -= v }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    ) {
+                        Text(mk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
 
             val rows = listOf(
                 listOf("C", "⌫", "%", "÷"),
