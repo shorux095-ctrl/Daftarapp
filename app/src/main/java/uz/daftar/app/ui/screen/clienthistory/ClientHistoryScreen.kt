@@ -440,7 +440,7 @@ private val MONTHS_UZ = listOf(
 /** Tanlangan oy OXIRIDAGI qarz qoldig'i (shu oygacha hammasi hisobida) */
 private fun monthEndDebt(
     transactions: List<TransactionEntity>,
-    priceByTx: Map<Long, Double>,
+    priceByTx: Map<Long, Double?>,
     monthPrefix: String
 ): Long {
     var d = 0.0

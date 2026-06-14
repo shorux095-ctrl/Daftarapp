@@ -147,11 +147,13 @@ class SettingsViewModel @Inject constructor(
             val count = runCatching { repo.countAll(userId) }.getOrDefault(0)
             if (count == 0) {
                 // YANGI/BO'SH telefon — Drive'dan avtomatik tiklaymiz
-                val r = runCatching { drive.restoreLatest() }
-                _driveMsg.value = r.fold(
-                    onSuccess = { name -> if (name != null) "✅ Tiklandi: $name" else "✅ Kirildi (Drive'da zaxira yo'q)" },
-                    onFailure = { "❌ Tiklash xato: ${it.message}" }
-                )
+                val res = runCatching { drive.restoreLatest() }
+                _driveMsg.value = if (res.isSuccess) {
+                    val name: String? = res.getOrNull()
+                    if (name != null) "✅ Tiklandi: $name" else "✅ Kirildi (Drive'da zaxira yo'q)"
+                } else {
+                    "❌ Tiklash xato: " + (res.exceptionOrNull()?.message ?: "")
+                }
             } else {
                 // Ma'lumot bor — tiklamaymiz (xavfsizlik), darhol zaxiralaymiz
                 val r = runCatching { drive.backupNow() }
