@@ -127,6 +127,9 @@ fun HelpScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 Cmd("bugun n   •   30.05 n")
                 Body("N narx (sotilgan) bo'yicha — 🔢 JAMI pul. Tur filtri: 30.05 a b")
+                Spacer(Modifier.height(6.dp))
+                Cmd("01.05 25.05        •        01.05 25.05 p")
+                Body("Sana ORALIG'I hisoboti. Tur filtri qo'shsangiz — faqat o'sha turlar:\n• 01.05 25.05 p — oraliqда P (to'lov) qilganlar, ism + summa + jami\n• 10.05 15.05 a b c — A/B/C yuklar (bir nechta tur birga)\n• 10.05 15.05 ali a b — faqat Ali, A va B\n• Oxiriga n qo'shsangiz — N (sotilgan) narx bo'yicha")
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 

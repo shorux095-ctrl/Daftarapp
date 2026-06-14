@@ -298,7 +298,24 @@ class TodayViewModel @Inject constructor(
 
     /** Chatdagi History kartalarni JONLI DB bilan qayta yasaydi (edit/o'chirishdan keyin eski qiymat qolmasin). */
     /** 🔄 Bosh ekran yangilash — kartalarni jonli DB bilan qayta yasaydi. */
-    fun refresh() { refreshHistoryCards() }
+    fun refresh() {
+        drainPendingWidget()
+        refreshHistoryCards()
+    }
+
+    /** Widjetdan qo'shilgan yozuvlarni chatda "✅ Saqlandi" sifatida ko'rsatish. */
+    private fun drainPendingWidget() {
+        viewModelScope.launch {
+            val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
+            if (pend.isEmpty()) return@launch
+            for (line in pend) {
+                appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
+            }
+            persistChat()
+            // Mijoz tarix kartalarini ham yangilab qo'yamiz
+            refreshHistoryCards()
+        }
+    }
 
     private fun refreshHistoryCards() {
         viewModelScope.launch {
@@ -422,6 +439,7 @@ class TodayViewModel @Inject constructor(
                 if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
             }
             runCatching { maybeShowAutoReports() }
+            drainPendingWidget()
             refreshHistoryCards()
         }
     }
@@ -864,9 +882,9 @@ class TodayViewModel @Inject constructor(
         }
         // Yangi matn yozilyapti — pin bekor qilinadi (live preview)
         _state.update { it.copy(pinnedView = false, globalPrice = null, t1set = null, aiQuery = null, isEditUndo = false, deleteAllDate = null, deleteClientName = null, rasxodAmount = null) }
-        // "r100 gaz" / "r 100 gaz" — rasxod (xarajat)
+        // "r100 gaz" / "r 100 gaz" / "rasxod 100 gaz" — rasxod (xarajat)
         run {
-            val m = Regex("""^[rR]\s*(\d+(?:[.,]\d+)?)\s*(.*)$""").matchEntire(text.trim())
+            val m = Regex("""^(?:r|rasxod)\s*(\d+(?:[.,]\d+)?)\s*(.*)$""", RegexOption.IGNORE_CASE).matchEntire(text.trim())
             if (m != null) {
                 val amt = m.groupValues[1].replace(",", ".").toDoubleOrNull()
                 if (amt != null && amt > 0) {
@@ -1065,6 +1083,44 @@ class TodayViewModel @Inject constructor(
         }
 
         val tokens = trimmedLow.split(Regex("\\s+")).filter { it.isNotBlank() }
+
+        // ── SANA ORALIG'I: "01.05 25.05 [ism] [a b c / p / n]" ──────────────
+        run {
+            val dRe = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""")
+            fun toDate(s: String): LocalDate? {
+                val m = dRe.matchEntire(s) ?: return null
+                return runCatching {
+                    val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
+                    val yr = m.groupValues[3]
+                    val year = when { yr.isEmpty() -> LocalDate.now().year; yr.length == 2 -> 2000 + yr.toInt(); else -> yr.toInt() }
+                    LocalDate.of(year, mo, d)
+                }.getOrNull()
+            }
+            if (tokens.size >= 2) {
+                val d1 = toDate(tokens[0]); val d2 = toDate(tokens[1])
+                if (d1 != null && d2 != null && !d2.isBefore(d1)) {
+                    val rest = tokens.drop(2)
+                    val useNarx = rest.contains("n")
+                    val letters = rest.filter { it != "n" && it.length == 1 && it[0] in "abcdkpq" }
+                    // lettersdan tashqari hamma narsa — ism
+                    val nameParts = rest.filter { it != "n" && !(it.length == 1 && it[0] in "abcdkpq") }
+                    // rest faqat harf/n yoki ism + harf bo'lishi mumkin
+                    val onlyLettersOrName = rest.all {
+                        it == "n" || (it.length == 1 && it[0] in "abcdkpq") || it.all { c -> c.isLetter() || c == '\'' || c == '-' }
+                    }
+                    if (onlyLettersOrName) {
+                        val types = if (letters.isEmpty()) null else letters.toSet()
+                        val clientFilter = if (nameParts.isEmpty()) null else nameParts.joinToString(" ")
+                        _state.update { it.copy(parsed = emptyList(), errorMessage = null, previews = emptyList(), textReport = null, isViewCommand = true) }
+                        loadDateReport(d1, types, useNarx, endDate = d2, clientFilter = clientFilter)
+                        updateSuggestions("")
+                        return
+                    }
+                }
+            }
+        }
+
+        // "bugun" / "kecha" / "DD.MM" + ixtiyoriy tur filtri ("30.05 a b c")
         val baseDate: LocalDate? = if (tokens.isEmpty()) null else when (tokens[0]) {
             "bugun" -> LocalDate.now()
             "kecha" -> LocalDate.now().minusDays(1)
@@ -1485,12 +1541,12 @@ class TodayViewModel @Inject constructor(
     }
 
     private var reportJob: Job? = null
-    private fun loadDateReport(date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false, endDate: LocalDate = date) {
+    private fun loadDateReport(date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false, endDate: LocalDate = date, clientFilter: String? = null) {
         reportJob?.cancel()
         reportJob = viewModelScope.launch {
             try {
-                val report = if (endDate != date) {
-                    getDateReport.range(userId, date, endDate, types, useNarx)
+                val report = if (endDate != date || clientFilter != null) {
+                    getDateReport.range(userId, date, endDate, types, useNarx, clientFilter)
                 } else {
                     getDateReport(userId, date, types, useNarx)
                 }
@@ -1651,6 +1707,22 @@ class TodayViewModel @Inject constructor(
         val t = spoken.trim()
         if (t.isBlank()) return
         viewModelScope.launch {
+            // 1) "rasxod 200" / "rasxod 200 gaz" / "rasxod 200 magazin" → to'g'ridan rasxodga
+            val rm = Regex("""^(?:rasxod|rasxot|rashod|r)\s+(\d+(?:[.,]\d+)?)\s*(.*)$""", RegexOption.IGNORE_CASE)
+                .matchEntire(t)
+            if (rm != null) {
+                val amt = rm.groupValues[1].replace(",", ".").toDoubleOrNull()
+                if (amt != null && amt > 0) {
+                    val note = rm.groupValues[2].trim()
+                    runCatching { addRasxod(userId, amt, note) }
+                    appendChat(ChatItem.Info(nextChatId(),
+                        "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()}" + if (note.isNotBlank()) "  $note" else ""))
+                    persistChat()
+                    onInputChange("")
+                    return@launch
+                }
+            }
+
             val lines = t.lines().map { it.trim() }.filter { it.isNotBlank() }
             val allParsed = lines.isNotEmpty() && lines.all { ln ->
                 val r = DaftarParser.parse(ln)
@@ -1661,10 +1733,12 @@ class TodayViewModel @Inject constructor(
                 _state.update { it.copy(voiceConfirm = t) }
                 return@launch
             }
-            // Aniq mijoz nomi bo'lsa — tarix
+            // 2) Aniq mijoz nomi — tarixni DARHOL ko'rsatish (yozuvda qoldirmaymiz)
             val names = runCatching { repo.suggestClients(userId, t) }.getOrDefault(emptyList())
-            if (names.any { it.equals(t, ignoreCase = true) }) {
-                onInputChange(t)
+            val exact = names.firstOrNull { it.equals(t, ignoreCase = true) }
+                ?: names.firstOrNull { it.replace("'", "").equals(t.replace("'", ""), ignoreCase = true) }
+            if (exact != null) {
+                onInputChange(exact)
                 send()
                 return@launch
             }

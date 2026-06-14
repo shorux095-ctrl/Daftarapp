@@ -150,6 +150,15 @@ fun TodayScreen(
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // Widjetdan qaytganda — yangi saqlangan yozuvlarni chatda ko'rsatish
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     val listState = rememberLazyListState()
     val calScope = rememberCoroutineScope()
     val csvContext = LocalContext.current
@@ -638,7 +647,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v42", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v45", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1550,6 +1559,17 @@ private fun DateReportCard(
     modifier: Modifier = Modifier
 ) {
     val dateStr = report.title.ifEmpty { report.date.format(DateTimeFormatter.ofPattern("dd.MM")) }
+    // Ranglar: A=yashil, B=sariq, C=ko'k, D/K=binafsha, P=qizil, Q=kulrang
+    val cA = androidx.compose.ui.graphics.Color(0xFF2E7D32)
+    val cB = androidx.compose.ui.graphics.Color(0xFFF57F17)
+    val cC = androidx.compose.ui.graphics.Color(0xFF1565C0)
+    val cDK = androidx.compose.ui.graphics.Color(0xFF7B1FA2)
+    val cP = androidx.compose.ui.graphics.Color(0xFFD32F2F)
+    val cQ = androidx.compose.ui.graphics.Color(0xFF616161)
+    fun colorFor(t: TxType) = when (t) {
+        TxType.A -> cA; TxType.B -> cB; TxType.C -> cC
+        TxType.D, TxType.K -> cDK; TxType.P -> cP; TxType.Q -> cQ
+    }
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -1558,10 +1578,9 @@ private fun DateReportCard(
         colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
         Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
-            // Sarlavha + yopish
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "📅 $dateStr",
+                    "\uD83D\uDCC5 $dateStr",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -1581,30 +1600,37 @@ private fun DateReportCard(
                 return@Column
             }
 
-            // Raqamlangan mijoz qatorlari — HAMMASI ko'rinadi (chat o'zi scroll qiladi)
+            // Raqamlangan mijoz qatorlari — HAMMASI ko'rinadi, rangli
             Column(modifier = Modifier.fillMaxWidth()) {
                 for ((idx, line) in report.clientLines.withIndex()) {
                     val capitalized = line.clientName.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                     }
-                    val entriesStr = buildString {
+                    val ann = androidx.compose.ui.text.buildAnnotatedString {
+                        append("${idx + 1}. $capitalized  ")
                         for ((j, e) in line.entries.withIndex()) {
-                            if (j > 0) append("  ")
-                            when (e.type) {
-                                TxType.P -> append("P:${e.amount.formatMoney()}")
-                                TxType.Q -> append("Q:${e.amount.formatMoney()}")
-                                else -> {
+                            if (j > 0) append("   ")
+                            val piece = when (e.type) {
+                                TxType.P -> "P:${e.amount.formatMoney()}"
+                                TxType.Q -> "Q:${e.amount.formatMoney()}"
+                                else -> buildString {
                                     append("${e.type.code.uppercase()}:${e.amount.formatQty()}")
                                     e.price?.let {
                                         if (report.useNarx) append("(n:${it.formatQty()})")
-                                        else append("   [${it.formatQty()}]")
+                                        else append(" [${it.formatQty()}]")
                                     }
                                 }
                             }
+                            androidx.compose.ui.text.withStyle(
+                                androidx.compose.ui.text.SpanStyle(
+                                    color = colorFor(e.type),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            ) { append(piece) }
                         }
                     }
                     Text(
-                        "${idx + 1}. $capitalized  $entriesStr",
+                        ann,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(vertical = 2.dp)
@@ -1616,12 +1642,7 @@ private fun DateReportCard(
             HorizontalDivider()
             Spacer(Modifier.height(8.dp))
 
-            // JAMI bloki
-            Text(
-                "JAMI:",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Text("\u2014 JAMI \u2014", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
                 val total = report.totalsByType[type] ?: 0.0
@@ -1630,44 +1651,37 @@ private fun DateReportCard(
                 Text(
                     "${type.code.uppercase()} ${total.formatQty()}  = ${rev.formatMoney()} so'm",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colorFor(type)
                 )
             }
-            if (report.useNarx) {
-                // N rejimi: 🅿️ keyin 🔢 JAMI pul
-                if (report.totalPayments > 0) {
-                    Text(
-                        "🅿️ ${report.totalPayments.formatMoney()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
+            if (report.totalPayments > 0) {
                 Text(
-                    "🔢 JAMI pul: ${report.totalRevenue.formatMoney()} so'm",
+                    "P ${report.totalPayments.formatMoney()} so'm",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cP
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            if (report.useNarx) {
+                Text(
+                    "\uD83D\uDD22 JAMI pul: ${report.totalRevenue.formatMoney()} so'm",
                     style = MaterialTheme.typography.titleSmall,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             } else {
-                // T rejimi: J keyin 🅿️
                 Text(
                     "J: ${report.totalRevenue.formatMoney()}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                if (report.totalPayments > 0) {
-                    Text(
-                        "🅿️ ${report.totalPayments.formatMoney()} so'm",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
             }
         }
     }
