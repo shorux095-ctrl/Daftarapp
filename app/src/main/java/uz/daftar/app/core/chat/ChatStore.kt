@@ -19,12 +19,30 @@ class ChatStore @Inject constructor(
 ) {
     private val chatKey = stringPreferencesKey("chat_json")
     private val lastReportKey = stringPreferencesKey("last_report_date")
+    private val pendingKey = stringPreferencesKey("pending_widget")
 
     suspend fun load(): String =
         context.chatDataStore.data.map { it[chatKey] ?: "" }.first()
 
     suspend fun save(json: String) {
         context.chatDataStore.edit { it[chatKey] = json }
+    }
+
+    /** Widjetdan saqlangan yozuvni navbatga qo'shish (keyin chatda ko'rsatiladi). */
+    suspend fun addPending(line: String) {
+        context.chatDataStore.edit { prefs ->
+            val cur = prefs[pendingKey] ?: ""
+            prefs[pendingKey] = if (cur.isBlank()) line else cur + "\n" + line
+        }
+    }
+
+    /** Navbatdagi widjet yozuvlarini olib, navbatni tozalash. */
+    suspend fun drainPending(): List<String> {
+        val cur = context.chatDataStore.data.map { it[pendingKey] ?: "" }.first()
+        if (cur.isNotBlank()) {
+            context.chatDataStore.edit { it[pendingKey] = "" }
+        }
+        return cur.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
 
     suspend fun getLastReportDate(): String =

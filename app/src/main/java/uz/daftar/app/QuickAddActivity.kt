@@ -59,6 +59,7 @@ class QuickAddActivity : ComponentActivity() {
 
     @Inject lateinit var addTx: AddTransactionUseCase
     @Inject lateinit var repo: TransactionRepository
+    @Inject lateinit var chatStore: uz.daftar.app.core.chat.ChatStore
     private val userId: Long = 1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -167,7 +168,10 @@ class QuickAddActivity : ComponentActivity() {
             if (line.isBlank()) continue
             val r = DaftarParser.parse(line)
             if (r is ParseResult.Success) {
-                runCatching { addTx(userId, r.entry) }.onSuccess { count++ }
+                runCatching { addTx(userId, r.entry) }.onSuccess {
+                    count++
+                    runCatching { chatStore.addPending(line.trim()) }
+                }
             }
         }
         return count

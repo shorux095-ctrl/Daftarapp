@@ -51,11 +51,13 @@ class GetDateReportUseCase @Inject constructor(
         startInclusive: LocalDate,
         endInclusive: LocalDate,
         types: Set<String>? = null,
-        useNarx: Boolean = false
+        useNarx: Boolean = false,
+        clientFilter: String? = null
     ): DateReport {
         val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM")
-        val title = "${startInclusive.format(fmt)}–${endInclusive.format(fmt)}"
-        return build(userId, startInclusive, endInclusive.plusDays(1), title, types, useNarx)
+        val who = if (clientFilter != null) clientFilter.replaceFirstChar { it.uppercase() } + " — " else ""
+        val title = who + "${startInclusive.format(fmt)}–${endInclusive.format(fmt)}"
+        return build(userId, startInclusive, endInclusive.plusDays(1), title, types, useNarx, clientFilter)
     }
 
     private suspend fun build(
@@ -64,11 +66,14 @@ class GetDateReportUseCase @Inject constructor(
         endExclusive: LocalDate,
         title: String,
         types: Set<String>?,
-        useNarx: Boolean
+        useNarx: Boolean,
+        clientFilter: String? = null
     ): DateReport {
         val dayStart = "$startInclusive 00:00:00"
         val dayEnd = "$endExclusive 00:00:00"
-        val allTxs = txDao.getRange(userId, dayStart, dayEnd).sortedBy { it.date }
+        val allTxs0 = txDao.getRange(userId, dayStart, dayEnd).sortedBy { it.date }
+        val allTxs = if (clientFilter.isNullOrBlank()) allTxs0
+                     else allTxs0.filter { it.clientName.equals(clientFilter, ignoreCase = true) }
         val txs = if (types.isNullOrEmpty()) allTxs
                   else allTxs.filter { it.type.lowercase() in types }
 
