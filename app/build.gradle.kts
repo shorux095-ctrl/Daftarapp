@@ -116,6 +116,9 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
+    // Google Sign-In + Drive backup (to'g'ridan-to'g'ri koordinata — catalog emas)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
     // Biometric (barmoq izi qulf)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)

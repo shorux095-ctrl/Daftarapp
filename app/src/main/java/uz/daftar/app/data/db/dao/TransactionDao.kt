@@ -130,4 +130,7 @@ interface TransactionDao {
 
     @Query("SELECT COUNT(*) FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName)")
     suspend fun countByClient(userId: Long, clientName: String): Int
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE user_id = :userId")
+    suspend fun countAll(userId: Long): Int
 }

@@ -46,12 +46,19 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var lockManager: LockManager
     @Inject lateinit var backupManager: uz.daftar.app.core.backup.BackupManager
     @Inject lateinit var themeManager: uz.daftar.app.core.theme.ThemeManager
+    @Inject lateinit var driveBackup: uz.daftar.app.core.drive.DriveBackup
 
     override fun onStop() {
         super.onStop()
         if (backupManager.isAutoBackupEnabled()) {
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching { backupManager.autoBackup() }
+            }
+        }
+        // Google Drive avto-zaxira (kirilgan bo'lsa)
+        if (driveBackup.isSignedIn()) {
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { driveBackup.backupNow() }
             }
         }
     }

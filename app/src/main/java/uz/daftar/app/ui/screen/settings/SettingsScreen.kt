@@ -78,6 +78,25 @@ fun SettingsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val autoBackupOn by vm.autoBackup.collectAsStateWithLifecycle()
+    val driveEmail by vm.driveEmail.collectAsStateWithLifecycle()
+    val driveMsg by vm.driveMsg.collectAsStateWithLifecycle()
+    val driveBusy by vm.driveBusy.collectAsStateWithLifecycle()
+    val driveSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        runCatching {
+            com.google.android.gms.auth.api.signin.GoogleSignIn
+                .getSignedInAccountFromIntent(result.data)
+                .getResult(com.google.android.gms.common.api.ApiException::class.java)
+        }.onSuccess { vm.onSignedIn() }
+            .onFailure { vm.onSignInFailed(it.message ?: "bekor qilindi") }
+    }
+    androidx.compose.runtime.LaunchedEffect(driveMsg) {
+        driveMsg?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            vm.clearDriveMsg()
+        }
+    }
     val autoBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
@@ -199,6 +218,27 @@ fun SettingsScreen(
                 checked = autoBackupOn,
                 onCheckedChange = { on -> if (on) autoBackupLauncher.launch("daftar_avto_backup.db") else vm.disableAutoBackup() }
             )
+            // 2c) Google Drive zaxira (bulut, 40 kunlik tarix)
+            SettingsItem(
+                icon = Icons.Outlined.Backup,
+                title = if (driveEmail != null) "☁️ Google Drive ✓" else "☁️ Google Drive zaxira",
+                subtitle = when {
+                    driveBusy -> "Saqlanmoqda…"
+                    driveEmail != null -> "$driveEmail — chiqishda avto, 40 kun saqlanadi"
+                    else -> "Google bilan kiring — bulutga avto-zaxira"
+                },
+                onClick = {
+                    if (driveEmail == null) driveSignInLauncher.launch(vm.signInClientIntent())
+                    else vm.backupNowDrive()
+                }
+            )
+            if (driveEmail != null) {
+                androidx.compose.material3.TextButton(
+                    onClick = { vm.signOutDrive() },
+                    modifier = Modifier.padding(start = 8.dp)
+                ) { Text("Google hisobidan chiqish") }
+            }
+
             // 3) Alias
             SettingsItem(
                 icon = Icons.Outlined.Edit,

@@ -16,6 +16,7 @@ import uz.daftar.app.core.security.LockManager
 import uz.daftar.app.data.repository.TransactionRepository
 import uz.daftar.app.domain.usecase.ImportOldDbUseCase
 import java.time.LocalDateTime
+import uz.daftar.app.core.drive.DriveBackup
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,6 +25,7 @@ class SettingsViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val importOldDb: ImportOldDbUseCase,
     private val backup: uz.daftar.app.core.backup.BackupManager,
+    private val drive: DriveBackup,
     private val themeManager: uz.daftar.app.core.theme.ThemeManager
 ) : ViewModel() {
 
@@ -124,4 +126,60 @@ class SettingsViewModel @Inject constructor(
             lockManager.setPinCode(pin)
         }
     }
+
+    // ── Google Drive zaxira ──
+    private val _driveEmail = MutableStateFlow(drive.signedInEmail())
+    val driveEmail: StateFlow<String?> = _driveEmail.asStateFlow()
+
+    private val _driveMsg = MutableStateFlow<String?>(null)
+    val driveMsg: StateFlow<String?> = _driveMsg.asStateFlow()
+
+    private val _driveBusy = MutableStateFlow(false)
+    val driveBusy: StateFlow<Boolean> = _driveBusy.asStateFlow()
+
+    fun signInClientIntent() = drive.signInIntent()
+
+    fun onSignedIn() {
+        _driveEmail.value = drive.signedInEmail()
+        if (_driveBusy.value) return
+        _driveBusy.value = true
+        viewModelScope.launch {
+            val count = runCatching { repo.countAll(userId) }.getOrDefault(0)
+            if (count == 0) {
+                // YANGI/BO'SH telefon — Drive'dan avtomatik tiklaymiz
+                val r = runCatching { drive.restoreLatest() }
+                _driveMsg.value = r.fold(
+                    onSuccess = { name -> if (name != null) "✅ Tiklandi: $name" else "✅ Kirildi (Drive'da zaxira yo'q)" },
+                    onFailure = { "❌ Tiklash xato: ${it.message}" }
+                )
+            } else {
+                // Ma'lumot bor — tiklamaymiz (xavfsizlik), darhol zaxiralaymiz
+                val r = runCatching { drive.backupNow() }
+                _driveMsg.value = r.getOrElse { "❌ " + (it.message ?: "xato") }
+            }
+            _driveBusy.value = false
+        }
+    }
+
+    fun onSignInFailed(msg: String) { _driveMsg.value = "❌ Kirish xato: $msg" }
+
+    fun signOutDrive() {
+        viewModelScope.launch {
+            drive.signOut()
+            _driveEmail.value = null
+            _driveMsg.value = "Google hisobidan chiqildi"
+        }
+    }
+
+    fun backupNowDrive() {
+        if (_driveBusy.value) return
+        _driveBusy.value = true
+        viewModelScope.launch {
+            val r = runCatching { drive.backupNow() }
+            _driveMsg.value = r.getOrElse { "❌ " + (it.message ?: "xato") }
+            _driveBusy.value = false
+        }
+    }
+
+    fun clearDriveMsg() { _driveMsg.value = null }
 }

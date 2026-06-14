@@ -37,6 +37,12 @@ class BackupManager @Inject constructor(
         } catch (_: Exception) { /* e'tiborsiz */ }
     }
 
+    /** Drive uchun: WAL checkpoint (tashqaridan chaqirish) */
+    fun checkpointPublic() = checkpoint()
+
+    /** Drive uchun: baza fayli */
+    fun dbFilePublic(): File = dbFile()
+
     /** Ichki zaxira yaratadi va faylni qaytaradi */
     fun createInternalBackup(): File {
         checkpoint()
