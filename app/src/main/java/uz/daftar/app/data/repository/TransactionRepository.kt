@@ -101,6 +101,9 @@ class TransactionRepository @Inject constructor(
     fun observeClientNames(userId: Long): Flow<List<String>> =
         txDao.observeAllClientNames(userId)
 
+    /** Jami yozuvlar soni (bo'sh telefonni aniqlash uchun) */
+    suspend fun countAll(userId: Long): Int = txDao.countAll(userId)
+
     companion object {
         private val ISO_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         private fun isoFormat(dt: LocalDateTime): String = dt.format(ISO_FMT)
@@ -132,6 +135,4 @@ private fun parseDateTime(s: String): LocalDateTime? {
             null
         }
     }
-
-    suspend fun countAll(userId: Long): Int = txDao.countAll(userId)
 }
