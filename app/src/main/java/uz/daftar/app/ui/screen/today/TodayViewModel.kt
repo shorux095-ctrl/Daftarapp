@@ -195,7 +195,10 @@ class TodayViewModel @Inject constructor(
         // Har qanday tranzaksiya o'zgarsa (edit/o'chirish ham) — History kartalarni jonli DB bilan yangilash
         viewModelScope.launch {
             repo.observeBetween(userId, java.time.LocalDate.of(2000, 1, 1), java.time.LocalDate.of(2100, 1, 1))
-                .collectLatest { refreshHistoryCards() }
+                .collectLatest {
+                    kotlinx.coroutines.delay(300)   // ketma-ket saqlashlarni jamlaymiz
+                    refreshHistoryCards()
+                }
         }
         // Tezkor shablonlarni kuzatish
         viewModelScope.launch {
@@ -299,15 +302,22 @@ class TodayViewModel @Inject constructor(
 
     private fun refreshHistoryCards() {
         viewModelScope.launch {
-            val cur = _state.value.chat
-            if (cur.none { it is ChatItem.History }) return@launch
-            val updated = cur.map { item ->
-                if (item is ChatItem.History) {
-                    val fresh = runCatching { buildClientPreview(item.preview.name, item.preview.month) }.getOrNull()
-                    if (fresh != null) ChatItem.History(item.id, fresh, item.ts) else item
-                } else item
+            val histories = _state.value.chat.filterIsInstance<ChatItem.History>()
+            if (histories.isEmpty()) return@launch
+            val freshById = HashMap<Long, ClientPreview>()
+            for (h in histories) {
+                runCatching { buildClientPreview(h.preview.name, h.preview.month) }.getOrNull()
+                    ?.let { freshById[h.id] = it }
             }
-            _state.update { it.copy(chat = updated) }
+            // ATOMAR yangilash: orada kelgan xabarlar ("✅ Saqlandi" va h.k.) YO'QOLMAYDI
+            _state.update { st ->
+                st.copy(chat = st.chat.map { item ->
+                    if (item is ChatItem.History) {
+                        val fresh = freshById[item.id]
+                        if (fresh != null) ChatItem.History(item.id, fresh, item.ts) else item
+                    } else item
+                })
+            }
             persistChat()
         }
     }

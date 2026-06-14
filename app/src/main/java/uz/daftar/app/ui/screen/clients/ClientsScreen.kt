@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,13 +28,21 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -41,6 +51,8 @@ import uz.daftar.app.core.theme.DebtColor
 import uz.daftar.app.core.theme.PaidColor
 import uz.daftar.app.core.util.formatMoney
 import uz.daftar.app.domain.usecase.ClientSummary
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +65,15 @@ fun ClientsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val shown = if (debtorsOnly) state.filtered.filter { it.debt > 0 } else state.filtered
+    val context = LocalContext.current
+    var showPay by remember { mutableStateOf(false) }
+    var payText by remember { mutableStateOf("") }
+    LaunchedEffect(state.info) {
+        state.info?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            vm.clearInfo()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -109,9 +130,30 @@ fun ClientsScreen(
                         val totalOverpaid = -overpaid.sumOf { it.debt }  // ijobiy qiymat
                         LazyColumn(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .weight(1f)
                                 .padding(horizontal = 16.dp)
                         ) {
+                            item(key = "total-top") {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(
+                                            "Jami qarz",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            "${totalDebt.formatMoney()} so'm",
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DebtColor
+                                        )
+                                    }
+                                }
+                            }
                             items(items = debtors, key = { "d-${it.name}" }) { c ->
                                 ClientCard(c, onClick = { onClientClick(c.name) })
                             }
@@ -163,6 +205,16 @@ fun ClientsScreen(
                                 }
                             }
                         }
+                        Button(
+                            onClick = { showPay = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("\ud83d\udcb5 To'lov qabul qilish", fontWeight = FontWeight.SemiBold)
+                        }
                     } else {
                         LazyColumn(
                             modifier = Modifier
@@ -178,6 +230,46 @@ fun ClientsScreen(
             }
         }
     }
+
+    if (showPay) {
+        PayDialog(
+            text = payText,
+            onText = { payText = it },
+            onConfirm = {
+                if (payText.isNotBlank()) vm.addPayment(payText)
+                payText = ""
+                showPay = false
+            },
+            onDismiss = { showPay = false; payText = "" }
+        )
+    }
+}
+
+@Composable
+private fun PayDialog(
+    text: String,
+    onText: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("\ud83d\udcb5 To'lov qabul qilish") },
+        text = {
+            Column {
+                Text("Mijoz nomi va summa:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onText,
+                    placeholder = { Text("ali 50000") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("\u2705 Saqlash") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Bekor") } }
+    )
 }
 
 @Composable
@@ -192,9 +284,23 @@ private fun ClientCard(c: ClientSummary, onClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(avatarColor(c.name), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    c.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = c.name.replaceFirstChar {
@@ -248,3 +354,11 @@ private fun EmptyClients() {
         )
     }
 }
+
+private val AVATAR_COLORS = listOf(
+    Color(0xFF5C6BC0), Color(0xFF7E57C2), Color(0xFF26A69A), Color(0xFFEF5350),
+    Color(0xFF42A5F5), Color(0xFFFFA726), Color(0xFF66BB6A), Color(0xFFEC407A)
+)
+
+private fun avatarColor(name: String): Color =
+    AVATAR_COLORS[kotlin.math.abs(name.hashCode()) % AVATAR_COLORS.size]

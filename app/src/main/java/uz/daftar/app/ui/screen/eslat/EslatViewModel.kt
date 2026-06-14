@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.daftar.app.core.notify.EslatmaWorker
+import uz.daftar.app.core.notify.cancelEslatmaAlarm
+import uz.daftar.app.core.notify.scheduleEslatmaAlarm
 import uz.daftar.app.data.db.dao.EslatmaDao
 import uz.daftar.app.data.db.entity.EslatmaEntity
 import java.time.LocalDate
@@ -57,23 +59,15 @@ class EslatViewModel @Inject constructor(
     fun delete(item: EslatmaEntity) {
         viewModelScope.launch {
             WorkManager.getInstance(context).cancelAllWorkByTag("eslatma_${item.id}")
+            cancelEslatmaAlarm(context, item.id)
             dao.delete(item.id)
             _message.value = "🗑 O'chirildi"
         }
     }
 
     private fun scheduleNotification(id: Long, text: String, triggerAt: Long) {
-        val delay = (triggerAt - System.currentTimeMillis()).coerceAtLeast(0)
-        val data = Data.Builder()
-            .putString("text", text)
-            .putInt("notif_id", (id % Int.MAX_VALUE).toInt())
-            .build()
-        val req = OneTimeWorkRequestBuilder<EslatmaWorker>()
-            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .setInputData(data)
-            .addTag("eslatma_$id")
-            .build()
-        WorkManager.getInstance(context).enqueue(req)
+        // AlarmManager — ANIQ vaqtda ishlaydi (WorkManager Xiaomi'da kechikardi)
+        scheduleEslatmaAlarm(context, id, text, triggerAt)
     }
 
     fun clearMessage() { _message.value = null }
