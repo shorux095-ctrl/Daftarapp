@@ -218,7 +218,8 @@ internal suspend fun buildReport(
             else -> null
         }
         if (cpPrice != null && cpPrice > 0.0) return cpPrice
-        return tHist[type.lowercase()]?.lastOrNull()?.second
+        // BOT bilan moslik: N narx topilmasa — daromadga QO'SHILMAYDI (global T'ga fallback YO'Q)
+        return null
     }
 
     // Berilgan sana (kun) yoki undan oldingi eng oxirgi global narx
@@ -240,7 +241,8 @@ internal suspend fun buildReport(
             TxType.Q -> { /* qo'lda qarz — sotuv emas; daromad/foydaga KIRMAYDI, faqat qarzga ta'sir qiladi */ }
             in cargo -> {
                 // Sotilgan narx (N): avval N (mijoz uchun), bo'lmasa T (global)
-                val nPrice = nPriceFor(tx.clientName, tx.type, tx.date) ?: tx.tOverride
+                // BOT bilan moslik: daromadga FAQAT N narx (topilmasa qo'shilmaydi)
+                val nPrice = nPriceFor(tx.clientName, tx.type, tx.date)
                 if (nPrice != null) revenue += tx.amount * nPrice
                 // Ulgurji tannarx: bir martalik override, yoki T1 tarif, yoki global T (O'SHA SANADAGI)
                 val globalCost = if (tx.costTier == "t1")
