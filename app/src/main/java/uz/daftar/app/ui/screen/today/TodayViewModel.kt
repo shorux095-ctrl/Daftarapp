@@ -299,8 +299,15 @@ class TodayViewModel @Inject constructor(
     /** Chatdagi History kartalarni JONLI DB bilan qayta yasaydi (edit/o'chirishdan keyin eski qiymat qolmasin). */
     /** 🔄 Bosh ekran yangilash — kartalarni jonli DB bilan qayta yasaydi. */
     fun refresh() {
-        drainPendingWidget()
-        refreshHistoryCards()
+        viewModelScope.launch {
+            // Avval widjet yozuvlarini chatga qo'shamiz, keyin kartalarni yangilaymiz
+            val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
+            for (line in pend) {
+                appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
+            }
+            if (pend.isNotEmpty()) persistChat()
+            refreshHistoryCards()
+        }
     }
 
     /** Widjetdan qo'shilgan yozuvlarni chatda "✅ Saqlandi" sifatida ko'rsatish. */
@@ -312,8 +319,6 @@ class TodayViewModel @Inject constructor(
                 appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
             }
             persistChat()
-            // Mijoz tarix kartalarini ham yangilab qo'yamiz
-            refreshHistoryCards()
         }
     }
 

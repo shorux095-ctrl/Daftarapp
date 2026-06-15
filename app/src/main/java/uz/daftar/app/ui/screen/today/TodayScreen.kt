@@ -377,6 +377,38 @@ fun TodayScreen(
         },
         bottomBar = {
             Column(Modifier.imePadding()) {
+                // ───── Doimiy pastki panel (5 tugma) ─────
+                Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BottomNavBtn("🏠", "Bosh ekran") {
+                            calScope.launch { runCatching { listState.animateScrollToItem(0) } }
+                        }
+                        BottomNavBtn("📊", "Hisobot") { onReports() }
+                        // Markaziy katta + tugma — yozuv maydoniga o'tish
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(52.dp)
+                        ) {
+                            IconButton(onClick = {
+                                bottomMenuOpen = false
+                                calScope.launch { runCatching { listState.animateScrollToItem(0) } }
+                                keyboardController?.show()
+                            }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Qo'shish",
+                                    tint = androidx.compose.ui.graphics.Color.White)
+                            }
+                        }
+                        BottomNavBtn("💳", "Qarzdorlar") { onClients() }
+                        BottomNavBtn("☰", "Menyu") { bottomMenuOpen = !bottomMenuOpen }
+                    }
+                }
                 // Pastki menyu paneli (toggle bilan ochiladi/yashirinadi)
                 if (bottomMenuOpen) {
                     Surface(tonalElevation = 2.dp) {
@@ -650,7 +682,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v49", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v50", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1552,6 +1584,25 @@ private fun TextReportCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BottomNavBtn(emoji: String, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(emoji, fontSize = 20.sp)
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
     }
 }
 

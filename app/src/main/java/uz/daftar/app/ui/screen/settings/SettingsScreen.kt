@@ -81,6 +81,7 @@ fun SettingsScreen(
     val driveEmail by vm.driveEmail.collectAsStateWithLifecycle()
     val driveMsg by vm.driveMsg.collectAsStateWithLifecycle()
     val driveBusy by vm.driveBusy.collectAsStateWithLifecycle()
+    var showDriveSignOut by remember { mutableStateOf(false) }
     val driveSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -233,10 +234,39 @@ fun SettingsScreen(
                 }
             )
             if (driveEmail != null) {
+                // Hozir zaxiralash tugmasi (aniq)
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { vm.backupNowDrive() },
+                    enabled = !driveBusy,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) { Text(if (driveBusy) "Saqlanmoqda…" else "💾 Hozir Drive'ga zaxiralash") }
+
+                // Chiqish — faqat tasdiqdan keyin (tasodifan bosilmasin)
                 androidx.compose.material3.TextButton(
-                    onClick = { vm.signOutDrive() },
+                    onClick = { showDriveSignOut = true },
                     modifier = Modifier.padding(start = 8.dp)
-                ) { Text("Google hisobidan chiqish") }
+                ) { Text("Google hisobidan chiqish", color = MaterialTheme.colorScheme.error) }
+            }
+
+            if (showDriveSignOut) {
+                AlertDialog(
+                    onDismissRequest = { showDriveSignOut = false },
+                    title = { Text("Hisobdan chiqish?") },
+                    text = { Text("Google hisobidan chiqsangiz, avtomatik zaxira to'xtaydi. Ma'lumotlaringiz telefonda va Drive'da saqlanib qoladi. Qayta kirsangiz davom etadi.") },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            showDriveSignOut = false
+                            vm.signOutDrive()
+                        }) { Text("Ha, chiqish", color = MaterialTheme.colorScheme.error) }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showDriveSignOut = false }) {
+                            Text("Bekor qilish")
+                        }
+                    }
+                )
             }
 
             // 3) Alias
