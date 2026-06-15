@@ -29,6 +29,8 @@ fun SkladScreen(
 ) {
     val items by vm.items.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val typeStock by vm.typeStock.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(items) { vm.refreshTypeStock() }
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showMoney by remember { mutableStateOf(false) }
@@ -135,6 +137,37 @@ fun SkladScreen(
                     }
                 }
             } else {
+                // ── YUK TURLARI bo'yicha qoldiq (mijozlarga sotilgan avtomatik ayriladi) ──
+                if (typeStock.isNotEmpty()) {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("🚚 Yuk turlari (mijozlarga sotilgan ayrilgan)",
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Spacer(Modifier.height(6.dp))
+                            typeStock.forEach { ts ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                                    Text(ts.type, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
+                                    Text("kelgan ${ts.kelgan.formatQty()}  •  sotilgan ${ts.sotilgan.formatQty()}",
+                                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                    Text("qoldi ${ts.qolgan.formatQty()}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (ts.qolgan > 0) MaterialTheme.colorScheme.primary
+                                                else androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text("Kelgan = skladga A/B/C/D/K nomi bilan qo'shilgan kirim",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 // ── YUK (qoldiq) ko'rinishi ──
                 Text("Tovarlar (qoldiq)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
@@ -146,11 +179,31 @@ fun SkladScreen(
                             Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(12.dp)) {
                                     Text(s.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                    Text("Keldi: ${s.keldi.formatQty()}  •  Ketdi: ${s.chiqdi.formatQty()}",
-                                        style = MaterialTheme.typography.bodySmall)
-                                    Text("Qoldi: ${s.qoldi.formatQty()}",
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("📥 Kelgan: ${s.keldi.formatQty()}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                                    Text("📤 Sotilgan: ${s.chiqdi.formatQty()}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                                    Text("📦 Qolgan: ${s.qoldi.formatQty()}",
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary)
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (s.qoldi > 0) MaterialTheme.colorScheme.primary
+                                                else androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                                    if (s.oxirgiKelgan > 0L) {
+                                        val d = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault())
+                                            .format(java.util.Date(s.oxirgiKelgan))
+                                        Text("🗓 Oxirgi kelgan: $d" +
+                                            (if (s.oxirgiNarx > 0) "  •  ${s.oxirgiNarx.formatQty()} so'm" else ""),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline)
+                                    }
+                                    if (s.pulChiqim > 0) {
+                                        Text("💰 Sotuvdan: ${s.pulChiqim.toLong().formatMoney()} so'm",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline)
+                                    }
                                 }
                             }
                         }

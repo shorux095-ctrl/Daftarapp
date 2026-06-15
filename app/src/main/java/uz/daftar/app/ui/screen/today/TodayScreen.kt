@@ -46,7 +46,6 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MoneyOff
@@ -200,6 +199,7 @@ fun TodayScreen(
 
     // Pastki menyu ochiq/yopiq (Telegram'day toggle)
     var bottomMenuOpen by remember { mutableStateOf(false) }
+    var showDatePick by remember { mutableStateOf(false) }
     // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
     var crashText by remember { mutableStateOf<String?>(null) }
@@ -400,7 +400,7 @@ fun TodayScreen(
                             }
                         }
                         BottomNavBtn("📦", "Yuk") { onYukReport() }
-                        // Markaziy katta + tugma: bosilsa yozuvga kirish, bosib turilsa ovoz
+                        // ➕ Yozish tugmasi: bosilsa klaviatura, bosib turilsa ovoz
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary,
@@ -419,58 +419,37 @@ fun TodayScreen(
                                 )
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.Add, contentDescription = "Qo'shish",
-                                    tint = androidx.compose.ui.graphics.Color.White)
+                                Text("➕", fontSize = 22.sp)
                             }
                         }
-                        BottomNavBtn("💳", "Qarzdorlar") { onClients() }
-                        BottomNavBtn("☰", "Menyu") { bottomMenuOpen = !bottomMenuOpen }
+                        // 📊 Hisobot tugmasi: Bugun / Kecha
+                        BottomNavBtn("📊", "Hisobot") { showDatePick = true }
+                        BottomNavBtn("☰", "Menyu") { menuOpen = true }
                     }
                 }
-                // Pastki menyu paneli (toggle bilan ochiladi/yashirinadi)
-                if (bottomMenuOpen) {
-                    Surface(tonalElevation = 2.dp) {
-                        Column {
-                            // Hisobotlar — bosganda oynaga to'liq ochiladi (T narx)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                AssistChip(
-                                    onClick = {
-                                        bottomMenuOpen = false
-                                        keyboardController?.hide(); focusManager.clearFocus()
-                                        vm.showDateReportButton(java.time.LocalDate.now())
-                                    },
-                                    label = { Text("📅 Bugun") }
-                                )
-                                AssistChip(
-                                    onClick = {
-                                        bottomMenuOpen = false
-                                        keyboardController?.hide(); focusManager.clearFocus()
-                                        vm.showDateReportButton(java.time.LocalDate.now().minusDays(1))
-                                    },
-                                    label = { Text("📅 Kecha") }
-                                )
-                                AssistChip(
-                                    onClick = {
-                                        bottomMenuOpen = false
-                                        keyboardController?.hide(); focusManager.clearFocus()
-                                        vm.showWeekReport()
-                                    },
-                                    label = { Text("📆 Hafta") }
-                                )
-                                AssistChip(
-                                    onClick = { bottomMenuOpen = false; onYukReport() },
-                                    label = { Text("📦 Yuk") }
-                                )
-                            }
+                // Bugun / Kecha tanlash oynasi (➕ yoki 📅 bosilganda)
+                if (showDatePick) {
+                    AlertDialog(
+                        onDismissRequest = { showDatePick = false },
+                        title = { Text("Hisobot") },
+                        text = { Text("Qaysi kun hisoboti kerak?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDatePick = false
+                                keyboardController?.hide(); focusManager.clearFocus()
+                                vm.showDateReportButton(java.time.LocalDate.now())
+                            }) { Text("Bugun") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showDatePick = false
+                                keyboardController?.hide(); focusManager.clearFocus()
+                                vm.showDateReportButton(java.time.LocalDate.now().minusDays(1))
+                            }) { Text("Kecha") }
                         }
-                    }
+                    )
                 }
+                // (Bugun/Kecha/Hafta/Yuk paneli olib tashlandi — ➕ tugma va 📅 Sana orqali)
                 // ───── Mijoz tarixi asosiy oynaga ko'chirildi ─────
                 InputBar(
                     input = state.input,
@@ -701,7 +680,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v52", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v57", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1058,39 +1037,36 @@ private fun InputBar(
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Tez kiritish tugmalari — faqat yozuvga kirilganda (fokusda) ko'rinadi
+            // Tez kiritish tugmalari — yozuvga kirilganda (fokusda) ko'rinadi
             if (inputFocused) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf("a", "b", "c", "n", "p", "t1").forEach { code ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("a", "b", "c", "n", "p", "t1").forEach { code ->
+                        AssistChip(
+                            onClick = {
+                                val cur = tfv.text
+                                val pos = tfv.selection.end.coerceIn(0, cur.length)
+                                val needSpace = pos > 0 && cur[pos - 1] != ' '
+                                val ins = (if (needSpace) " " else "") + code
+                                val newText = cur.substring(0, pos) + ins + cur.substring(pos)
+                                val newPos = pos + ins.length
+                                tfv = TextFieldValue(newText, selection = TextRange(newPos))
+                                onChange(newText)
+                                if (code !in listOf("n", "t1")) numericMode = true
+                            },
+                            label = { Text(code.uppercase()) }
+                        )
+                    }
                     AssistChip(
-                        onClick = {
-                            val cur = tfv.text
-                            val pos = tfv.selection.end.coerceIn(0, cur.length)
-                            // Oldingi belgi probel bo'lmasa — harf oldidan probel qo'shamiz
-                            val needSpace = pos > 0 && cur[pos - 1] != ' '
-                            val ins = (if (needSpace) " " else "") + code
-                            val newText = cur.substring(0, pos) + ins + cur.substring(pos)
-                            val newPos = pos + ins.length  // kursor harfdan KEYIN
-                            tfv = TextFieldValue(newText, selection = TextRange(newPos))
-                            onChange(newText)
-                            // n/t1 (narx markerlari)dan keyin yuk turi harfi kerak — raqamga o'tmaymiz
-                            if (code !in listOf("n", "t1")) numericMode = true
-                        },
-                        label = { Text(code.uppercase()) }
+                        onClick = { numericMode = !numericMode },
+                        label = { Text(if (numericMode) "Abc" else "123") }
                     )
                 }
-                // Abc/123 — qo'lда harf klaviaturasiga qaytish (ism yozish uchun)
-                AssistChip(
-                    onClick = { numericMode = !numericMode },
-                    label = { Text(if (numericMode) "Abc" else "123") }
-                )
-            }
             }
 
             // Autocomplete chips

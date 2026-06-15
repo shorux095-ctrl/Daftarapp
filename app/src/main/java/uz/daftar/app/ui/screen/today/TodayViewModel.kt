@@ -1197,10 +1197,14 @@ class TodayViewModel @Inject constructor(
                 errorMessage = if (parsedList.isEmpty() && !isNameOnly) firstError?.error?.message else null
             )
         }
-        // Autocomplete — OXIRGI qatordagi birinchi so'z (ko'p qatorda ham ishlaydi)
+        // Autocomplete — OXIRGI qatordagi birinchi so'z (har bir qatorda ishlaydi)
         val lastLine0 = text.substringAfterLast('\n').trimStart()
         val firstWord = lastLine0.substringBefore(' ').trim()
-        val onlyName = firstWord.isNotBlank() && firstWord.all { it.isLetter() || it == '\'' }
+        // Ism yozilyapti deb hisoblaymiz: birinchi so'z harf bilan boshlansa
+        // (qator oxirida yuk bo'lsa ham, yangi qator ismiga yordam chiqsin)
+        val onlyName = firstWord.isNotBlank() &&
+            firstWord.first().isLetter() &&
+            firstWord.all { it.isLetter() || it == '\'' || it == '-' }
         updateSuggestions(if (onlyName) firstWord else "")
 
         // Jonli tarix preview — ism yozilsa (parsing yozuv topa olmasa)
