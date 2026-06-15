@@ -102,6 +102,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -647,7 +649,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v45", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v46", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -924,10 +926,10 @@ private fun ClientDayCard(
                     ) {
                         if (noPrice) {
                             Text(
-                                androidx.compose.ui.text.buildAnnotatedString {
+                                buildAnnotatedString {
                                     append("  ${tx.type.label}: ${tx.amount.formatQty()}  ")
                                     withStyle(
-                                        androidx.compose.ui.text.SpanStyle(
+                                        SpanStyle(
                                             color = MaterialTheme.colorScheme.error,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -1480,7 +1482,7 @@ private fun ChatBotBubble(text: String) {
             val timeColor = MaterialTheme.colorScheme.primary
             val timeRe = Regex("🕒 \\d{1,2}:\\d{2}")
             val annotated = runCatching {
-                androidx.compose.ui.text.buildAnnotatedString {
+                buildAnnotatedString {
                     var i = 0
                     while (i < text.length) {
                         val mIdx = text.indexOf(marker, i)
@@ -1489,13 +1491,13 @@ private fun ChatBotBubble(text: String) {
                         when {
                             mIdx >= 0 && (tIdx < 0 || mIdx < tIdx) -> {
                                 append(text.substring(i, mIdx))
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) { append(marker) }
+                                withStyle(SpanStyle(color = errColor, fontWeight = FontWeight.Bold)) { append(marker) }
                                 i = mIdx + marker.length
                             }
                             tIdx >= 0 && tm != null -> {
                                 val tv = tm.value
                                 append(text.substring(i, tIdx))
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tv) }
+                                withStyle(SpanStyle(color = timeColor, fontWeight = FontWeight.Bold)) { append(tv) }
                                 i = tIdx + tv.length
                             }
                             else -> { append(text.substring(i)); i = text.length }
@@ -1606,7 +1608,7 @@ private fun DateReportCard(
                     val capitalized = line.clientName.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                     }
-                    val ann = androidx.compose.ui.text.buildAnnotatedString {
+                    val ann = buildAnnotatedString {
                         append("${idx + 1}. $capitalized  ")
                         for ((j, e) in line.entries.withIndex()) {
                             if (j > 0) append("   ")
@@ -1621,8 +1623,8 @@ private fun DateReportCard(
                                     }
                                 }
                             }
-                            androidx.compose.ui.text.withStyle(
-                                androidx.compose.ui.text.SpanStyle(
+                            withStyle(
+                                SpanStyle(
                                     color = colorFor(e.type),
                                     fontWeight = FontWeight.SemiBold
                                 )
