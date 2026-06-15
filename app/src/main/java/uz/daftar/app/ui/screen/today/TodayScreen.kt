@@ -111,6 +111,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -164,6 +166,7 @@ fun TodayScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
     val listState = rememberLazyListState()
+    val inputFr = remember { FocusRequester() }
     val calScope = rememberCoroutineScope()
     val csvContext = LocalContext.current
     val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -379,6 +382,7 @@ fun TodayScreen(
         bottomBar = {
             Column(Modifier.imePadding()) {
                 // ───── Doimiy pastki panel (5 tugma) ─────
+                val panelVoice = rememberVoiceInput { spoken -> vm.onVoiceInput(spoken) }
                 Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
                     Row(
                         modifier = Modifier
@@ -388,20 +392,33 @@ fun TodayScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         BottomNavBtn("🏠", "Bosh ekran") {
-                            calScope.launch { runCatching { listState.animateScrollToItem(0) } }
+                            // Oxirgi (eng yangi) yozuvga qaytadi
+                            calScope.launch {
+                                runCatching {
+                                    if (state.chat.isNotEmpty()) listState.animateScrollToItem(state.chat.size - 1)
+                                }
+                            }
                         }
-                        BottomNavBtn("📊", "Hisobot") { onReports() }
-                        // Markaziy katta + tugma — yozuv maydoniga o'tish
+                        BottomNavBtn("📦", "Yuk") { onYukReport() }
+                        // Markaziy katta + tugma: bosilsa yozuvga kirish, bosib turilsa ovoz
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(52.dp)
+                            modifier = Modifier
+                                .size(52.dp)
+                                .combinedClickable(
+                                    onClick = {
+                                        bottomMenuOpen = false
+                                        runCatching { inputFr.requestFocus() }
+                                        keyboardController?.show()
+                                    },
+                                    onLongClick = {
+                                        bottomMenuOpen = false
+                                        panelVoice("uz-UZ")
+                                    }
+                                )
                         ) {
-                            IconButton(onClick = {
-                                bottomMenuOpen = false
-                                calScope.launch { runCatching { listState.animateScrollToItem(0) } }
-                                keyboardController?.show()
-                            }) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.Add, contentDescription = "Qo'shish",
                                     tint = androidx.compose.ui.graphics.Color.White)
                             }
@@ -471,7 +488,8 @@ fun TodayScreen(
                     errorMessage = state.errorMessage,
                     parsed = state.parsed,
                     menuOpen = bottomMenuOpen,
-                    onToggleMenu = { bottomMenuOpen = !bottomMenuOpen }
+                    onToggleMenu = { bottomMenuOpen = !bottomMenuOpen },
+                    inputFocusRequester = inputFr
                 )
             }
         },
@@ -683,7 +701,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v51", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v52", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1021,7 +1039,8 @@ private fun InputBar(
     errorMessage: String?,
     parsed: List<ParsedEntry>,
     menuOpen: Boolean,
-    onToggleMenu: () -> Unit
+    onToggleMenu: () -> Unit,
+    inputFocusRequester: FocusRequester? = null
 ) {
     // Kursorni boshqarish uchun TextFieldValue (tugma bosilganda kursor harfdan KEYIN turishi uchun)
     var tfv by remember { mutableStateOf(TextFieldValue(input)) }
@@ -1181,6 +1200,7 @@ private fun InputBar(
                     },
                     modifier = Modifier
                         .weight(1f)
+                        .then(if (inputFocusRequester != null) Modifier.focusRequester(inputFocusRequester) else Modifier)
                         .onFocusChanged { inputFocused = it.isFocused },
                     placeholder = { Text("Yozuv...") },
                     trailingIcon = {
