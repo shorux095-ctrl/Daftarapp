@@ -77,6 +77,10 @@ class TransactionRepository @Inject constructor(
     suspend fun allClientNames(userId: Long): List<String> =
         txDao.getAllClientNames(userId)
 
+    /** Sklad uchun: barcha tranzaksiyalar (sotilgan yukni hisoblash) */
+    suspend fun getAllForUser(userId: Long): List<uz.daftar.app.data.db.entity.TransactionEntity> =
+        txDao.getAllForUser(userId)
+
     /** Berilgan sana oralig'idagi yozuvlar */
     suspend fun getRange(userId: Long, start: LocalDateTime, end: LocalDateTime): List<Transaction> {
         return txDao.getRange(userId, isoFormat(start), isoFormat(end)).mapNotNull { it.toDomain() }
