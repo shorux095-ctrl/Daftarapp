@@ -482,6 +482,21 @@ class TodayViewModel @Inject constructor(
                 appendChat(ChatItem.Info(nextChatId(), txt))
             }
         }
+        // ⏰ Qarz eslatmasi — muddati o'tgan qarzdorlar (kuniga bir marta, botdek)
+        runCatching {
+            val list = getOverdue(userId).filter { it.daysOverdue >= 7 }
+            if (list.isNotEmpty()) {
+                val body = buildString {
+                    append("⏰ Qarz eslatmasi (qarz boshlanganidan beri)\n\n")
+                    list.sortedByDescending { it.debt }.forEach { d ->
+                        append("• ${d.client}: ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun)\n")
+                    }
+                    val jami = list.sumOf { it.debt }
+                    append("\n🔢 JAMI: ${jami.formatMoney()} so'm")
+                }
+                appendChat(ChatItem.Info(nextChatId(), body))
+            }
+        }
         runCatching { chatStore.setLastReportDate(today.toString()) }
     }
 
@@ -1734,9 +1749,16 @@ class TodayViewModel @Inject constructor(
                 return@launch
             }
             // 2) Aniq mijoz nomi — tarixni DARHOL ko'rsatish (yozuvda qoldirmaymiz)
+            fun norm(x: String) = x.lowercase().replace("'", "").replace("`", "")
+                .replace(Regex("[.,!?]"), "").replace(Regex("\\s+"), " ").trim()
+            val tn = norm(t)
+            // Avval prefiks bo'yicha, topilmasa hamma mijozlardan qidiramiz
             val names = runCatching { repo.suggestClients(userId, t) }.getOrDefault(emptyList())
-            val exact = names.firstOrNull { it.equals(t, ignoreCase = true) }
-                ?: names.firstOrNull { it.replace("'", "").equals(t.replace("'", ""), ignoreCase = true) }
+                .ifEmpty { runCatching { repo.allClientNames(userId) }.getOrDefault(emptyList()) }
+            val exact = names.firstOrNull { norm(it) == tn }
+                ?: names.firstOrNull { norm(it).startsWith(tn) }
+                ?: names.firstOrNull { tn.startsWith(norm(it)) }
+                ?: names.firstOrNull { norm(it).contains(tn) && tn.length >= 3 }
             if (exact != null) {
                 onInputChange(exact)
                 send()

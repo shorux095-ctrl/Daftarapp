@@ -649,7 +649,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v46", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v48", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1609,7 +1609,12 @@ private fun DateReportCard(
                         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                     }
                     val ann = buildAnnotatedString {
-                        append("${idx + 1}. $capitalized  ")
+                        withStyle(SpanStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFF111111)
+                        )) { append("${idx + 1}. $capitalized") }
+                        append("  ")
                         for ((j, e) in line.entries.withIndex()) {
                             if (j > 0) append("   ")
                             val piece = when (e.type) {
@@ -1633,9 +1638,9 @@ private fun DateReportCard(
                     }
                     Text(
                         ann,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        modifier = Modifier.padding(vertical = 3.dp)
                     )
                 }
             }
