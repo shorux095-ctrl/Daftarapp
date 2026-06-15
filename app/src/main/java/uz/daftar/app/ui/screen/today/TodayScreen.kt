@@ -199,6 +199,7 @@ fun TodayScreen(
 
     // Pastki menyu ochiq/yopiq (Telegram'day toggle)
     var bottomMenuOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     var showDatePick by remember { mutableStateOf(false) }
     // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
@@ -375,7 +376,9 @@ fun TodayScreen(
                     onHelp = onHelp,
                     onEslat = onEslat,
                     onSklad = onSklad,
-                    onYukType = { yukTypeDialog = it }
+                    onYukType = { yukTypeDialog = it },
+                    menuOpen = menuOpen,
+                    onMenuOpenChange = { menuOpen = it }
                 )
             }
         },
@@ -662,10 +665,11 @@ private fun ChatTopBar(
     onOpenCalendar: () -> Unit = {},
     onJumpToDate: (java.time.LocalDate) -> Unit = {},
     onImport: () -> Unit = {},
-    onYukType: (String) -> Unit
+    onYukType: (String) -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit
 ) {
     var filterOpen by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
     var yuklarOpen by remember { mutableStateOf(false) }
     var hisobotOpen by remember { mutableStateOf(false) }
     val kbCtrl = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -680,11 +684,11 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v57", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v58", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
-                IconButton(onClick = { runCatching { kbCtrl?.hide(); focusMgr.clearFocus() }; menuOpen = true }) {
+                IconButton(onClick = { runCatching { kbCtrl?.hide(); focusMgr.clearFocus() }; onMenuOpenChange(true) }) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menyu")
                 }
 // ☰ menyu endi pastdan chiqadi (ModalBottomSheet — quyida)
@@ -706,7 +710,7 @@ private fun ChatTopBar(
 
     // ── Ikonkali to'r menyu (pastdan chiqadi) ──
     if (menuOpen) {
-        ModalBottomSheet(onDismissRequest = { menuOpen = false }) {
+        ModalBottomSheet(onDismissRequest = { onMenuOpenChange(false) }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -723,7 +727,7 @@ private fun ChatTopBar(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("A", "B", "C", "D", "K").forEach { t ->
                         AssistChip(
-                            onClick = { menuOpen = false; pendingNav = { onYukType(t) } },
+                            onClick = { onMenuOpenChange(false); pendingNav = { onYukType(t) } },
                             label = { Text(t) }
                         )
                     }
@@ -749,7 +753,7 @@ private fun ChatTopBar(
                     ) {
                         rowTiles.forEach { (emoji, label, action) ->
                             MenuTile(emoji, label, Modifier.weight(1f)) {
-                                menuOpen = false; pendingNav = action
+                                onMenuOpenChange(false); pendingNav = action
                             }
                         }
                         repeat(3 - rowTiles.size) { Spacer(Modifier.weight(1f)) }
