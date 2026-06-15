@@ -73,6 +73,10 @@ class TransactionRepository @Inject constructor(
         return txDao.suggestClients(userId, prefix.lowercase())
     }
 
+    /** Barcha mijoz nomlari (ovoz orqali aniq qidirish uchun) */
+    suspend fun allClientNames(userId: Long): List<String> =
+        txDao.getAllClientNames(userId)
+
     /** Berilgan sana oralig'idagi yozuvlar */
     suspend fun getRange(userId: Long, start: LocalDateTime, end: LocalDateTime): List<Transaction> {
         return txDao.getRange(userId, isoFormat(start), isoFormat(end)).mapNotNull { it.toDomain() }
