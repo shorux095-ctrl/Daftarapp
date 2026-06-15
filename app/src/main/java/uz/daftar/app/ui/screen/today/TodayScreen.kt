@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -649,7 +650,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v48", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v49", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1602,46 +1603,70 @@ private fun DateReportCard(
                 return@Column
             }
 
-            // Raqamlangan mijoz qatorlari — HAMMASI ko'rinadi, rangli
+            // Raqamlangan mijoz qatorlari — har biri alohida kartochka + rangli nuqta
             Column(modifier = Modifier.fillMaxWidth()) {
                 for ((idx, line) in report.clientLines.withIndex()) {
                     val capitalized = line.clientName.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                     }
-                    val ann = buildAnnotatedString {
-                        withStyle(SpanStyle(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = androidx.compose.ui.graphics.Color(0xFF111111)
-                        )) { append("${idx + 1}. $capitalized") }
-                        append("  ")
-                        for ((j, e) in line.entries.withIndex()) {
-                            if (j > 0) append("   ")
-                            val piece = when (e.type) {
-                                TxType.P -> "P:${e.amount.formatMoney()}"
-                                TxType.Q -> "Q:${e.amount.formatMoney()}"
-                                else -> buildString {
-                                    append("${e.type.code.uppercase()}:${e.amount.formatQty()}")
-                                    e.price?.let {
-                                        if (report.useNarx) append("(n:${it.formatQty()})")
-                                        else append(" [${it.formatQty()}]")
+                    // Nuqta rangi: birinchi yuk turi (P/Q bo'lmasa), aks holda birinchi yozuv
+                    val dotType = line.entries.firstOrNull { it.type != TxType.P && it.type != TxType.Q }?.type
+                        ?: line.entries.firstOrNull()?.type ?: TxType.C
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = androidx.compose.ui.graphics.Color(0xFFF7F7F9),
+                        tonalElevation = 1.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Rangli nuqta
+                            Box(
+                                modifier = Modifier
+                                    .size(11.dp)
+                                    .background(colorFor(dotType), CircleShape)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            // Raqam + ism
+                            Text(
+                                "${idx + 1}. $capitalized",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = androidx.compose.ui.graphics.Color(0xFF111111),
+                                modifier = Modifier.weight(1f)
+                            )
+                            // Yuk/pul qiymatlari (rangli) — o'ngda
+                            val ann = buildAnnotatedString {
+                                for ((j, e) in line.entries.withIndex()) {
+                                    if (j > 0) append("  ")
+                                    val piece = when (e.type) {
+                                        TxType.P -> "P:${e.amount.formatMoney()}"
+                                        TxType.Q -> "Q:${e.amount.formatMoney()}"
+                                        else -> buildString {
+                                            append("${e.type.code.uppercase()}:${e.amount.formatQty()}")
+                                            e.price?.let {
+                                                if (report.useNarx) append("(n:${it.formatQty()})")
+                                                else append(" [${it.formatQty()}]")
+                                            }
+                                        }
                                     }
+                                    withStyle(
+                                        SpanStyle(color = colorFor(e.type), fontWeight = FontWeight.SemiBold)
+                                    ) { append(piece) }
                                 }
                             }
-                            withStyle(
-                                SpanStyle(
-                                    color = colorFor(e.type),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            ) { append(piece) }
+                            Text(
+                                ann,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            )
                         }
                     }
-                    Text(
-                        ann,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(vertical = 3.dp)
-                    )
                 }
             }
 
