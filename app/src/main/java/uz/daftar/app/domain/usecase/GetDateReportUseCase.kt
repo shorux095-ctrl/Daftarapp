@@ -147,14 +147,23 @@ class GetDateReportUseCase @Inject constructor(
 
         val clientLines = mutableListOf<DateReportClientLine>()
         for (cl in clientOrder) {
-            val entries = clientTxs[cl]!!.map { tx ->
+            val rawEntries = clientTxs[cl]!!.map { tx ->
                 val type = TxType.fromCode(tx.type) ?: TxType.A
                 val price = if (type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
                     effectivePrice(tx)
                 } else null
                 DateReportEntry(type = type, amount = tx.amount, price = price)
             }
-            clientLines.add(DateReportClientLine(clientName = cl, entries = entries))
+            // Bir xil tur + bir xil narxni BIRLASHTIRAMIZ (a10 + a10 = A:20)
+            // Tartib saqlanadi (birinchi uchragan tur oldinda)
+            val order = LinkedHashMap<String, DateReportEntry>()
+            for (e in rawEntries) {
+                val key = e.type.name + "|" + (e.price?.toString() ?: "")
+                val prev = order[key]
+                order[key] = if (prev == null) e
+                             else prev.copy(amount = prev.amount + e.amount)
+            }
+            clientLines.add(DateReportClientLine(clientName = cl, entries = order.values.toList()))
         }
 
         // JAMI hisoblash
