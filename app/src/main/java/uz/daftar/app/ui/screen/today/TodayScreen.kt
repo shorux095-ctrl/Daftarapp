@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -383,7 +384,7 @@ fun TodayScreen(
             }
         },
         bottomBar = {
-            Column(Modifier.imePadding()) {
+            Column(Modifier.navigationBarsPadding().imePadding()) {
                 // ───── Doimiy pastki panel (5 tugma) ─────
                 val panelVoice = rememberVoiceInput { spoken -> vm.onVoiceInput(spoken) }
                 Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
@@ -684,7 +685,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v59", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v60", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
