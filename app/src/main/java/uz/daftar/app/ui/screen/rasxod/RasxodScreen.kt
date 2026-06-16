@@ -115,7 +115,8 @@ fun RasxodScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // Add form
+            // Add form — faqat "Kun" bo'limida ko'rinadi (Oy/Yil faqat hisobot)
+            if (state.period == RasxodPeriod.DAY) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
@@ -157,6 +158,7 @@ fun RasxodScreen(
                 }
             }
             Spacer(Modifier.height(12.dp))
+            }
 
             Text(
                 "Xarajatlar ro'yxati",
