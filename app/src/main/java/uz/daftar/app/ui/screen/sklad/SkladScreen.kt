@@ -44,6 +44,11 @@ fun SkladScreen(
     }
 
     val sums = remember(items) { SkladViewModel.summarize(items) }
+    // Yuk turlari (A/B/C/D/K) "Tovarlar (qoldiq)" ro'yxatida TAKRORLANMAYDI —
+    // ular yuqorida "Yuk turlari" kartasida ko'rsatiladi.
+    val productSums = remember(sums) {
+        sums.filter { it.name.trim().uppercase() !in SkladViewModel.CARGO_TYPES }
+    }
 
     Scaffold(
         topBar = {
@@ -74,6 +79,25 @@ fun SkladScreen(
                         label = { Text("Tovar nomi") }, singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // ── Yuk turi tez tanlash: bosilsa nom A/B/C/D/K bo'ladi ──
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Yuk turi (har birini alohida kirim qiling) — bosing, nom avtomatik to'ladi:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SkladViewModel.CARGO_TYPES.forEach { t ->
+                            FilterChip(
+                                selected = name.trim().uppercase() == t,
+                                onClick = { name = if (name.trim().uppercase() == t) "" else t },
+                                label = { Text(t) }
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -139,6 +163,7 @@ fun SkladScreen(
             } else {
                 // ── YUK TURLARI bo'yicha qoldiq (mijozlarga sotilgan avtomatik ayriladi) ──
                 if (typeStock.isNotEmpty()) {
+                    val kamomad = typeStock.any { it.qolgan < 0 }
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
@@ -155,27 +180,34 @@ fun SkladScreen(
                                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                     Text("qoldi ${ts.qolgan.formatQty()}",
                                         fontWeight = FontWeight.Bold,
-                                        color = if (ts.qolgan > 0) MaterialTheme.colorScheme.primary
+                                        color = if (ts.qolgan >= 0) MaterialTheme.colorScheme.primary
                                                 else androidx.compose.ui.graphics.Color(0xFFD32F2F))
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
-                            Text("Kelgan = skladga A/B/C/D/K nomi bilan qo'shilgan kirim",
+                            Text("Har bir turni alohida kirim qiling: nomga A/B/C/D/K yozing (yuqoridagi tugmalar). Qoldi = kelgan − sotilgan.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            if (kamomad) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("⚠️ Manfiy qoldi = sotilgani kiritilgan kirimdan ko'p. To'liq kirimni kiriting.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                            }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
 
-                // ── YUK (qoldiq) ko'rinishi ──
+                // ── YUK (qoldiq) ko'rinishi — yuk turlari (A/B/C/D/K) bu yerda ko'rinmaydi ──
                 Text("Tovarlar (qoldiq)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                if (sums.isEmpty()) {
-                    Text("Sklad bo'sh. Yuqoridan tovar qo'shing.", style = MaterialTheme.typography.bodyMedium)
+                if (productSums.isEmpty()) {
+                    Text("Boshqa tovar yo'q. Yuqoridan nom yozib qo'shing (masalan: mayda xalta).",
+                        style = MaterialTheme.typography.bodyMedium)
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(sums, key = { it.name }) { s ->
+                        items(productSums, key = { it.name }) { s ->
                             Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(12.dp)) {
                                     Text(s.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -189,7 +221,7 @@ fun SkladScreen(
                                     Text("📦 Qolgan: ${s.qoldi.formatQty()}",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (s.qoldi > 0) MaterialTheme.colorScheme.primary
+                                        color = if (s.qoldi >= 0) MaterialTheme.colorScheme.primary
                                                 else androidx.compose.ui.graphics.Color(0xFFD32F2F))
                                     if (s.oxirgiKelgan > 0L) {
                                         val d = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault())

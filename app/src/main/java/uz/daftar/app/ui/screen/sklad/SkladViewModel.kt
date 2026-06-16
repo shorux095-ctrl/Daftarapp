@@ -53,21 +53,22 @@ class SkladViewModel @Inject constructor(
 
     init { refreshTypeStock() }
 
-    /** Yuk turlari bo'yicha: kirim (sklad) − sotilgan (tranzaksiya) = qoldiq */
+    /** Yuk turlari bo'yicha: kirim (sklad) − sotilgan (tranzaksiya) = qoldiq.
+     *  A/B/C/D/K turlarining HAMMASI doimo ko'rsatiladi (faolligi bo'lmasa ham). */
     fun refreshTypeStock() {
         viewModelScope.launch {
             val txs = runCatching { txRepo.getAllForUser(userId) }.getOrDefault(emptyList())
             // Mijozlarga sotilgan yuk (faqat A/B/C/D/K turlari)
-            val soldByType = txs.filter { it.type.uppercase() in listOf("A", "B", "C", "D", "K") }
+            val soldByType = txs.filter { it.type.uppercase() in CARGO_TYPES }
                 .groupBy { it.type.uppercase() }
                 .mapValues { (_, rows) -> rows.sumOf { it.amount } }
             // Skladga qo'lда kiritilgan kirim — tovar nomi turga teng bo'lsa (a/b/c/d/k)
             val skladRows = items.value
-            val inByType = skladRows.filter { it.isIn && it.name.trim().uppercase() in listOf("A", "B", "C", "D", "K") }
+            val inByType = skladRows.filter { it.isIn && it.name.trim().uppercase() in CARGO_TYPES }
                 .groupBy { it.name.trim().uppercase() }
                 .mapValues { (_, rows) -> rows.sumOf { it.qty } }
-            val allTypes = (soldByType.keys + inByType.keys).toSortedSet()
-            _typeStock.value = allTypes.map { t ->
+            // Doimo barcha 5 turni ko'rsatamiz (foydalanuvchi qaysi turga kirim kerakligini ko'rsin)
+            _typeStock.value = CARGO_TYPES.map { t ->
                 val k = inByType[t] ?: 0.0
                 val s = soldByType[t] ?: 0.0
                 SkladTypeStock(type = t, kelgan = k, sotilgan = s, qolgan = k - s)
@@ -98,6 +99,9 @@ class SkladViewModel @Inject constructor(
     fun clearMessage() { _message.value = null }
 
     companion object {
+        /** Yuk turlari — A/B/C/D/K (qat'iy ro'yxat, tartibda) */
+        val CARGO_TYPES = listOf("A", "B", "C", "D", "K")
+
         /** Yozuvlardan tovar bo'yicha yig'mani hisoblaydi */
         fun summarize(list: List<SkladEntity>): List<SkladItemSum> {
             return list.groupBy { it.name.trim().lowercase() }.map { (_, rows) ->
