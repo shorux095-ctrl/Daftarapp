@@ -155,6 +155,7 @@ fun TodayScreen(
     onHelp: () -> Unit = onSettings,
     onEslat: () -> Unit = onSettings,
     onSklad: () -> Unit = onSettings,
+    onTahrir: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -380,6 +381,7 @@ fun TodayScreen(
                     onHelp = onHelp,
                     onEslat = onEslat,
                     onSklad = onSklad,
+                    onTahrir = onTahrir,
                     onYukType = { yukTypeDialog = it },
                     menuOpen = menuOpen,
                     onMenuOpenChange = { menuOpen = it }
@@ -674,6 +676,7 @@ private fun ChatTopBar(
     onHelp: () -> Unit,
     onEslat: () -> Unit,
     onSklad: () -> Unit,
+    onTahrir: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onJumpToDate: (java.time.LocalDate) -> Unit = {},
     onImport: () -> Unit = {},
@@ -696,7 +699,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v62", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v63", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -748,6 +751,7 @@ private fun ChatTopBar(
                 val tiles = listOf(
                     Triple("\uD83D\uDCE6", "Yuk hisoboti", onYukReport),
                     Triple("\uD83D\uDCCA", "Hisobot", onReports),
+                    Triple("\u270F\uFE0F", "Tahrirlash", onTahrir),
                     Triple("\uD83D\uDCCB", "To'liq", onToliq),
                     Triple("\uD83D\uDCC8", "Grafik", onGrafik),
                     Triple("\uD83D\uDC65", "Mijozlar", onClients),
