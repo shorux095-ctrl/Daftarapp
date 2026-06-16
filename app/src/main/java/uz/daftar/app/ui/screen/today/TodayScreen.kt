@@ -202,6 +202,7 @@ fun TodayScreen(
     var bottomMenuOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showDatePick by remember { mutableStateOf(false) }
+    var showInput by remember { mutableStateOf(false) }
     // Yuk turi dialog (A/B/C/D/K bosilganda — bugun qancha, kimga)
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
     var crashText by remember { mutableStateOf<String?>(null) }
@@ -413,8 +414,8 @@ fun TodayScreen(
                                 .combinedClickable(
                                     onClick = {
                                         bottomMenuOpen = false
-                                        runCatching { inputFr.requestFocus() }
-                                        keyboardController?.show()
+                                        showInput = !showInput
+                                        if (!showInput) { keyboardController?.hide(); focusManager.clearFocus() }
                                     },
                                     onLongClick = {
                                         bottomMenuOpen = false
@@ -454,26 +455,34 @@ fun TodayScreen(
                     )
                 }
                 // (Bugun/Kecha/Hafta/Yuk paneli olib tashlandi — ➕ tugma va 📅 Sana orqali)
-                // ───── Mijoz tarixi asosiy oynaga ko'chirildi ─────
-                InputBar(
-                    input = state.input,
-                    onChange = vm::onInputChange,
-                    suggestions = state.suggestions,
-                    onSuggestionClick = vm::applySuggestion,
-                    onVoice = vm::onVoiceInput,
-                    onSend = {
-                        bottomMenuOpen = false
-                        keyboardController?.hide(); focusManager.clearFocus()
-                        vm.send()
-                    },
-                    canSend = state.canSend,
-                    isSending = state.isSending,
-                    errorMessage = state.errorMessage,
-                    parsed = state.parsed,
-                    menuOpen = bottomMenuOpen,
-                    onToggleMenu = { bottomMenuOpen = !bottomMenuOpen },
-                    inputFocusRequester = inputFr
-                )
+                // ───── Yozuv maydoni: faqat ➕ bosilganda ko'rinadi ─────
+                if (showInput) {
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(80)
+                        runCatching { inputFr.requestFocus() }
+                        keyboardController?.show()
+                    }
+                    InputBar(
+                        input = state.input,
+                        onChange = vm::onInputChange,
+                        suggestions = state.suggestions,
+                        onSuggestionClick = vm::applySuggestion,
+                        onVoice = vm::onVoiceInput,
+                        onSend = {
+                            bottomMenuOpen = false
+                            keyboardController?.hide(); focusManager.clearFocus()
+                            vm.send()
+                            showInput = false
+                        },
+                        canSend = state.canSend,
+                        isSending = state.isSending,
+                        errorMessage = state.errorMessage,
+                        parsed = state.parsed,
+                        menuOpen = bottomMenuOpen,
+                        onToggleMenu = { bottomMenuOpen = !bottomMenuOpen },
+                        inputFocusRequester = inputFr
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) { Snackbar(snackbarData = it) } }
@@ -685,7 +694,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v60", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v61", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1729,46 +1738,60 @@ private fun DateReportCard(
             Spacer(Modifier.height(8.dp))
 
             Text("\u2014 JAMI \u2014", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
-                val total = report.totalsByType[type] ?: 0.0
-                if (total <= 0.0) continue
-                val rev = report.revenueByType[type] ?: 0.0
-                Text(
-                    "${type.code.uppercase()} ${total.formatQty()}  = ${rev.formatMoney()} so'm",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colorFor(type)
-                )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
+                    val total = report.totalsByType[type] ?: 0.0
+                    if (total <= 0.0) continue
+                    val rev = report.revenueByType[type] ?: 0.0
+                    JamiBadge(type.code.uppercase(), colorFor(type), total.formatQty(), "${rev.formatMoney()} so'm")
+                }
+                if (report.totalPayments > 0) {
+                    JamiBadge("P", cP, report.totalPayments.formatMoney(), "so'm")
+                }
+                JamiBadge("J", cDK, report.totalRevenue.formatMoney(), if (report.useNarx) "jami pul" else "jami")
             }
-            if (report.totalPayments > 0) {
-                Text(
-                    "P ${report.totalPayments.formatMoney()} so'm",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    color = cP
-                )
+        }
+    }
+}
+
+
+@Composable
+private fun JamiBadge(
+    letter: String,
+    color: androidx.compose.ui.graphics.Color,
+    value: String,
+    sub: String
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = androidx.compose.ui.graphics.Color(0xFFF7F7F9),
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(22.dp).background(color, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        letter,
+                        color = androidx.compose.ui.graphics.Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
-            Spacer(Modifier.height(4.dp))
-            if (report.useNarx) {
-                Text(
-                    "\uD83D\uDD22 JAMI pul: ${report.totalRevenue.formatMoney()} so'm",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Text(
-                    "J: ${report.totalRevenue.formatMoney()}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            Spacer(Modifier.height(2.dp))
+            Text(sub, color = androidx.compose.ui.graphics.Color(0xFF888888), fontSize = 11.sp)
         }
     }
 }
