@@ -31,6 +31,7 @@ import uz.daftar.app.ui.screen.rasxod.RasxodScreen
 import uz.daftar.app.ui.screen.reminder.ReminderLimitScreen
 import uz.daftar.app.ui.screen.reports.ReportsScreen
 import uz.daftar.app.ui.screen.search.SearchScreen
+import uz.daftar.app.ui.screen.tahrir.TahrirScreen
 import uz.daftar.app.ui.screen.settings.SettingsScreen
 import uz.daftar.app.ui.screen.today.TodayScreen
 import uz.daftar.app.ui.screen.yuknarx.YukNarxScreen
@@ -60,6 +61,7 @@ object Routes {
     const val TOLIQ = "toliq"
     const val GRAFIK = "grafik"
     const val CALC = "calc"
+    const val TAHRIR = "tahrir"
 }
 
 // ── DIAGNOSTIKA: ekran HAQIQATAN kompozitsiyaga kirdimi? ──
@@ -130,7 +132,8 @@ fun DaftarNavHost() {
                 onDashboard = { if (canNav()) nav.navigate(Routes.DASHBOARD) },
                 onHelp = { if (canNav()) nav.navigate(Routes.HELP) },
                 onEslat = { if (canNav()) nav.navigate(Routes.ESLAT) },
-                onSklad = { if (canNav()) nav.navigate(Routes.SKLAD) }
+                onSklad = { if (canNav()) nav.navigate(Routes.SKLAD) },
+                onTahrir = { if (canNav()) nav.navigate(Routes.TAHRIR) }
             )
         }
 
@@ -217,6 +220,7 @@ fun DaftarNavHost() {
         composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.TAHRIR) { DiagIn("tahrir"); TahrirScreen(onBack = { if (canNav()) nav.popBackStack() }, onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") }) }
     }
     // (diagnostika olib tashlandi)
     }
