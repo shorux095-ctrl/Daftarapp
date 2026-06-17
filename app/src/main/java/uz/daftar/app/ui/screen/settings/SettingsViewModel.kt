@@ -26,6 +26,7 @@ class SettingsViewModel @Inject constructor(
     private val importOldDb: ImportOldDbUseCase,
     private val backup: uz.daftar.app.core.backup.BackupManager,
     private val drive: DriveBackup,
+    private val telegram: uz.daftar.app.core.backup.TelegramBackup,
     private val themeManager: uz.daftar.app.core.theme.ThemeManager
 ) : ViewModel() {
 
@@ -184,4 +185,43 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearDriveMsg() { _driveMsg.value = null }
+
+    // ───────── Telegram zaxira ─────────
+    private val _tgToken = MutableStateFlow(telegram.getToken())
+    val tgToken: StateFlow<String> = _tgToken.asStateFlow()
+    private val _tgChat = MutableStateFlow(telegram.getChatId())
+    val tgChat: StateFlow<String> = _tgChat.asStateFlow()
+    private val _tgConfigured = MutableStateFlow(telegram.isConfigured())
+    val tgConfigured: StateFlow<Boolean> = _tgConfigured.asStateFlow()
+    private val _tgMsg = MutableStateFlow<String?>(null)
+    val tgMsg: StateFlow<String?> = _tgMsg.asStateFlow()
+    private val _tgBusy = MutableStateFlow(false)
+    val tgBusy: StateFlow<Boolean> = _tgBusy.asStateFlow()
+
+    fun saveTelegram(token: String, chatId: String) {
+        telegram.setConfig(token, chatId)
+        _tgToken.value = telegram.getToken()
+        _tgChat.value = telegram.getChatId()
+        _tgConfigured.value = telegram.isConfigured()
+        _tgMsg.value = if (_tgConfigured.value) "✅ Saqlandi" else "❌ Token va chat_id to'liq emas"
+    }
+
+    fun backupNowTelegram() {
+        if (_tgBusy.value) return
+        _tgBusy.value = true
+        viewModelScope.launch {
+            val r = telegram.sendBackup()
+            _tgMsg.value = r.getOrElse { "❌ " + (it.message ?: "xato") }
+            _tgConfigured.value = telegram.isConfigured()
+            _tgBusy.value = false
+        }
+    }
+
+    fun clearTgConfig() {
+        telegram.clearConfig()
+        _tgToken.value = ""; _tgChat.value = ""; _tgConfigured.value = false
+        _tgMsg.value = "🗑 Telegram zaxira o'chirildi"
+    }
+
+    fun clearTgMsg() { _tgMsg.value = null }
 }

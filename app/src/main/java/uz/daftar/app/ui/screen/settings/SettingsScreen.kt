@@ -81,6 +81,13 @@ fun SettingsScreen(
     val driveEmail by vm.driveEmail.collectAsStateWithLifecycle()
     val driveMsg by vm.driveMsg.collectAsStateWithLifecycle()
     val driveBusy by vm.driveBusy.collectAsStateWithLifecycle()
+    val tgConfigured by vm.tgConfigured.collectAsStateWithLifecycle()
+    val tgMsg by vm.tgMsg.collectAsStateWithLifecycle()
+    val tgBusy by vm.tgBusy.collectAsStateWithLifecycle()
+    val tgTokenInit by vm.tgToken.collectAsStateWithLifecycle()
+    val tgChatInit by vm.tgChat.collectAsStateWithLifecycle()
+    var tgToken by remember(tgTokenInit) { mutableStateOf(tgTokenInit) }
+    var tgChat by remember(tgChatInit) { mutableStateOf(tgChatInit) }
     var showDriveSignOut by remember { mutableStateOf(false) }
     val driveSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -96,6 +103,12 @@ fun SettingsScreen(
         driveMsg?.let {
             android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
             vm.clearDriveMsg()
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(tgMsg) {
+        tgMsg?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            vm.clearTgMsg()
         }
     }
     val autoBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -267,6 +280,51 @@ fun SettingsScreen(
                         }
                     }
                 )
+            }
+
+            // 2d) Telegram zaxira — botingizga bazani (.db) yuboradi
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        if (tgConfigured) "\uD83D\uDCE8 Telegram zaxira \u2713" else "\uD83D\uDCE8 Telegram zaxira",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Bot token + chat_id kiriting \u2014 baza har kuni Telegramga yuboriladi. Telefon yo'qolsa ham ma'lumot saqlanadi.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tgToken, onValueChange = { tgToken = it },
+                        label = { Text("Bot token") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = tgChat, onValueChange = { tgChat = it },
+                        label = { Text("Chat ID (sizning ID)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Button(
+                            onClick = { vm.saveTelegram(tgToken, tgChat) }
+                        ) { Text("Saqlash") }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { vm.backupNowTelegram() },
+                            enabled = tgConfigured && !tgBusy
+                        ) { Text(if (tgBusy) "Yuborilmoqda\u2026" else "\uD83D\uDCE8 Hozir yubor") }
+                    }
+                    if (tgConfigured) {
+                        androidx.compose.material3.TextButton(
+                            onClick = { vm.clearTgConfig() }
+                        ) { Text("O'chirish", color = MaterialTheme.colorScheme.error) }
+                    }
+                }
             }
 
             // 3) Alias
