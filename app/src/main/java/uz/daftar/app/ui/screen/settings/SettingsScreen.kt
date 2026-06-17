@@ -327,6 +327,13 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsItem(
+                icon = Icons.Outlined.Download,
+                title = "☁️ Drive'dan yangilash",
+                subtitle = "2-telefon: so'nggi ma'lumotni Drive'dan oladi",
+                onClick = { vm.refreshFromDrive() }
+            )
+
             // 3) Alias
             SettingsItem(
                 icon = Icons.Outlined.Edit,

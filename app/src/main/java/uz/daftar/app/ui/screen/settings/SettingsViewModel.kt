@@ -184,6 +184,20 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 2-telefon uchun: Drive'dan so'nggi zaxirani tortib, lokal bazani yangilaydi */
+    fun refreshFromDrive() {
+        if (_driveBusy.value) return
+        _driveBusy.value = true
+        viewModelScope.launch {
+            val res = runCatching { drive.restoreLatest() }
+            _driveMsg.value = if (res.isSuccess) {
+                val name: String? = res.getOrNull()
+                if (name != null) "✅ Yangilandi: $name — ilovani qayta oching" else "Drive'da zaxira topilmadi"
+            } else "❌ Xato: " + (res.exceptionOrNull()?.message ?: "")
+            _driveBusy.value = false
+        }
+    }
+
     fun clearDriveMsg() { _driveMsg.value = null }
 
     // ───────── Telegram zaxira ─────────

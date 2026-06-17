@@ -718,7 +718,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v67", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v68", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -768,63 +768,93 @@ private fun ChatTopBar(
                 }
                 Spacer(Modifier.height(16.dp))
                 val tiles = listOf(
-                    Triple("\uD83D\uDCE6", "Yuk hisoboti", onYukReport),
-                    Triple("\uD83D\uDCCA", "Hisobot", onReports),
-                    Triple("\u270F\uFE0F", "Tahrirlash", onTahrir),
-                    Triple("\uD83D\uDCCB", "To'liq", onToliq),
-                    Triple("\uD83D\uDCC8", "Grafik", onGrafik),
-                    Triple("\uD83D\uDC65", "Mijozlar", onClients),
-                    Triple("\uD83D\uDCB3", "Qarzdorlar", onQarz),
-                    Triple("\uD83D\uDE9A", "Narx", onYukNarx),
-                    Triple("\uD83D\uDCB8", "Rasxod", onRasxod),
-                    Triple("\uD83D\uDCE6", "Sklad", onSklad),
-                    Triple("\uD83E\uDDEE", "Kalkulyator", onCalc),
-                    Triple("\u2753", "Yordam", onHelp),
-                    Triple("\u2699\uFE0F", "Sozlamalar", onSettings),
+                    MenuItem("📦", "Yuk hisoboti", "Yuklar va holatlar", Color(0xFFD6F5E0), onYukReport),
+                    MenuItem("📊", "Hisobot", "Umumiy hisobotlar", Color(0xFFD9E8FF), onReports),
+                    MenuItem("✏️", "Tahrirlash", "Ma'lumotlarni tahrirlash", Color(0xFFEDE3FF), onTahrir),
+                    MenuItem("📋", "To'liq", "To'liq ma'lumot", Color(0xFFFFE9D1), onToliq),
+                    MenuItem("📈", "Grafik", "Statistik grafiklar", Color(0xFFFFDCE6), onGrafik),
+                    MenuItem("👥", "Mijozlar", "Mijozlar ro'yxati", Color(0xFFD5F2EE), onClients),
+                    MenuItem("💳", "Qarzdorlar", "Qarzdorlar ro'yxati", Color(0xFFFFEEC2), onQarz),
+                    MenuItem("🚚", "Narx", "Narxlar ro'yxati", Color(0xFFDCE8FF), onYukNarx),
+                    MenuItem("💵", "Rasxod", "Rasxodlar hisobi", Color(0xFFD6F5E0), onRasxod),
+                    MenuItem("🏬", "Sklad", "Ombor ma'lumoti", Color(0xFFEDE3FF), onSklad),
+                    MenuItem("🧮", "Kalkulyator", "Hisob-kitob vositasi", Color(0xFFFFE9D1), onCalc),
+                    MenuItem("❓", "Yordam", "Yordam va qo'llanma", Color(0xFFFFDCE6), onHelp),
                 )
                 tiles.chunked(3).forEach { rowTiles ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        rowTiles.forEach { (emoji, label, action) ->
-                            MenuTile(emoji, label, Modifier.weight(1f)) {
-                                onMenuOpenChange(false); pendingNav = action
+                        rowTiles.forEach { item ->
+                            MenuTile(item.emoji, item.title, item.subtitle, item.bg, Modifier.weight(1f)) {
+                                onMenuOpenChange(false); pendingNav = item.action
                             }
                         }
                         repeat(3 - rowTiles.size) { Spacer(Modifier.weight(1f)) }
                     }
                     Spacer(Modifier.height(10.dp))
                 }
+                Spacer(Modifier.height(2.dp))
+                MenuSettingsRow { onMenuOpenChange(false); pendingNav = onSettings }
             }
         }
     }
 }
 
+private data class MenuItem(
+    val emoji: String,
+    val title: String,
+    val subtitle: String,
+    val bg: Color,
+    val action: () -> Unit
+)
+
 @Composable
-private fun MenuTile(emoji: String, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun MenuTile(emoji: String, title: String, subtitle: String, bg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer
+        modifier = modifier.height(122.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp, start = 6.dp, end = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(emoji, fontSize = 30.sp)
-            Spacer(Modifier.height(4.dp))
+            Box(
+                modifier = Modifier.size(50.dp).background(bg, RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) { Text(emoji, fontSize = 24.sp) }
+            Spacer(Modifier.height(7.dp))
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A), maxLines = 1)
             Text(
-                label,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                lineHeight = 13.sp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                subtitle, fontSize = 10.sp, color = Color(0xFF8A8A8A),
+                textAlign = TextAlign.Center, maxLines = 2, lineHeight = 12.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun MenuSettingsRow(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 1.dp
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(46.dp).background(Color(0xFFEDEDED), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) { Text("⚙️", fontSize = 22.sp) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Sozlamalar", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                Text("Ilova sozlamalari", fontSize = 11.sp, color = Color(0xFF8A8A8A))
+            }
+            Text("›", fontSize = 22.sp, color = Color(0xFF8A8A8A))
         }
     }
 }
