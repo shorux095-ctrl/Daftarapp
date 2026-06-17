@@ -369,6 +369,7 @@ class TodayViewModel @Inject constructor(
                     o.put("name", c.preview.name)
                     o.put("month", c.preview.month.toString())
                 }
+                is ChatItem.DebtRep -> { o.put("k", "debt") }
             }
             arr.put(o)
         }
@@ -429,6 +430,10 @@ class TodayViewModel @Inject constructor(
                         }
                     }
                     "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
+                    "debt" -> {
+                        val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
+                        if (!l.isNullOrEmpty()) list.add(ChatItem.DebtRep(nextChatId(), l, ts))
+                    }
                     else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
                 }
             }
