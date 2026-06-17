@@ -78,6 +78,10 @@ class TransactionRepository @Inject constructor(
         txDao.getAllClientNames(userId)
 
     /** Sklad uchun: barcha tranzaksiyalar (sotilgan yukni hisoblash) */
+    /** Yuk turi bo'yicha sotilgan jami — SQL GROUP BY (100k+ tranzaksiyada ham tez) */
+    suspend fun soldSumByCargoType(userId: Long): Map<String, Double> =
+        txDao.sumByCargoType(userId).associate { it.type.uppercase() to it.total }
+
     suspend fun getAllForUser(userId: Long): List<uz.daftar.app.data.db.entity.TransactionEntity> =
         txDao.getAllForUser(userId)
 

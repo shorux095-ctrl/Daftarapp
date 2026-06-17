@@ -57,11 +57,9 @@ class SkladViewModel @Inject constructor(
      *  A/B/C/D/K turlarining HAMMASI doimo ko'rsatiladi (faolligi bo'lmasa ham). */
     fun refreshTypeStock() {
         viewModelScope.launch {
-            val txs = runCatching { txRepo.getAllForUser(userId) }.getOrDefault(emptyList())
-            // Mijozlarga sotilgan yuk (faqat A/B/C/D/K turlari)
-            val soldByType = txs.filter { it.type.uppercase() in CARGO_TYPES }
-                .groupBy { it.type.uppercase() }
-                .mapValues { (_, rows) -> rows.sumOf { it.amount } }
+            // Mijozlarga sotilgan yuk (A/B/C/D/K) — SQL GROUP BY orqali (barcha tranzaksiyani
+            // yuklamaydi, 100k+ yozuvda ham tez). Baza atigi ~5 qator qaytaradi.
+            val soldByType = runCatching { txRepo.soldSumByCargoType(userId) }.getOrDefault(emptyMap())
             // Skladga qo'lда kiritilgan kirim — tovar nomi turga teng bo'lsa (a/b/c/d/k)
             val skladRows = items.value
             val inByType = skladRows.filter { it.isIn && it.name.trim().uppercase() in CARGO_TYPES }

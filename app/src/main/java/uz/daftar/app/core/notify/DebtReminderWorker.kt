@@ -32,7 +32,7 @@ class DebtReminderWorker @AssistedInject constructor(
             return Result.success()
         }
         // 7+ kun muddati o'tganlar
-        val overdue = list.filter { it.daysOverdue >= 7 }
+        val overdue = list.filter { it.daysOverdue >= 10 }
         if (overdue.isNotEmpty()) {
             postReminder(applicationContext, overdue.size, overdue.maxOf { it.daysOverdue })
         }

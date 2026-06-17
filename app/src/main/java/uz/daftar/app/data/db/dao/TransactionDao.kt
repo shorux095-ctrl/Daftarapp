@@ -8,6 +8,9 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import uz.daftar.app.data.db.entity.TransactionEntity
 
+/** SUM(amount) — yuk turi bo'yicha (SQL yig'indisi, 100k+ uchun tez) */
+data class CargoTypeSum(val type: String, val total: Double)
+
 @Dao
 interface TransactionDao {
 
@@ -133,4 +136,8 @@ interface TransactionDao {
 
     @Query("SELECT COUNT(*) FROM transactions WHERE user_id = :userId")
     suspend fun countAll(userId: Long): Int
+
+    // Yuk turlari (A/B/C/D/K) bo'yicha sotilgan jami — bazada hisoblanadi (barcha qatorni yuklamaydi)
+    @Query("SELECT type AS type, SUM(amount) AS total FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k') GROUP BY type")
+    suspend fun sumByCargoType(userId: Long): List<CargoTypeSum>
 }

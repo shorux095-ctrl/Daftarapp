@@ -489,15 +489,25 @@ class TodayViewModel @Inject constructor(
         }
         // ⏰ Qarz eslatmasi — muddati o'tgan qarzdorlar (kuniga bir marta, botdek)
         runCatching {
-            val list = getOverdue(userId).filter { it.daysOverdue >= 7 }
+            val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
             if (list.isNotEmpty()) {
                 val body = buildString {
-                    append("⏰ Qarz eslatmasi (qarz boshlanganidan beri)\n\n")
-                    list.sortedByDescending { it.debt }.forEach { d ->
-                        append("• ${d.client}: ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun)\n")
+                    append("⏰ Qarz eslatmasi (oxirgi to'lovdan beri)\n\n")
+                    fun bk(title: String, items: List<uz.daftar.app.domain.usecase.OverdueDebtor>) {
+                        if (items.isEmpty()) return
+                        append("$title\n")
+                        items.sortedByDescending { it.daysOverdue }.forEach { d ->
+                            append("  • ${d.client.replaceFirstChar { c -> c.uppercase() }} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun · ${d.sinceDate.format(fmt)})\n")
+                        }
+                        append("\n")
                     }
+                    bk("🔴 60+ kun", list.filter { it.daysOverdue >= 60 })
+                    bk("🟠 30 kunlik (30–59)", list.filter { it.daysOverdue in 30..59 })
+                    bk("🟡 15 kunlik (15–29)", list.filter { it.daysOverdue in 15..29 })
+                    bk("🔵 10 kunlik (10–14)", list.filter { it.daysOverdue in 10..14 })
                     val jami = list.sumOf { it.debt }
-                    append("\n🔢 JAMI: ${jami.formatMoney()} so'm")
+                    append("🔢 JAMI: ${jami.formatMoney()} so'm  (${list.size} mijoz)")
                 }
                 appendChat(ChatItem.Info(nextChatId(), body))
             }
@@ -1536,23 +1546,23 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val list = getOverdue(userId)
+                val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+                val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
                 val body = if (list.isEmpty()) {
-                    "✅ Muddati o'tgan qarz yo'q."
+                    "✅ 10 kundan oshgan qarz yo'q."
                 } else buildString {
                     fun bucket(title: String, items: List<uz.daftar.app.domain.usecase.OverdueDebtor>) {
                         if (items.isEmpty()) return
                         append("$title\n")
-                        items.forEach { d ->
-                            append("  • ${d.client} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun)\n")
+                        items.sortedByDescending { it.daysOverdue }.forEach { d ->
+                            append("  • ${d.client.replaceFirstChar { c -> c.uppercase() }} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun · ${d.sinceDate.format(fmt)})\n")
                         }
                         append("\n")
                     }
                     bucket("🔴 60+ kun", list.filter { it.daysOverdue >= 60 })
-                    bucket("🟠 30–59 kun", list.filter { it.daysOverdue in 30..59 })
-                    bucket("🟡 14–29 kun", list.filter { it.daysOverdue in 14..29 })
-                    bucket("🔵 7–13 kun", list.filter { it.daysOverdue in 7..13 })
-                    bucket("⚪ 7 kundan kam", list.filter { it.daysOverdue < 7 })
+                    bucket("🟠 30 kunlik (30–59)", list.filter { it.daysOverdue in 30..59 })
+                    bucket("🟡 15 kunlik (15–29)", list.filter { it.daysOverdue in 15..29 })
+                    bucket("🔵 10 kunlik (10–14)", list.filter { it.daysOverdue in 10..14 })
                     val jami = list.sumOf { it.debt }
                     append("──────────\n")
                     append("JAMI qarz: ${jami.formatMoney()} so'm  (${list.size} mijoz)")

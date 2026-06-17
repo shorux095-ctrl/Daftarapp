@@ -387,7 +387,8 @@ class GetClientProfitUseCase @Inject constructor(
 data class OverdueDebtor(
     val client: String,
     val debt: Long,
-    val daysOverdue: Int   // qarz boshlanganidan beri kunlar
+    val daysOverdue: Int,                // oxirgi to'lovdan (yo'q bo'lsa qarz boshidan) beri kunlar
+    val sinceDate: LocalDate             // sanash boshlangan sana
 )
 
 class GetOverdueDebtorsUseCase @Inject constructor(
@@ -403,27 +404,29 @@ class GetOverdueDebtorsUseCase @Inject constructor(
             if (txs.isEmpty()) continue
             val pricesByType = priceDao.getAllForClient(userId, name.lowercase()).groupBy { it.priceType }
             var bal = 0.0
-            var startDate: LocalDate? = null
+            var firstDebtDate: LocalDate? = null    // qarz 0'dan musbatga o'tgan sana
+            var lastPaymentDate: LocalDate? = null   // oxirgi to'lov (P) sanasi
             for (tx in txs) {
                 val before = bal
+                val d = runCatching {
+                    LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate()
+                }.getOrNull()
                 when (tx.type) {
-                    "p" -> bal -= tx.amount
+                    "p" -> { bal -= tx.amount; if (d != null) lastPaymentDate = d }
                     "q" -> bal += tx.amount
                     else -> {
                         val pr = tx.tOverride ?: findPriceAtSimple(pricesByType[tx.type], tx.date)
                         if (pr != null) bal += tx.amount * pr
                     }
                 }
-                if (before <= 0.0 && bal > 0.0) {
-                    startDate = runCatching {
-                        LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate()
-                    }.getOrNull()
-                }
-                if (bal <= 0.0) startDate = null
+                if (before <= 0.0 && bal > 0.0 && d != null) firstDebtDate = d
+                if (bal <= 0.0) firstDebtDate = null
             }
-            if (bal > 0.5 && startDate != null) {
-                val days = ChronoUnit.DAYS.between(startDate, today).toInt().coerceAtLeast(0)
-                out.add(OverdueDebtor(name, bal.roundToLong(), days))
+            if (bal > 0.5) {
+                // Pul bergan bo'lsa — oxirgi to'lovdan; aks holda qarz boshidan sanaymiz
+                val since = lastPaymentDate ?: firstDebtDate ?: continue
+                val days = ChronoUnit.DAYS.between(since, today).toInt().coerceAtLeast(0)
+                out.add(OverdueDebtor(name, bal.roundToLong(), days, since))
             }
         }
         return out.sortedByDescending { it.daysOverdue }

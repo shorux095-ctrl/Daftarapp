@@ -9,7 +9,6 @@ import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import uz.daftar.app.core.notify.AutoReportWorker
 import uz.daftar.app.core.notify.DebtReminderWorker
-import uz.daftar.app.core.notify.TelegramBackupWorker
 import uz.daftar.app.core.notify.createReminderChannel
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -48,7 +47,6 @@ class DaftarApplication : Application(), Configuration.Provider {
         startLogCapture()
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
         scheduleDailyReminder()   // har kuni 10:00 — qarz eslatma bildirishnomasi
-        scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
         // scheduleDailyAutoReport()
     }
 
@@ -120,27 +118,6 @@ class DaftarApplication : Application(), Configuration.Provider {
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "daily_debt_reminder",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
-        )
-    }
-
-    /** Har kuni 23:00 da bazani Telegramga zaxiralash ishini rejalashtiradi */
-    private fun scheduleTelegramBackup() {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 23)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
-        }
-        val delay = target.timeInMillis - now.timeInMillis
-        val request = PeriodicWorkRequestBuilder<TelegramBackupWorker>(1, TimeUnit.DAYS)
-            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "daily_telegram_backup",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
