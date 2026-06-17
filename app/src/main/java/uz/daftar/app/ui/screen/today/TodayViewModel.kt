@@ -145,6 +145,7 @@ sealed interface ChatItem {
     data class TextRep(override val id: Long, val report: TextReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Mijoz tarixi (chap) */
     data class History(override val id: Long, val preview: ClientPreview, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    data class DebtRep(override val id: Long, val debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>, override val ts: Long = System.currentTimeMillis()) : ChatItem
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -487,30 +488,10 @@ class TodayViewModel @Inject constructor(
                 appendChat(ChatItem.Info(nextChatId(), txt))
             }
         }
-        // ⏰ Qarz eslatmasi — muddati o'tgan qarzdorlar (kuniga bir marta, botdek)
+        // ⏰ Qarz eslatmasi — chiroyli karta (kuniga bir marta)
         runCatching {
-            val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
             val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
-            if (list.isNotEmpty()) {
-                val body = buildString {
-                    append("⏰ Qarz eslatmasi (oxirgi to'lovdan beri)\n\n")
-                    fun bk(title: String, items: List<uz.daftar.app.domain.usecase.OverdueDebtor>) {
-                        if (items.isEmpty()) return
-                        append("$title\n")
-                        items.sortedByDescending { it.daysOverdue }.forEach { d ->
-                            append("  • ${d.client.replaceFirstChar { c -> c.uppercase() }} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun · ${d.sinceDate.format(fmt)})\n")
-                        }
-                        append("\n")
-                    }
-                    bk("🔴 60+ kun", list.filter { it.daysOverdue >= 60 })
-                    bk("🟠 30 kunlik (30–59)", list.filter { it.daysOverdue in 30..59 })
-                    bk("🟡 15 kunlik (15–29)", list.filter { it.daysOverdue in 15..29 })
-                    bk("🔵 10 kunlik (10–14)", list.filter { it.daysOverdue in 10..14 })
-                    val jami = list.sumOf { it.debt }
-                    append("🔢 JAMI: ${jami.formatMoney()} so'm  (${list.size} mijoz)")
-                }
-                appendChat(ChatItem.Info(nextChatId(), body))
-            }
+            if (list.isNotEmpty()) appendChat(ChatItem.DebtRep(nextChatId(), list))
         }
         runCatching { chatStore.setLastReportDate(today.toString()) }
     }
@@ -1546,28 +1527,12 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
                 val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
-                val body = if (list.isEmpty()) {
-                    "✅ 10 kundan oshgan qarz yo'q."
-                } else buildString {
-                    fun bucket(title: String, items: List<uz.daftar.app.domain.usecase.OverdueDebtor>) {
-                        if (items.isEmpty()) return
-                        append("$title\n")
-                        items.sortedByDescending { it.daysOverdue }.forEach { d ->
-                            append("  • ${d.client.replaceFirstChar { c -> c.uppercase() }} — ${d.debt.formatMoney()} so'm  (${d.daysOverdue} kun · ${d.sinceDate.format(fmt)})\n")
-                        }
-                        append("\n")
-                    }
-                    bucket("🔴 60+ kun", list.filter { it.daysOverdue >= 60 })
-                    bucket("🟠 30 kunlik (30–59)", list.filter { it.daysOverdue in 30..59 })
-                    bucket("🟡 15 kunlik (15–29)", list.filter { it.daysOverdue in 15..29 })
-                    bucket("🔵 10 kunlik (10–14)", list.filter { it.daysOverdue in 10..14 })
-                    val jami = list.sumOf { it.debt }
-                    append("──────────\n")
-                    append("JAMI qarz: ${jami.formatMoney()} so'm  (${list.size} mijoz)")
+                if (list.isEmpty()) {
+                    appendChat(ChatItem.Info(nextChatId(), "✅ 10 kundan oshgan qarz yo'q."))
+                } else {
+                    appendChat(ChatItem.DebtRep(nextChatId(), list))
                 }
-                _state.update { it.copy(textReport = TextReport("⏰ Qarz eslatma", body)) }
             } catch (e: Exception) {
                 _state.update { it.copy(textReport = TextReport("Xatolik", e.message ?: "Noma'lum xato")) }
             }

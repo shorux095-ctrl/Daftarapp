@@ -86,6 +86,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -440,21 +441,35 @@ fun TodayScreen(
                 if (showDatePick) {
                     AlertDialog(
                         onDismissRequest = { showDatePick = false },
-                        title = { Text("Hisobot") },
-                        text = { Text("Qaysi kun hisoboti kerak?") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showDatePick = false
-                                keyboardController?.hide(); focusManager.clearFocus()
-                                vm.showDateReportButton(java.time.LocalDate.now())
-                            }) { Text("Bugun") }
+                        title = { Text("📊 Hisobot", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column {
+                                Text("Qaysi kun hisoboti kerak?", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(14.dp))
+                                Button(
+                                    onClick = {
+                                        showDatePick = false
+                                        keyboardController?.hide(); focusManager.clearFocus()
+                                        vm.showDateReportButton(java.time.LocalDate.now())
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text("📅 Bugun", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                                Spacer(Modifier.height(10.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        showDatePick = false
+                                        keyboardController?.hide(); focusManager.clearFocus()
+                                        vm.showDateReportButton(java.time.LocalDate.now().minusDays(1))
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text("🗓 Kecha", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                            }
                         },
+                        confirmButton = {},
                         dismissButton = {
-                            TextButton(onClick = {
-                                showDatePick = false
-                                keyboardController?.hide(); focusManager.clearFocus()
-                                vm.showDateReportButton(java.time.LocalDate.now().minusDays(1))
-                            }) { Text("Kecha") }
+                            TextButton(onClick = { showDatePick = false }) { Text("Bekor") }
                         }
                     )
                 }
@@ -551,6 +566,10 @@ fun TodayScreen(
                                         onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) },
                                         onEditTx = onEditTx,
                                         onDeleteTx = { vm.deleteOne(it) }
+                                    )
+                                    is ChatItem.DebtRep -> DebtReminderCard(
+                                        debtors = item.debtors,
+                                        onClose = { vm.removeChat(item.id) }
                                     )
                                 }
                                 if (deleteChatId == item.id) {
@@ -699,7 +718,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v64", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v66", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1800,6 +1819,80 @@ private fun JamiBadge(
             }
             Spacer(Modifier.height(2.dp))
             Text(sub, color = androidx.compose.ui.graphics.Color(0xFF888888), fontSize = 11.sp)
+        }
+    }
+}
+
+
+@Composable
+private fun DebtReminderCard(
+    debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>,
+    onClose: () -> Unit
+) {
+    val total = debtors.sumOf { it.debt }
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFFFF8F0),
+        tonalElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("⏰", fontSize = 20.sp)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Qarz eslatmasi", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A1A1A))
+                    Text(
+                        "Jami " + total.formatMoney() + " so'm \u00b7 " + debtors.size + " mijoz",
+                        fontSize = 12.sp, color = Color(0xFF8A8A8A)
+                    )
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Yopish", tint = Color(0xFFB0B0B0))
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            DebtBucket("🔴 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
+            DebtBucket("🟠 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
+            DebtBucket("🟡 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
+            DebtBucket("🔵 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
+        }
+    }
+}
+
+@Composable
+private fun DebtBucket(
+    title: String,
+    items: List<uz.daftar.app.domain.usecase.OverdueDebtor>,
+    accent: Color,
+    badgeBg: Color
+) {
+    if (items.isEmpty()) return
+    Text(
+        title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = accent,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+    )
+    items.sortedByDescending { it.daysOverdue }.forEach { d ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+        ) {
+            Box(Modifier.size(7.dp).background(accent, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                d.client.replaceFirstChar { it.uppercase() },
+                fontSize = 14.sp, color = Color(0xFF222222),
+                modifier = Modifier.weight(1f), maxLines = 1
+            )
+            Text(d.debt.formatMoney(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1A1A1A))
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .background(badgeBg, RoundedCornerShape(7.dp))
+                    .padding(horizontal = 7.dp, vertical = 2.dp)
+            ) {
+                Text(d.daysOverdue.toString() + " kun", fontSize = 11.sp, color = accent, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }
