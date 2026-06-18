@@ -1748,12 +1748,22 @@ class TodayViewModel @Inject constructor(
                 ?: names.firstOrNull { norm(it).startsWith(tn) }
                 ?: names.firstOrNull { tn.startsWith(norm(it)) }
                 ?: names.firstOrNull { norm(it).contains(tn) && tn.length >= 3 }
-            if (exact != null) {
-                onInputChange(exact)
-                send()
+            val nameToShow = exact ?: t
+            // Tarixni to'g'ridan-to'g'ri DB'dan tortib chatga qo'shamiz
+            // (send() bilan poyga bo'lmasin — previews asinxron yuklanadi)
+            val cp = runCatching { buildClientPreview(nameToShow, null) }.getOrNull()
+            if (cp != null) {
+                val cap = cp.name.replaceFirstChar { c -> c.uppercase() }
+                appendChat(
+                    ChatItem.User(nextChatId(), cap),
+                    ChatItem.History(nextChatId(), cp)
+                )
+                persistChat()
+                onInputChange("")
                 return@launch
             }
-            onInputChange(t)
+            // Tarix topilmadi — matnni maydonga qo'yamiz, qo'lda tuzatasiz
+            onInputChange(exact ?: t)
         }
     }
 
