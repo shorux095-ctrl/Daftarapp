@@ -276,7 +276,7 @@ object DaftarParser {
 
         val year = when {
             yearRaw.isEmpty() -> Year.now().value
-            yearRaw.length == 2 -> 2000 + yearRaw.toInt()
+            yearRaw.length == 2 -> 2000 + (yearRaw.toIntOrNull() ?: return Pair(null, text))
             else -> yearRaw.toIntOrNull() ?: return Pair(null, text)
         }
         // Sananing to'g'riligini tekshirish

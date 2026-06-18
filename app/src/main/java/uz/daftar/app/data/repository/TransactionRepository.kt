@@ -82,6 +82,10 @@ class TransactionRepository @Inject constructor(
     suspend fun soldSumByCargoType(userId: Long): Map<String, Double> =
         txDao.sumByCargoType(userId).associate { it.type.uppercase() to it.total }
 
+    /** Reaktiv: yuk turi bo'yicha sotilgan jami (tranzaksiya o'zgarsa avtomatik) */
+    fun observeSoldSumByCargoType(userId: Long): Flow<Map<String, Double>> =
+        txDao.observeSumByCargoType(userId).map { list -> list.associate { it.type.uppercase() to it.total } }
+
     suspend fun getAllForUser(userId: Long): List<uz.daftar.app.data.db.entity.TransactionEntity> =
         txDao.getAllForUser(userId)
 

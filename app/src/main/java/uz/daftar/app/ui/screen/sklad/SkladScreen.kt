@@ -30,7 +30,6 @@ fun SkladScreen(
     val items by vm.items.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val typeStock by vm.typeStock.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(items) { vm.refreshTypeStock() }
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showMoney by remember { mutableStateOf(false) }

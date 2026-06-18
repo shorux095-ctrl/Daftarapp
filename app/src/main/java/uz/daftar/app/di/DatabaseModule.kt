@@ -42,16 +42,36 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private const val DB_VERSION = 3
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): DaftarDatabase {
+        // Migration OLDIDAN zaxira: diskdagi baza versiyasi koddan eski bo'lsa,
+        // har ehtimolga qarshi .db faylni nusxalaymiz (ma'lumot yo'qolmasin).
+        runCatching {
+            val dbFile = context.getDatabasePath(DaftarDatabase.NAME)
+            if (dbFile.exists()) {
+                val ver = android.database.sqlite.SQLiteDatabase
+                    .openDatabase(dbFile.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+                    .use { it.version }
+                if (ver in 1 until DB_VERSION) {
+                    val dir = java.io.File(context.filesDir, "backups").apply { mkdirs() }
+                    val ts = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"))
+                    dbFile.copyTo(java.io.File(dir, "premigration_v${ver}_$ts.db"), overwrite = true)
+                }
+            }
+        }
+        // fallbackToDestructiveMigration OLIB TASHLANDI — baza endi hech qachon avtomatik
+        // o'chmaydi. Yangi versiya kerak bo'lsa Migration yozish SHART (aks holda ochilishda
+        // xato beradi — bu yaxshi: jim turib ma'lumotni yo'q qilmaydi).
         return Room.databaseBuilder(
             context,
             DaftarDatabase::class.java,
             DaftarDatabase.NAME
         )
             .addMigrations(MIGRATION_2_3)
-            .fallbackToDestructiveMigration()
             .build()
     }
 

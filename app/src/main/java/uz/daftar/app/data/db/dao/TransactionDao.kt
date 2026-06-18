@@ -143,4 +143,8 @@ interface TransactionDao {
     // Yuk turlari (A/B/C/D/K) bo'yicha sotilgan jami — bazada hisoblanadi (barcha qatorni yuklamaydi)
     @Query("SELECT type AS type, SUM(amount) AS total FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k') GROUP BY type")
     suspend fun sumByCargoType(userId: Long): List<CargoTypeSum>
+
+    // Reaktiv (Flow) — tranzaksiya o'zgarsa avtomatik yangilanadi (Sklad qoldig'i uchun)
+    @Query("SELECT type AS type, SUM(amount) AS total FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k') GROUP BY type")
+    fun observeSumByCargoType(userId: Long): Flow<List<CargoTypeSum>>
 }

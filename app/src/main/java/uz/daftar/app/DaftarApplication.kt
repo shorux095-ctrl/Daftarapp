@@ -20,6 +20,8 @@ class DaftarApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject lateinit var backupManager: uz.daftar.app.core.backup.BackupManager
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -49,6 +51,8 @@ class DaftarApplication : Application(), Configuration.Provider {
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
         // scheduleDailyReminder() — bildirishnoma O'CHIRILDI (eslatma faqat bosh ekranda chiqadi)
         scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
+        // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)
+        Thread { runCatching { backupManager.dailyLocalBackupIfNeeded() } }.apply { isDaemon = true }.start()
         // scheduleDailyAutoReport()
     }
 

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.daftar.app.data.db.dao.SkladDao
@@ -47,32 +48,22 @@ class SkladViewModel @Inject constructor(
     val items: StateFlow<List<SkladEntity>> =
         dao.all(userId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Yuk turlari bo'yicha qoldiq — Sklad ochilganda hisoblanadi
-    private val _typeStock = MutableStateFlow<List<SkladTypeStock>>(emptyList())
-    val typeStock: StateFlow<List<SkladTypeStock>> = _typeStock.asStateFlow()
-
-    init { refreshTypeStock() }
-
-    /** Yuk turlari bo'yicha: kirim (sklad) − sotilgan (tranzaksiya) = qoldiq.
-     *  A/B/C/D/K turlarining HAMMASI doimo ko'rsatiladi (faolligi bo'lmasa ham). */
-    fun refreshTypeStock() {
-        viewModelScope.launch {
-            // Mijozlarga sotilgan yuk (A/B/C/D/K) — SQL GROUP BY orqali (barcha tranzaksiyani
-            // yuklamaydi, 100k+ yozuvda ham tez). Baza atigi ~5 qator qaytaradi.
-            val soldByType = runCatching { txRepo.soldSumByCargoType(userId) }.getOrDefault(emptyMap())
-            // Skladga qo'lда kiritilgan kirim — tovar nomi turga teng bo'lsa (a/b/c/d/k)
-            val skladRows = items.value
+    // Yuk turlari bo'yicha qoldiq — sklad kirimi + mijozga sotilgan (ikkalasi ham reaktiv Flow).
+    // Tranzaksiya YOKI sklad o'zgarsa avtomatik yangilanadi. LaunchedEffect / poyga YO'Q.
+    val typeStock: StateFlow<List<SkladTypeStock>> =
+        combine(
+            dao.all(userId),
+            txRepo.observeSoldSumByCargoType(userId)
+        ) { skladRows, soldByType ->
             val inByType = skladRows.filter { it.isIn && it.name.trim().uppercase() in CARGO_TYPES }
                 .groupBy { it.name.trim().uppercase() }
                 .mapValues { (_, rows) -> rows.sumOf { it.qty } }
-            // Doimo barcha 5 turni ko'rsatamiz (foydalanuvchi qaysi turga kirim kerakligini ko'rsin)
-            _typeStock.value = CARGO_TYPES.map { t ->
+            CARGO_TYPES.map { t ->
                 val k = inByType[t] ?: 0.0
                 val s = soldByType[t] ?: 0.0
                 SkladTypeStock(type = t, kelgan = k, sotilgan = s, qolgan = k - s)
             }
-        }
-    }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun add(name: String, qtyStr: String, priceStr: String, isIn: Boolean) {
         val n = name.trim()
@@ -83,7 +74,6 @@ class SkladViewModel @Inject constructor(
         viewModelScope.launch {
             dao.insert(SkladEntity(userId = userId, name = n, qty = qty, price = price, isIn = isIn))
             _message.value = if (isIn) "✅ Kirim qo'shildi" else "✅ Chiqim qo'shildi"
-            refreshTypeStock()
         }
     }
 

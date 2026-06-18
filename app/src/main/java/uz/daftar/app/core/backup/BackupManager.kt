@@ -52,6 +52,22 @@ class BackupManager @Inject constructor(
         return target
     }
 
+    /** Kunlik lokal zaxira: bugun nusxa bo'lmagan bo'lsa yaratadi + eskilarini tozalaydi.
+     *  Ilova ochilganda chaqiriladi — har kuni kamida bitta lokal nusxa bo'ladi. */
+    fun dailyLocalBackupIfNeeded(keep: Int = 14) {
+        runCatching {
+            val today = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+            val hasToday = backupDir()
+                .listFiles { f -> f.isFile && f.name.startsWith("daftar_$today") }
+                ?.isNotEmpty() == true
+            if (!hasToday) {
+                createInternalBackup()
+                // joy to'lmasin — faqat oxirgi `keep` ta zaxira qoladi
+                listBackups().drop(keep).forEach { deleteBackup(it) }
+            }
+        }
+    }
+
     /** Ichki zaxiralar ro'yxati (yangi → eski) */
     fun listBackups(): List<File> =
         backupDir().listFiles { f -> f.isFile && f.name.endsWith(".db") }
