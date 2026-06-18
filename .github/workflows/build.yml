@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,6 +20,9 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -30,7 +33,6 @@ jobs:
           sed -i 's/-Xmx768m/-Xmx4g/' gradle.properties || true
           sed -i 's/-Xmx512m/-Xmx2g/' gradle.properties || true
           sed -i 's/org.gradle.daemon=true/org.gradle.daemon=false/' gradle.properties || true
-
       - name: Build APK
         run: gradle assembleDebug --stacktrace --no-daemon
 
