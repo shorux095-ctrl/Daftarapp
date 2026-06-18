@@ -1741,14 +1741,16 @@ class TodayViewModel @Inject constructor(
             fun norm(x: String) = x.lowercase().replace("'", "").replace("`", "")
                 .replace(Regex("[.,!?]"), "").replace(Regex("\\s+"), " ").trim()
             val tn = norm(t)
-            // Avval prefiks bo'yicha, topilmasa hamma mijozlardan qidiramiz
-            val names = runCatching { repo.suggestClients(userId, t) }.getOrDefault(emptyList())
-                .ifEmpty { runCatching { repo.allClientNames(userId) }.getOrDefault(emptyList()) }
-            val exact = names.firstOrNull { norm(it) == tn }
-                ?: names.firstOrNull { norm(it).startsWith(tn) }
-                ?: names.firstOrNull { tn.startsWith(norm(it)) }
-                ?: names.firstOrNull { norm(it).contains(tn) && tn.length >= 3 }
-            val nameToShow = exact ?: t
+            // Ovoz ko'p so'z qaytarishi mumkin ("olim shashlik") — ism odatda birinchi so'z(lar)
+            val firstWord = tn.substringBefore(' ').trim()
+            val names = runCatching { repo.allClientNames(userId) }.getOrDefault(emptyList())
+            val exact = names.firstOrNull { norm(it) == tn }                          // to'liq mos
+                ?: names.filter { tn == norm(it) || tn.startsWith(norm(it) + " ") }    // ism + qo'shimcha so'z
+                    .maxByOrNull { it.length }
+                ?: names.firstOrNull { norm(it) == firstWord }                         // birinchi so'z = ism
+                ?: names.firstOrNull { norm(it).startsWith(tn) && tn.length >= 2 }     // qisman yozilgan
+                ?: names.firstOrNull { tn.length >= 3 && norm(it).contains(tn) }       // ichida
+            val nameToShow = exact ?: firstWord.ifBlank { t }
             // Tarixni to'g'ridan-to'g'ri DB'dan tortib chatga qo'shamiz
             // (send() bilan poyga bo'lmasin — previews asinxron yuklanadi)
             val cp = runCatching { buildClientPreview(nameToShow, null) }.getOrNull()
