@@ -1,6 +1,7 @@
 package uz.daftar.app.ui.screen.tahrir
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -14,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -46,7 +48,7 @@ fun TahrirScreen(
     onEditTx: (Long) -> Unit,
     vm: TahrirViewModel = hiltViewModel()
 ) {
-    val items by vm.items.collectAsStateWithLifecycle()
+    val rows by vm.rows.collectAsStateWithLifecycle()
     val date by vm.date.collectAsStateWithLifecycle()
     val nameFilter by vm.nameFilter.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -90,13 +92,26 @@ fun TahrirScreen(
                         )
                         IconButton(onClick = { vm.nextDay() }) { Text("▶", fontSize = 20.sp) }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Bugun / Kecha + (o'ngda) qisqa "Hammasini o'chirish"
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         FilterChip(selected = isToday, onClick = { vm.today() }, label = { Text("Bugun") })
                         FilterChip(
                             selected = date == LocalDate.now().minusDays(1),
                             onClick = { vm.setDate(LocalDate.now().minusDays(1)) },
                             label = { Text("Kecha") }
                         )
+                        Spacer(Modifier.weight(1f))
+                        if (rows.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = { confirmAll = true },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = cP),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.heightIn(min = 34.dp)
+                            ) { Text("🗑 Hammasi", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -114,23 +129,8 @@ fun TahrirScreen(
                 }
             }
 
-            // ── Hammasini o'chirish ──
-            if (items.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${items.size} ta yozuv", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    OutlinedButton(
-                        onClick = { confirmAll = true },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = cP)
-                    ) { Text("🗑 Hammasini o'chirish") }
-                }
-            }
-
             // ── Ro'yxat ──
-            if (items.isEmpty()) {
+            if (rows.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Bu sanada yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -140,12 +140,14 @@ fun TahrirScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    itemsIndexed(items, key = { _, tx -> tx.id }) { idx, tx ->
+                    itemsIndexed(rows, key = { _, r -> r.tx.id }) { idx, r ->
                         TahrirRow(
                             index = idx + 1,
-                            tx = tx,
-                            onEdit = { onEditTx(tx.id) },
-                            onDelete = { confirmId = tx.id }
+                            tx = r.tx,
+                            costPrice = r.costPrice,
+                            onEdit = { onEditTx(r.tx.id) },
+                            onDelete = { confirmId = r.tx.id },
+                            onSetTier = { tier -> vm.setTier(r.tx, tier) }
                         )
                     }
                 }
@@ -173,7 +175,7 @@ fun TahrirScreen(
         AlertDialog(
             onDismissRequest = { confirmAll = false },
             title = { Text("Hammasini o'chirish?") },
-            text = { Text("$dateStr sanasidagi ${items.size} ta yozuv o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.") },
+            text = { Text("$dateStr sanasidagi ${rows.size} ta yozuv o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.") },
             confirmButton = {
                 TextButton(onClick = { vm.deleteAllShown(); confirmAll = false }) {
                     Text("Hammasini o'chirish", color = cP)
@@ -185,14 +187,19 @@ fun TahrirScreen(
 }
 
 @Composable
-private fun TahrirRow(index: Int, tx: Transaction, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun TahrirRow(
+    index: Int,
+    tx: Transaction,
+    costPrice: Double?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSetTier: (String) -> Unit
+) {
+    val isCargo = tx.type != TxType.P && tx.type != TxType.Q
     val entry = when (tx.type) {
         TxType.P -> "P:${tx.amount.formatMoney()}"
         TxType.Q -> "Q:${tx.amount.formatMoney()}"
-        else -> buildString {
-            append("${tx.type.code.uppercase()}:${tx.amount.formatQty()}")
-            tx.tOverride?.let { append(" [${it.formatQty()}]") }
-        }
+        else -> "${tx.type.code.uppercase()}:${tx.amount.formatQty()}"
     }
     val name = tx.clientName.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     Surface(
@@ -200,24 +207,73 @@ private fun TahrirRow(index: Int, tx: Transaction, onEdit: () -> Unit, onDelete:
         color = Color(0xFFF7F7F9),
         tonalElevation = 1.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(Modifier.size(10.dp).background(colorFor(tx.type), CircleShape))
-            Spacer(Modifier.width(10.dp))
-            Text("$index.", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF555555))
-            Spacer(Modifier.width(6.dp))
-            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                color = Color(0xFF111111), modifier = Modifier.weight(1f))
-            Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace, fontSize = 14.sp)
-            IconButton(onClick = onEdit, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = cC)
+        Column(Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp)) {
+            // 1-qator: ism + entry + tahrir/o'chirish
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(colorFor(tx.type), CircleShape))
+                Spacer(Modifier.width(10.dp))
+                Text("$index.", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF555555))
+                Spacer(Modifier.width(6.dp))
+                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                    color = Color(0xFF111111), modifier = Modifier.weight(1f))
+                Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace, fontSize = 14.sp)
+                IconButton(onClick = onEdit, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = cC)
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = cP)
+                }
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = cP)
+            // 2-qator (faqat yuk uchun): T narx + T/T1 tarif tugmasi
+            if (isCargo) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 20.dp, end = 6.dp)
+                ) {
+                    val manual = tx.tOverride != null
+                    Text(
+                        "T narx: " + (costPrice?.let { "${it.formatQty()} so'm" } ?: "—") +
+                            (if (manual) "  (qo'lda)" else ""),
+                        fontSize = 13.sp, color = Color(0xFF444444),
+                        fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)
+                    )
+                    TierToggle(tx.costTier, onSetTier)
+                }
             }
         }
+    }
+}
+
+/** Kichik [T | T1] tarif tanlagich */
+@Composable
+private fun TierToggle(current: String?, onSet: (String) -> Unit) {
+    val isT1 = current == "t1"
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFE8EBEF)).padding(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        TierSeg("T", !isT1, cC) { onSet("t") }
+        TierSeg("T1", isT1, cB) { onSet("t1") }
+    }
+}
+
+@Composable
+private fun TierSeg(text: String, active: Boolean, activeColor: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (active) activeColor else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = if (active) Color.White else Color(0xFF555555),
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 13.sp
+        )
     }
 }

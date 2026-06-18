@@ -59,6 +59,9 @@ interface TransactionDao {
     @Query("UPDATE transactions SET cost_tier = :tier WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND type = :type AND date >= :start AND date < :end")
     suspend fun setTierType(userId: Long, clientName: String, type: String, start: String, end: String, tier: String?): Int
 
+    @Query("UPDATE transactions SET cost_tier = :tier WHERE id = :id")
+    suspend fun setTierById(id: Long, tier: String?): Int
+
     /** Sana oralig'idagi barcha yozuvlar — kunlik/oylik hisobotlar uchun. */
     @Query("""
         SELECT * FROM transactions

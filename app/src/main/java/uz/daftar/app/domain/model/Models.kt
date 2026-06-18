@@ -27,7 +27,8 @@ data class Transaction(
     val type: TxType,
     val amount: Double,
     val date: LocalDateTime,
-    val tOverride: Double? = null
+    val tOverride: Double? = null,
+    val costTier: String? = null   // null/"t" = T tarif, "t1" = T1 tarif
 )
 
 /** Kunlik hisobot — bot.py'dagi rep_daily */

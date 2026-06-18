@@ -131,7 +131,8 @@ internal fun TransactionEntity.toDomain(): Transaction? {
         type = txType,
         amount = amount,
         date = dt,
-        tOverride = tOverride
+        tOverride = tOverride,
+        costTier = costTier
     )
 }
 
