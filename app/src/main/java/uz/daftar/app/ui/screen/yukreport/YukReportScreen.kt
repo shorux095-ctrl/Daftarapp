@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uz.daftar.app.core.util.formatMoney
 import uz.daftar.app.core.util.formatQty
-import uz.daftar.app.domain.usecase.YukCountReport
 import uz.daftar.app.domain.usecase.YukReport
 
 /* ───────────── Ranglar ───────────── */
@@ -67,33 +67,13 @@ private val NBg = Color(0xFFECFBF1)
 private val PPurple = Color(0xFF7C3AED)
 private val PRing = Color(0xFF8B5CF6)
 private val PBg = Color(0xFFF3EFFE)
-private val DOrange = Color(0xFFEA580C)
-private val DRing = Color(0xFFF97316)
-private val DBg = Color(0xFFFFF3EA)
-private val KTeal = Color(0xFF0D9488)
-private val KRing = Color(0xFF14B8A6)
-private val KBg = Color(0xFFEAFBF8)
 private val FarqRed = Color(0xFFDC2626)
-private val NeutralBg = Color(0xFFF3F5F8)
-private val NeutralRing = Color(0xFF9AA4B2)
+private val FarqBg = Color(0xFFFFF1F1)
 private val HeaderBlue = Color(0xFF3366FF)
 private val LineGray = Color(0xFFE9ECF1)
 
-// Farq: musbat → YASHIL, manfiy → qizil
 private fun farqStr(v: Long): String = if (v > 0) "+${v.formatMoney()}" else v.formatMoney()
-private fun farqColor(v: Long): Color = if (v >= 0) NGreen else FarqRed
-
-// A B C D K ranglari: (matn, halqa, fon)
-private fun typeColors(t: String): Triple<Color, Color, Color> = when (t) {
-    "a" -> Triple(TBlue, TRing, TBg)
-    "b" -> Triple(NGreen, NRing, NBg)
-    "c" -> Triple(PPurple, PRing, PBg)
-    "d" -> Triple(DOrange, DRing, DBg)
-    else -> Triple(KTeal, KRing, KBg)
-}
-
-private val TYPES = listOf("a", "b", "c", "d", "k")
-private val LETTERS = listOf("A", "B", "C", "D", "K")
+private fun farqColor(v: Long): Color = if (v >= 0) TBlue else FarqRed
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -122,10 +102,10 @@ fun YukReportScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
 
-            // ── Toggle qatori (BIR QATOR): Oylik/Yillik + Pul + Soni ──
+            // ── Toggle qatori: Oylik/Yillik + Pul/Soni ──
             FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Segmented(
@@ -134,10 +114,10 @@ fun YukReportScreen(
                     onLeft = vm::showMonthly, onRight = vm::showYearly
                 )
                 PillButton("💰 Pul (T/N/P) ▾", !state.counts, vm::showMoney)
-                PillButton("📦 Soni", state.counts, vm::showCounts)
+                PillButton("📦 Soni (ABCDK)", state.counts, vm::showCounts)
             }
 
-            // ── Oy/Yil navigatsiyasi:  ‹  June 2026  ›  ──
+            // ── Oy/Yil navigatsiyasi:  ‹  May 2026  ›  ──
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.Center,
@@ -151,7 +131,16 @@ fun YukReportScreen(
             }
 
             if (state.counts) {
-                // ===== SONI (ABCDK) — yangi chiroyli dizayn =====
+                // ===== SONI (ABCDK) — eski ko'rinish (o'zgartirilmagan) =====
+                Text(
+                    state.countReport?.title ?: "",
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                CountHeader()
+                HorizontalDivider()
                 val cr = state.countReport
                 when {
                     state.isLoading && cr == null -> Box(
@@ -163,20 +152,16 @@ fun YukReportScreen(
                     ) { Text("Bu davrda yuk yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
                     else -> {
-                        val coverDenom = if (state.yearly) 12 else state.month.lengthOfMonth()
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            item { SoniCardsRow(cr, coverDenom) }
-                            item { SoniTableCard(cr) }
-                            item { SoniJamiCard(cr) }
+                        LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            items(items = cr.rows, key = { it.label }) { row -> CountRow(row) }
                         }
+                        HorizontalDivider(thickness = 2.dp)
+                        CountTotalRow(cr.totals)
+                        Spacer(Modifier.height(8.dp))
                     }
                 }
             } else {
-                // ===== PUL (T/N/P) — chiroyli dizayn =====
+                // ===== PUL (T/N/P) — yangi chiroyli dizayn =====
                 when {
                     state.isLoading && state.report == null -> Box(
                         modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
@@ -207,8 +192,7 @@ fun YukReportScreen(
     }
 }
 
-/* ═════════════ PUL (T/N/P) ═════════════ */
-
+/* ───────────── Yuqori 4 ta karta (ring) ───────────── */
 @Composable
 private fun CardsRow(report: YukReport, dayCount: Int, coverDenom: Int) {
     val d = if (dayCount > 0) dayCount else 1
@@ -228,7 +212,7 @@ private fun CardsRow(report: YukReport, dayCount: Int, coverDenom: Int) {
         RingCard(Modifier.weight(1f), "T", report.jamiT.formatMoney(), TBlue, TBg, TRing, tCov, avgT.formatMoney(), TBlue)
         RingCard(Modifier.weight(1f), "N", report.jamiN.formatMoney(), NGreen, NBg, NRing, nCov, avgN.formatMoney(), NGreen)
         RingCard(Modifier.weight(1f), "P", report.jamiP.formatMoney(), PPurple, PBg, PRing, pCov, avgP.formatMoney(), PPurple)
-        RingCard(Modifier.weight(1f), "Farq", farqStr(report.jamiFarq), farqColor(report.jamiFarq), NeutralBg, NeutralRing, null, farqStr(avgFarq), farqColor(avgFarq))
+        RingCard(Modifier.weight(1f), "Farq", farqStr(report.jamiFarq), farqColor(report.jamiFarq), FarqBg, FarqRed, null, farqStr(avgFarq), farqColor(avgFarq))
     }
 }
 
@@ -255,42 +239,38 @@ private fun RingCard(
     ) {
         Text(label, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(value, color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-        RingCanvas(fraction, ringColor, valueColor)
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(62.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = 7.dp.toPx()
+                val inset = stroke / 2f
+                val arcSize = Size(size.width - stroke, size.height - stroke)
+                val tl = Offset(inset, inset)
+                drawArc(
+                    color = ringColor.copy(alpha = 0.16f),
+                    startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                    topLeft = tl, size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                )
+                if (fraction != null) {
+                    drawArc(
+                        color = ringColor,
+                        startAngle = -90f, sweepAngle = 360f * fraction.coerceIn(0f, 1f),
+                        useCenter = false, topLeft = tl, size = arcSize,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    )
+                }
+            }
+            Text(
+                if (fraction != null) "${(fraction.coerceIn(0f, 1f) * 100).toInt()}%" else "—",
+                fontSize = 11.sp, fontWeight = FontWeight.Bold, color = valueColor
+            )
+        }
         Text("O'rtacha / kun", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         Text(avg, color = avgColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
     }
 }
 
-@Composable
-private fun RingCanvas(fraction: Float?, ringColor: Color, textColor: Color, diameter: Int = 62) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(diameter.dp)) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = 7.dp.toPx()
-            val inset = stroke / 2f
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            val tl = Offset(inset, inset)
-            drawArc(
-                color = ringColor.copy(alpha = 0.16f),
-                startAngle = -90f, sweepAngle = 360f, useCenter = false,
-                topLeft = tl, size = arcSize,
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
-            )
-            if (fraction != null) {
-                drawArc(
-                    color = ringColor,
-                    startAngle = -90f, sweepAngle = 360f * fraction.coerceIn(0f, 1f),
-                    useCenter = false, topLeft = tl, size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
-            }
-        }
-        Text(
-            if (fraction != null) "${(fraction.coerceIn(0f, 1f) * 100).toInt()}%" else "—",
-            fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textColor
-        )
-    }
-}
-
+/* ───────────── Statistika qatori ───────────── */
 @Composable
 private fun StatsCard(report: YukReport) {
     val posDays = report.rows.count { it.farq > 0 }
@@ -357,6 +337,7 @@ private fun StatsCard(report: YukReport) {
     }
 }
 
+/* ───────────── Jadval (chiziqli) ───────────── */
 @Composable
 private fun TableCard(report: YukReport) {
     val maxT = (report.rows.maxOfOrNull { it.tTotal } ?: 0L).coerceAtLeast(1L)
@@ -435,6 +416,7 @@ private fun RowScope.HCell(text: String, weight: Float, align: TextAlign) {
     )
 }
 
+/* ───────────── JAMI karta ───────────── */
 @Composable
 private fun JamiCard(report: YukReport) {
     Row(
@@ -462,145 +444,7 @@ private fun JamiCol(modifier: Modifier, label: String, value: String, color: Col
     }
 }
 
-/* ═════════════ SONI (A B C D K) ═════════════ */
-
-@Composable
-private fun SoniCardsRow(cr: YukCountReport, coverDenom: Int) {
-    val cd = if (coverDenom > 0) coverDenom else 1
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        TYPES.forEachIndexed { i, t ->
-            val (c, r, b) = typeColors(t)
-            val total = cr.totals[t] ?: 0.0
-            val cov = cr.rows.count { (it.counts[t] ?: 0.0) > 0 }.toFloat() / cd
-            SoniCard(Modifier.weight(1f), LETTERS[i], total, c, b, r, cov)
-        }
-    }
-}
-
-@Composable
-private fun SoniCard(
-    modifier: Modifier,
-    letter: String,
-    total: Double,
-    color: Color,
-    bg: Color,
-    ringColor: Color,
-    fraction: Float
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .border(1.dp, ringColor.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
-            .padding(vertical = 10.dp, horizontal = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(letter, color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        RingCanvas(fraction, ringColor, color, diameter = 44)
-        Text(
-            if (total > 0) total.formatQty() else "—",
-            color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false
-        )
-    }
-}
-
-@Composable
-private fun SoniTableCard(cr: YukCountReport) {
-    val maxes = TYPES.associateWith { t ->
-        (cr.rows.maxOfOrNull { it.counts[t] ?: 0.0 } ?: 0.0).coerceAtLeast(1.0)
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, LineGray, RoundedCornerShape(18.dp))
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().background(HeaderBlue).padding(horizontal = 8.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HCell("Sana", 1.1f, TextAlign.Start)
-            LETTERS.forEach { HCell(it, 1f, TextAlign.End) }
-        }
-        cr.rows.forEachIndexed { i, row ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    row.label, modifier = Modifier.weight(1.1f),
-                    fontSize = 11.sp, fontFamily = FontFamily.Monospace
-                )
-                TYPES.forEach { t ->
-                    val v = row.counts[t] ?: 0.0
-                    val (c, _, _) = typeColors(t)
-                    SoniCell(v, maxes[t] ?: 1.0, c, 1f)
-                }
-            }
-            if (i < cr.rows.size - 1) HorizontalDivider(color = LineGray)
-        }
-    }
-}
-
-@Composable
-private fun RowScope.SoniCell(value: Double, max: Double, color: Color, weight: Float) {
-    val frac = (value / max).coerceIn(0.0, 1.0).toFloat()
-    Column(
-        modifier = Modifier.weight(weight).padding(horizontal = 2.dp)
-    ) {
-        Text(
-            if (value > 0) value.formatQty() else "—",
-            modifier = Modifier.fillMaxWidth(),
-            fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End, maxLines = 1, softWrap = false
-        )
-        if (value > 0) {
-            Spacer(Modifier.height(3.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth().height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)).background(color.copy(alpha = 0.16f))
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(frac).height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)).background(color)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SoniJamiCard(cr: YukCountReport) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFEFF3FF))
-            .border(1.dp, HeaderBlue.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 10.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("∑", modifier = Modifier.width(30.dp), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        TYPES.forEachIndexed { i, t ->
-            val (c, _, _) = typeColors(t)
-            val v = cr.totals[t] ?: 0.0
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    if (v > 0) v.formatQty() else "—",
-                    color = c, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false
-                )
-                Text(LETTERS[i], color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
-            }
-        }
-    }
-}
-
-/* ═════════════ Umumiy kichik yordamchilar ═════════════ */
-
+/* ───────────── Kichik yordamchilar ───────────── */
 @Composable
 private fun NavSquare(icon: ImageVector, onClick: () -> Unit) {
     Box(
@@ -634,14 +478,14 @@ private fun SegItem(text: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(10.dp))
             .background(if (selected) TBlue else Color.Transparent)
             .clickable { onClick() }
-            .padding(horizontal = 13.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text,
             color = if (selected) Color.White else Color(0xFF374151),
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            fontSize = 13.sp
+            fontSize = 14.sp
         )
     }
 }
@@ -654,9 +498,75 @@ private fun PillButton(text: String, selected: Boolean, onClick: () -> Unit) {
             .background(if (selected) Color(0xFFEFF4FF) else Color.White)
             .border(1.dp, if (selected) TBlue.copy(alpha = 0.4f) else Color(0xFFE2E5EA), RoundedCornerShape(13.dp))
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text, color = Color(0xFF1F2937), fontWeight = FontWeight.Medium, fontSize = 12.sp, maxLines = 1)
+        Text(text, color = Color(0xFF1F2937), fontWeight = FontWeight.Medium, fontSize = 13.sp, maxLines = 1)
     }
 }
+
+/* ───────────── SONI (ABCDK) — eski yordamchilar (o'zgartirilmagan) ───────────── */
+@Composable
+private fun RowScope.Cell(
+    text: String,
+    weight: Float,
+    bold: Boolean = false,
+    align: TextAlign = TextAlign.End
+) {
+    Text(
+        text,
+        modifier = Modifier.weight(weight),
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        textAlign = align
+    )
+}
+
+@Composable
+private fun CountHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        Cell("Sana", weight = 1.2f, bold = true, align = TextAlign.Start)
+        Cell("A", weight = 1f, bold = true)
+        Cell("B", weight = 1f, bold = true)
+        Cell("C", weight = 1f, bold = true)
+        Cell("D", weight = 1f, bold = true)
+        Cell("K", weight = 1f, bold = true)
+    }
+}
+
+@Composable
+private fun CountRow(row: uz.daftar.app.domain.usecase.YukCountRow) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
+    ) {
+        Cell(row.label, weight = 1.2f, align = TextAlign.Start)
+        for (t in listOf("a", "b", "c", "d", "k")) {
+            val v = row.counts[t] ?: 0.0
+            Cell(if (v > 0) fmtCount(v) else "—", weight = 1f)
+        }
+    }
+}
+
+@Composable
+private fun CountTotalRow(totals: Map<String, Double>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 8.dp, vertical = 10.dp)
+    ) {
+        Cell("∑", weight = 1.2f, bold = true, align = TextAlign.Start)
+        for (t in listOf("a", "b", "c", "d", "k")) {
+            val v = totals[t] ?: 0.0
+            Cell(if (v > 0) fmtCount(v) else "—", weight = 1f, bold = true)
+        }
+    }
+}
+
+private fun fmtCount(v: Double): String = v.formatQty()
