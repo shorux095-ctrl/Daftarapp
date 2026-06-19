@@ -171,27 +171,34 @@ fun SkladScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text("🚚 Yuk turlari (mijozlarga sotilgan ayrilgan)",
+                                Text("🚚 Yuk turlari (qoldiq)",
                                     fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                                 Spacer(Modifier.height(6.dp))
                                 typeStock.forEach { ts ->
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                                        Text(ts.type, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
-                                        Text("kelgan ${ts.kelgan.formatQty()}  •  sotilgan ${ts.sotilgan.formatQty()}",
-                                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("qoldi ${ts.qolgan.formatQty()}",
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (ts.qolgan >= 0) MaterialTheme.colorScheme.primary
-                                                    else androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                                    Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(ts.type, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
+                                            Text("kelgan ${ts.kelgan.formatQty()}  •  sotilgan ${ts.sotilgan.formatQty()}",
+                                                style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                            Text("qoldi ${ts.qolgan.formatQty()}",
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (ts.qolgan >= 0) MaterialTheme.colorScheme.primary
+                                                        else androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                                        }
+                                        ts.baselineLabel?.let { bl ->
+                                            Text("📅 $bl dan beri sotilgani hisoblanadi",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline)
+                                        }
                                     }
                                 }
                                 Spacer(Modifier.height(4.dp))
-                                Text("Har bir turni alohida kirim qiling: nomga A/B/C/D/K yozing (yuqoridagi tugmalar). Qoldi = kelgan − sotilgan.",
+                                Text("Qoldi = kelgan − (skladga qo'shilgan kundan beri sotilgan). Qo'shishdan oldingi eski sotuvlar hisobga OLINMAYDI.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer)
                                 if (kamomad) {
                                     Spacer(Modifier.height(2.dp))
-                                    Text("⚠️ Manfiy qoldi = sotilgani kiritilgan kirimdan ko'p. To'liq kirimni kiriting.",
+                                    Text("⚠️ Manfiy qoldi = qo'shilgandan keyin sotilgani kirimdan ko'p. To'liq kirimni kiriting.",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
                                 }
@@ -238,10 +245,10 @@ fun SkladScreen(
                 }
             }
 
-            // ───── Yozuvlar tarixi (sana + miqdor) ─────
+            // ───── Sklad tarixi (qachon / nima / qancha qo'shilgan yoki chiqarilgan) ─────
             item {
                 Spacer(Modifier.height(4.dp))
-                Text("Yozuvlar tarixi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("📜 Sklad tarixi (qachon necha qo'shilgan)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             if (items.isEmpty()) {
                 item { Text("Hozircha yozuv yo'q.", style = MaterialTheme.typography.bodySmall) }

@@ -13,6 +13,9 @@ import kotlinx.coroutines.launch
 import uz.daftar.app.data.db.dao.SkladDao
 import uz.daftar.app.data.db.entity.SkladEntity
 import uz.daftar.app.data.repository.TransactionRepository
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 /** Bitta tovar bo'yicha yig'ma */
@@ -31,8 +34,9 @@ data class SkladItemSum(
 data class SkladTypeStock(
     val type: String,   // A/B/C/D/K
     val kelgan: Double,  // skladga qo'lда kiritilgan kirim
-    val sotilgan: Double, // mijozlarga sotilgan (tranzaksiyalardan)
-    val qolgan: Double
+    val sotilgan: Double, // mijozlarga sotilgan (qo'shilgan kundan beri)
+    val qolgan: Double,
+    val baselineLabel: String? = null // qaysi kundan beri sotilgani hisoblanadi (dd.MM.yyyy)
 )
 
 @HiltViewModel
@@ -49,19 +53,39 @@ class SkladViewModel @Inject constructor(
         dao.all(userId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Yuk turlari bo'yicha qoldiq — sklad kirimi + mijozga sotilgan (ikkalasi ham reaktiv Flow).
-    // Tranzaksiya YOKI sklad o'zgarsa avtomatik yangilanadi. LaunchedEffect / poyga YO'Q.
+    // MUHIM: sotilganlar FAQAT shu turni skladga BIRINCHI qo'shilgan kundan beri hisoblanadi.
+    // Ya'ni eski (qo'shishdan oldingi) sotuvlar AYIRILMAYDI — shunda qoldiq to'g'ri chiqadi.
     val typeStock: StateFlow<List<SkladTypeStock>> =
         combine(
             dao.all(userId),
-            txRepo.observeSoldSumByCargoType(userId)
-        ) { skladRows, soldByType ->
-            val inByType = skladRows.filter { it.isIn && it.name.trim().uppercase() in CARGO_TYPES }
+            txRepo.observeCargoSales(userId)
+        ) { skladRows, cargoSales ->
+            val zone = ZoneId.of("Asia/Tashkent")
+            val inByType = skladRows
+                .filter { it.isIn && it.name.trim().uppercase() in CARGO_TYPES }
                 .groupBy { it.name.trim().uppercase() }
-                .mapValues { (_, rows) -> rows.sumOf { it.qty } }
             CARGO_TYPES.map { t ->
-                val k = inByType[t] ?: 0.0
-                val s = soldByType[t] ?: 0.0
-                SkladTypeStock(type = t, kelgan = k, sotilgan = s, qolgan = k - s)
+                val rows = inByType[t]
+                if (rows == null) {
+                    // Hali skladga kiritilmagan tur — hisob yo'q, hech narsa ayirilmaydi
+                    SkladTypeStock(type = t, kelgan = 0.0, sotilgan = 0.0, qolgan = 0.0, baselineLabel = null)
+                } else {
+                    val kelgan = rows.sumOf { it.qty }
+                    // Shu turni skladga BIRINCHI qo'shilgan kun → shu kundan beri sotilganlar ayriladi
+                    val baselineDate = Instant.ofEpochMilli(rows.minOf { it.date })
+                        .atZone(zone).toLocalDate()
+                    val baselineKey = baselineDate.toString() // "yyyy-MM-dd"
+                    val sotilgan = cargoSales
+                        .filter { it.type.equals(t, ignoreCase = true) && txDay(it.date) >= baselineKey }
+                        .sumOf { it.amount }
+                    SkladTypeStock(
+                        type = t,
+                        kelgan = kelgan,
+                        sotilgan = sotilgan,
+                        qolgan = kelgan - sotilgan,
+                        baselineLabel = fmtDay(baselineDate)
+                    )
+                }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -112,3 +136,10 @@ class SkladViewModel @Inject constructor(
         }
     }
 }
+
+/** Tranzaksiya sanasidan faqat kun qismi ("yyyy-MM-dd") — 'T'/probel formatiga ham mos. */
+private fun txDay(d: String): String = d.replace('T', ' ').take(10)
+
+/** LocalDate → "dd.MM.yyyy" (ko'rsatish uchun). */
+private fun fmtDay(d: LocalDate): String =
+    "%02d.%02d.%04d".format(d.dayOfMonth, d.monthValue, d.year)

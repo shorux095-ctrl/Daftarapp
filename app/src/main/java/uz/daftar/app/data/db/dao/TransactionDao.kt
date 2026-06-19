@@ -11,6 +11,9 @@ import uz.daftar.app.data.db.entity.TransactionEntity
 /** SUM(amount) — yuk turi bo'yicha (SQL yig'indisi, 100k+ uchun tez) */
 data class CargoTypeSum(val type: String, val total: Double)
 
+/** (type, amount, date) — Sklad qoldig'ini SANA bo'yicha ayirish uchun (oldindan yig'ilmaydi) */
+data class CargoTxLite(val type: String, val amount: Double, val date: String)
+
 @Dao
 interface TransactionDao {
 
@@ -147,4 +150,8 @@ interface TransactionDao {
     // Reaktiv (Flow) — tranzaksiya o'zgarsa avtomatik yangilanadi (Sklad qoldig'i uchun)
     @Query("SELECT type AS type, SUM(amount) AS total FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k') GROUP BY type")
     fun observeSumByCargoType(userId: Long): Flow<List<CargoTypeSum>>
+
+    // Reaktiv — yuk turi sotuvlari SANA bilan (Sklad: qo'shilgan kundan beri ayirish uchun)
+    @Query("SELECT type AS type, amount AS amount, date AS date FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k')")
+    fun observeCargoTxLite(userId: Long): Flow<List<CargoTxLite>>
 }

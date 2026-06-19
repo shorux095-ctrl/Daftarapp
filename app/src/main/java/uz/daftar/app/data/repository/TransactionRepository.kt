@@ -86,6 +86,10 @@ class TransactionRepository @Inject constructor(
     fun observeSoldSumByCargoType(userId: Long): Flow<Map<String, Double>> =
         txDao.observeSumByCargoType(userId).map { list -> list.associate { it.type.uppercase() to it.total } }
 
+    /** Reaktiv: yuk turi sotuvlari SANA bilan — Sklad qoldig'ini "qo'shilgan kundan beri" ayirish uchun */
+    fun observeCargoSales(userId: Long): Flow<List<uz.daftar.app.data.db.dao.CargoTxLite>> =
+        txDao.observeCargoTxLite(userId)
+
     suspend fun getAllForUser(userId: Long): List<uz.daftar.app.data.db.entity.TransactionEntity> =
         txDao.getAllForUser(userId)
 
