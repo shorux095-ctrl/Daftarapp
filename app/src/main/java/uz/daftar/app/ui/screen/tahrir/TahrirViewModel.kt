@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -30,7 +31,8 @@ data class TahrirRowData(
 class TahrirViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val txDao: uz.daftar.app.data.db.dao.TransactionDao,
-    private val yukDao: uz.daftar.app.data.db.dao.YukNarxDao
+    private val yukDao: uz.daftar.app.data.db.dao.YukNarxDao,
+    private val lockManager: uz.daftar.app.core.security.LockManager
 ) : ViewModel() {
 
     private val userId = 1L
@@ -114,13 +116,25 @@ class TahrirViewModel @Inject constructor(
         }
     }
 
-    /** Ekranda ko'rinayotgan barcha yozuvlarni o'chirish */
-    fun deleteAllShown() {
+    /** PIN o'rnatilganmi (Sozlamalardagi ilova PINi) */
+    val pinSet: StateFlow<Boolean> =
+        lockManager.pinCode.map { it != null }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Ekranda ko'rinayotgan barcha yozuvlarni o'chirish.
+     *  PIN o'rnatilgan bo'lsa — kiritilgan kod mos kelmasa O'CHIRMAYDI. */
+    fun deleteAllShown(pinInput: String? = null, onDone: () -> Unit = {}) {
         viewModelScope.launch {
+            val pin = lockManager.pinCode.first()
+            if (pin != null && pin != pinInput?.trim()) {
+                _message.value = "❌ Kod noto'g'ri"
+                return@launch
+            }
             val ids = rows.value.map { it.tx.id }
             if (ids.isEmpty()) { _message.value = "O'chirish uchun yozuv yo'q"; return@launch }
             repo.deleteByIds(ids)
             _message.value = "🗑 ${ids.size} ta yozuv o'chirildi"
+            onDone()
         }
     }
 }

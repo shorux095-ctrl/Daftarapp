@@ -3,6 +3,7 @@ package uz.daftar.app.ui.screen.tahrir
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,10 +54,12 @@ fun TahrirScreen(
     val date by vm.date.collectAsStateWithLifecycle()
     val nameFilter by vm.nameFilter.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val pinSet by vm.pinSet.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     var confirmAll by remember { mutableStateOf(false) }
     var confirmId by remember { mutableStateOf<Long?>(null) }
+    var delPin by remember { mutableStateOf("") }
 
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
 
@@ -173,15 +177,35 @@ fun TahrirScreen(
     // ── Tasdiqlash: hammasini o'chirish ──
     if (confirmAll) {
         AlertDialog(
-            onDismissRequest = { confirmAll = false },
+            onDismissRequest = { confirmAll = false; delPin = "" },
             title = { Text("Hammasini o'chirish?") },
-            text = { Text("$dateStr sanasidagi ${rows.size} ta yozuv o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.") },
+            text = {
+                Column {
+                    Text("$dateStr sanasidagi ${rows.size} ta yozuv o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.")
+                    if (pinSet) {
+                        Spacer(Modifier.height(10.dp))
+                        Text("Tasdiqlash uchun PIN kodni kiriting:", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = delPin,
+                            onValueChange = { if (it.length <= 6 && it.all { ch -> ch.isDigit() }) delPin = it },
+                            label = { Text("PIN kod") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = { vm.deleteAllShown(); confirmAll = false }) {
+                TextButton(
+                    onClick = { vm.deleteAllShown(delPin) { confirmAll = false; delPin = "" } },
+                    enabled = !pinSet || delPin.length >= 4
+                ) {
                     Text("Hammasini o'chirish", color = cP)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmAll = false }) { Text("Bekor") } }
+            dismissButton = { TextButton(onClick = { confirmAll = false; delPin = "" }) { Text("Bekor") } }
         )
     }
 }

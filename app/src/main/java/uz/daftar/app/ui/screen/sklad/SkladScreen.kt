@@ -47,6 +47,7 @@ fun SkladScreen(
     var eIsIn by remember { mutableStateOf(true) }
     var eDateMs by remember { mutableStateOf(0L) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf<SkladEntity?>(null) }
 
     LaunchedEffect(message) {
         message?.let { snackbarHostState.showSnackbar(it); vm.clearMessage() }
@@ -274,7 +275,7 @@ fun SkladScreen(
                             eDateMs = e.date
                             editing = e
                         },
-                        onDelete = { vm.delete(e) }
+                        onDelete = { confirmDelete = e }
                     )
                 }
             }
@@ -357,6 +358,22 @@ fun SkladScreen(
             ) {
                 DatePicker(state = dpState)
             }
+        }
+        // ───── O'chirishni tasdiqlash ─────
+        confirmDelete?.let { del ->
+            AlertDialog(
+                onDismissRequest = { confirmDelete = null },
+                title = { Text("O'chirilsinmi?") },
+                text = { Text("${del.name} — ${del.qty.plain()} (${fmtDate(del.date)}) yozuvi o'chiriladi.") },
+                confirmButton = {
+                    TextButton(onClick = { vm.delete(del); confirmDelete = null }) {
+                        Text("O'chirish", color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmDelete = null }) { Text("Bekor") }
+                }
+            )
         }
     }
 }
