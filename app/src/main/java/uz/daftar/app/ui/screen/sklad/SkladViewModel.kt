@@ -108,6 +108,19 @@ class SkladViewModel @Inject constructor(
         }
     }
 
+    /** Mavjud yozuvni tahrirlash (nom/miqdor/narx/kirim-chiqim/sana). */
+    fun update(id: Long, name: String, qtyStr: String, priceStr: String, isIn: Boolean, dateMs: Long) {
+        val n = name.trim()
+        val qty = qtyStr.trim().replace(",", ".").toDoubleOrNull()
+        val price = priceStr.trim().replace(",", ".").toDoubleOrNull() ?: 0.0
+        if (n.isEmpty()) { _message.value = "❌ Tovar nomini yozing"; return }
+        if (qty == null || qty <= 0) { _message.value = "❌ Miqdorni to'g'ri yozing"; return }
+        viewModelScope.launch {
+            dao.update(id, n, qty, price, isIn, dateMs)
+            _message.value = "✏️ Tahrirlandi"
+        }
+    }
+
     fun clearMessage() { _message.value = null }
 
     companion object {

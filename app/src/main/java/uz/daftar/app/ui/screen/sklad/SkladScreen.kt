@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,15 @@ fun SkladScreen(
     var qty by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var isIn by remember { mutableStateOf(true) }
+
+    // ── Tahrirlash dialogi holati ──
+    var editing by remember { mutableStateOf<SkladEntity?>(null) }
+    var eName by remember { mutableStateOf("") }
+    var eQty by remember { mutableStateOf("") }
+    var ePrice by remember { mutableStateOf("") }
+    var eIsIn by remember { mutableStateOf(true) }
+    var eDateMs by remember { mutableStateOf(0L) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         message?.let { snackbarHostState.showSnackbar(it); vm.clearMessage() }
@@ -254,8 +264,98 @@ fun SkladScreen(
                 item { Text("Hozircha yozuv yo'q.", style = MaterialTheme.typography.bodySmall) }
             } else {
                 items(items, key = { it.id }) { e ->
-                    SkladRow(e, onDelete = { vm.delete(e) })
+                    SkladRow(
+                        e,
+                        onEdit = {
+                            eName = e.name
+                            eQty = e.qty.plain()
+                            ePrice = if (e.price > 0) e.price.plain() else ""
+                            eIsIn = e.isIn
+                            eDateMs = e.date
+                            editing = e
+                        },
+                        onDelete = { vm.delete(e) }
+                    )
                 }
+            }
+        }
+
+        // ───── Tahrirlash dialogi ─────
+        editing?.let { ed ->
+            AlertDialog(
+                onDismissRequest = { editing = null },
+                title = { Text("✏️ Yozuvni tahrirlash") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = eName, onValueChange = { eName = it },
+                            label = { Text("Tovar nomi") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SkladViewModel.CARGO_TYPES.forEach { t ->
+                                FilterChip(
+                                    selected = eName.trim().uppercase() == t,
+                                    onClick = { eName = t },
+                                    label = { Text(t) }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = eQty, onValueChange = { eQty = it },
+                                label = { Text("Miqdor") }, singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = ePrice, onValueChange = { ePrice = it },
+                                label = { Text("Narx") }, singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = eIsIn, onClick = { eIsIn = true }, label = { Text("➕ Kirim") })
+                            FilterChip(selected = !eIsIn, onClick = { eIsIn = false }, label = { Text("➖ Chiqim") })
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("📅 Sana: ${fmtDate(eDateMs)}")
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        vm.update(ed.id, eName, eQty, ePrice, eIsIn, eDateMs)
+                        editing = null
+                    }) { Text("Saqlash") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editing = null }) { Text("Bekor") }
+                }
+            )
+        }
+
+        // ───── Sana tanlash ─────
+        if (showDatePicker) {
+            val dpState = rememberDatePickerState(initialSelectedDateMillis = eDateMs)
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        dpState.selectedDateMillis?.let { eDateMs = it }
+                        showDatePicker = false
+                    }) { Text("OK") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("Bekor") }
+                }
+            ) {
+                DatePicker(state = dpState)
             }
         }
     }
@@ -265,8 +365,12 @@ fun SkladScreen(
 private fun fmtDate(ms: Long): String =
     java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault()).format(java.util.Date(ms))
 
+/** Double → toza raqam matni (1000.0 → "1000", 12.5 → "12.5") — tahrir maydoniga to'ldirish uchun */
+private fun Double.plain(): String =
+    if (this == toLong().toDouble()) toLong().toString() else toString()
+
 @Composable
-private fun SkladRow(e: SkladEntity, onDelete: () -> Unit) {
+private fun SkladRow(e: SkladEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(10.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(if (e.isIn) "➕" else "➖", modifier = Modifier.padding(end = 8.dp))
@@ -278,6 +382,7 @@ private fun SkladRow(e: SkladEntity, onDelete: () -> Unit) {
                 }
                 Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
+            IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash") }
             IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, contentDescription = "O'chirish") }
         }
     }
