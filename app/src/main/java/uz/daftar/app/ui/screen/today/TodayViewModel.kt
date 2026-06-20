@@ -1172,8 +1172,36 @@ class TodayViewModel @Inject constructor(
             }
             // Aks holda ("30.05 a10") — bu oddiy yozuv, pastga o'tadi
         }
-        // Multi-line — har qator alohida parsing
-        val results = text.lines().filter { it.isNotBlank() }.map { DaftarParser.parse(it) }
+        // Multi-line — har qator alohida parsing.
+        // MUHIM: "12.06" kabi FAQAT-SANA qatori yozuv emas — u pastdagi HAMMA qatorga
+        // shu sanani beradi (bitta sana bilan 5-10 odamni birdan qo'shish uchun).
+        // Yangi sana qatori chiqsa — undan keyingilarga yangi sana qo'llanadi.
+        // Qatorda o'z sanasi bo'lsa ("13.06 ali a10") — o'sha saqlanadi.
+        val pureDateRe = Regex("""^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$""")
+        fun pureDate(s: String): LocalDate? {
+            val m = pureDateRe.matchEntire(s) ?: return null
+            return runCatching {
+                val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
+                val yr = m.groupValues[3]
+                val year = when { yr.isEmpty() -> LocalDate.now().year; yr.length == 2 -> 2000 + yr.toInt(); else -> yr.toInt() }
+                LocalDate.of(year, mo, d)
+            }.getOrNull()
+        }
+        val results: List<ParseResult> = run {
+            var curDate: LocalDate? = null
+            val acc = mutableListOf<ParseResult>()
+            for (ln in text.lines().map { it.trim() }.filter { it.isNotBlank() }) {
+                val dOnly = pureDate(ln)
+                if (dOnly != null) { curDate = dOnly; continue }  // sana qatori — entry emas
+                val r = DaftarParser.parse(ln)
+                acc.add(
+                    if (r is ParseResult.Success && r.entry.date == null && curDate != null)
+                        ParseResult.Success(r.entry.copy(date = curDate))
+                    else r
+                )
+            }
+            acc
+        }
         val parsedList = results.filterIsInstance<ParseResult.Success>().map { it.entry }
         val firstError = results.filterIsInstance<ParseResult.Failure>().firstOrNull()
         // Faqat ism yozilganmi? (marker yo'q, harfli) — bu tarix ko'rinishi, xato emas
