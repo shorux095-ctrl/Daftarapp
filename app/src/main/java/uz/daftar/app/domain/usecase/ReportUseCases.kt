@@ -423,8 +423,17 @@ class GetOverdueDebtorsUseCase @Inject constructor(
                 if (bal <= 0.0) firstDebtDate = null
             }
             if (bal > 0.5) {
-                // Pul bergan bo'lsa — oxirgi to'lovdan; aks holda qarz boshidan sanaymiz
-                val since = lastPaymentDate ?: firstDebtDate ?: continue
+                // since = qarz boshi va oxirgi to'lovдан ENG YANGISI.
+                // Shunda: qarzni to'lab bo'lib, keyin YANGI qarz olса — yangi qarz sanasидан sanaydi
+                // (eski to'lov sanasидан emas). 17.06 yangi qarz → bugun 20.06 bo'lsa = 3 kun.
+                val fdd = firstDebtDate
+                val lpd = lastPaymentDate
+                val since = when {
+                    fdd != null && lpd != null -> maxOf(fdd, lpd)
+                    fdd != null -> fdd
+                    lpd != null -> lpd
+                    else -> continue
+                }
                 val days = ChronoUnit.DAYS.between(since, today).toInt().coerceAtLeast(0)
                 out.add(OverdueDebtor(name, bal.roundToLong(), days, since))
             }

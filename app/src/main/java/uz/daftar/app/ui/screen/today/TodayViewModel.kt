@@ -452,6 +452,7 @@ class TodayViewModel @Inject constructor(
             runCatching { maybeShowAutoReports() }
             drainPendingWidget()
             refreshHistoryCards()
+            runCatching { ensureDebtReminder() }
         }
     }
 
@@ -499,6 +500,17 @@ class TodayViewModel @Inject constructor(
             if (list.isNotEmpty()) appendChat(ChatItem.DebtRep(nextChatId(), list))
         }
         runCatching { chatStore.setLastReportDate(today.toString()) }
+    }
+
+    /** Eslatma kartasi HAR OCHILGANDA ishonchli ko'rinsin: agar 10+ kunlik qarz bor-u,
+     *  chatda eslatma karta yo'q bo'lsa — qo'shamiz. (Karta bor bo'lsa, restore qayta hisoblaydi.) */
+    private suspend fun ensureDebtReminder() {
+        if (_state.value.chat.any { it is ChatItem.DebtRep }) return
+        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull() ?: return
+        if (list.isNotEmpty()) {
+            appendChat(ChatItem.DebtRep(nextChatId(), list))
+            persistChat()
+        }
     }
 
     // ── t1set parser ──
