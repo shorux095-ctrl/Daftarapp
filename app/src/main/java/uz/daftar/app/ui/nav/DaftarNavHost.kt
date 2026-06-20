@@ -59,6 +59,7 @@ object Routes {
     const val ESLAT = "eslat"
     const val SKLAD = "sklad"
     const val TOLIQ = "toliq"
+    const val DAILY = "daily"
     const val GRAFIK = "grafik"
     const val CALC = "calc"
     const val TAHRIR = "tahrir"
@@ -122,6 +123,7 @@ fun DaftarNavHost() {
                 onYukNarx = { if (canNav()) nav.navigate(Routes.YUK_NARX) },
                 onYukReport = { if (canNav()) nav.navigate(Routes.YUK_REPORT) },
                 onToliq = { if (canNav()) nav.navigate(Routes.TOLIQ) },
+                onDaily = { if (canNav()) nav.navigate(Routes.DAILY) },
                 onGrafik = { if (canNav()) nav.navigate(Routes.GRAFIK) },
                 onCalc = { if (canNav()) nav.navigate(Routes.CALC) },
                 onAlias = { if (canNav()) nav.navigate(Routes.ALIAS) },
@@ -210,6 +212,7 @@ fun DaftarNavHost() {
         composable(Routes.YUK_NARX) { DiagIn("yuk_narx"); YukNarxScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.TOLIQ) { DiagIn("toliq"); uz.daftar.app.ui.screen.toliq.ToliqHisobotScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.DAILY) { DiagIn("daily"); uz.daftar.app.ui.screen.daily.DailyReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.GRAFIK) { DiagIn("grafik"); uz.daftar.app.ui.screen.grafik.GrafikScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.CALC) { DiagIn("calc"); uz.daftar.app.ui.screen.calc.CalcScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { if (canNav()) nav.popBackStack() }) }
