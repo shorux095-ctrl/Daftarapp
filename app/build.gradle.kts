@@ -41,13 +41,13 @@ android {
             signingConfig = signingConfigs.getByName("daftar")
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Minify (R8) O'CHIQ — Room/Hilt/Drive crash bo'lmasin (proguard qoidasiz xavfsiz)
+            isMinifyEnabled = false
+            isShrinkResources = false
+            // .debug qo'shimcha SAQLANADI → paket o'sha-o'sha → ESKI DATA YO'QOLMAYDI (yangilanish)
+            applicationIdSuffix = ".debug"
+            // debuggable=false (release default) → ilova sezilarli TEZ
             signingConfig = signingConfigs.getByName("daftar")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
     compileOptions {
