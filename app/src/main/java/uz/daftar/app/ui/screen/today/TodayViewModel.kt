@@ -2011,6 +2011,8 @@ class TodayViewModel @Inject constructor(
         if (lines.size >= 2 && (first == "x" || DELETE_X_RE.matches(first))) return true
         // Yangi: biror qator "x NAME" bilan boshlansa
         if (lines.any { it.startsWith("x ") }) return true
+        // Yangi: "DD.MM x NAME" bir qatorda (masalan: 09.06 x moxon)
+        if (Regex("""^\d{1,2}[.,]\d{1,2}(?:[.,]\d{2,4})?\s+x\s+.+$""").matches(first)) return true
         // Birinchi qator sana, keyingilar "x NAME"
         if (Regex("""^\d{1,2}\.\d{1,2}$""").matches(first) &&
             lines.drop(1).any { it.startsWith("x ") }) return true
@@ -2018,15 +2020,27 @@ class TodayViewModel @Inject constructor(
     }
 
     private fun handleDeleteCommand(text: String) {
-        val rawLines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val rawLines = text.lines().map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
         if (rawLines.isEmpty()) return
         var date: LocalDate = LocalDate.now()
 
         // Birinchi qatorni tahlil qilish — sana aniqlash, qaerdan boshlash
         val firstLower = rawLines.first().lowercase()
+        val dateXNameRe = Regex("""^(\d{1,2})[.,](\d{1,2})(?:[.,](\d{2,4}))?\s+x\s+(.+)$""")
+        val dateXNameMatch = dateXNameRe.matchEntire(firstLower)
         val datePureMatch = Regex("""^(\d{1,2})\.(\d{1,2})$""").matchEntire(firstLower)
         val dateXMatch = DELETE_X_RE.matchEntire(firstLower)
         val startIdx = when {
+            dateXNameMatch != null -> {
+                runCatching {
+                    date = LocalDate.now()
+                        .withMonth(dateXNameMatch.groupValues[2].toInt())
+                        .withDayOfMonth(dateXNameMatch.groupValues[1].toInt())
+                }
+                // "09.06 x moxon" → birinchi qatorni "x moxon" ga aylantiramiz
+                rawLines[0] = "x " + dateXNameMatch.groupValues[4].trim()
+                0
+            }
             datePureMatch != null -> {
                 runCatching {
                     date = LocalDate.now()

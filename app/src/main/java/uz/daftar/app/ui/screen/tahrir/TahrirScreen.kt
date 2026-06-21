@@ -60,6 +60,7 @@ fun TahrirScreen(
     var confirmAll by remember { mutableStateOf(false) }
     var confirmId by remember { mutableStateOf<Long?>(null) }
     var delPin by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
 
@@ -91,7 +92,10 @@ fun TahrirScreen(
                             "🗓 $dateStr" + if (isToday) "  (bugun)" else "",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showDatePicker = true }
+                                .padding(vertical = 4.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         IconButton(onClick = { vm.nextDay() }) { Text("▶", fontSize = 20.sp) }
@@ -207,6 +211,26 @@ fun TahrirScreen(
             },
             dismissButton = { TextButton(onClick = { confirmAll = false; delPin = "" }) { Text("Bekor") } }
         )
+    }
+
+    // ── Kalendar (istalgan sanani tanlash) ──
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        val d = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        vm.setDate(d)
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Bekor") } }
+        ) { DatePicker(state = pickerState) }
     }
 }
 
