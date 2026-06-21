@@ -48,6 +48,7 @@ private fun colorFor(t: TxType) = when (t) {
 fun TahrirScreen(
     onBack: () -> Unit,
     onEditTx: (Long) -> Unit,
+    onOpenClient: (String) -> Unit = {},
     vm: TahrirViewModel = hiltViewModel()
 ) {
     val rows by vm.rows.collectAsStateWithLifecycle()
@@ -134,28 +135,51 @@ fun TahrirScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    // Umumiy qidiruv: ism kiritilsa, butun tarixni ochish (barcha sanalar)
+                    if (nameFilter.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Surface(
+                            onClick = { onOpenClient(nameFilter.trim()) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFE8F5EC),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "📂 \"${nameFilter.trim()}\" — butun tarixini ochish",
+                                    color = Color(0xFF1AA35A), fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp, modifier = Modifier.weight(1f)
+                                )
+                                Text("→", color = Color(0xFF1AA35A), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── Ro'yxat ──
+            // ── Ro'yxat (mijoz bo'yicha guruhlangan: yuk+pul birga) ──
             if (rows.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Bu sanada yozuv yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
+                val grouped = remember(rows) { rows.groupBy { it.tx.clientName }.entries.toList() }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    itemsIndexed(rows, key = { _, r -> r.tx.id }) { idx, r ->
-                        TahrirRow(
+                    itemsIndexed(grouped, key = { _, e -> e.key }) { idx, entry ->
+                        ClientGroupCard(
                             index = idx + 1,
-                            tx = r.tx,
-                            costPrice = r.costPrice,
-                            onEdit = { onEditTx(r.tx.id) },
-                            onDelete = { confirmId = r.tx.id },
-                            onSetTier = { tier -> vm.setTier(r.tx, tier) }
+                            clientName = entry.key,
+                            rows = entry.value,
+                            onEdit = { id -> onEditTx(id) },
+                            onDelete = { id -> confirmId = id },
+                            onSetTier = { tx, tier -> vm.setTier(tx, tier) }
                         )
                     }
                 }
@@ -235,59 +259,60 @@ fun TahrirScreen(
 }
 
 @Composable
-private fun TahrirRow(
+private fun ClientGroupCard(
     index: Int,
-    tx: Transaction,
-    costPrice: Double?,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onSetTier: (String) -> Unit
+    clientName: String,
+    rows: List<TahrirRowData>,
+    onEdit: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+    onSetTier: (Transaction, String) -> Unit
 ) {
-    val isCargo = tx.type != TxType.P && tx.type != TxType.Q
-    val entry = when (tx.type) {
-        TxType.P -> "P:${tx.amount.formatMoney()}"
-        TxType.Q -> "Q:${tx.amount.formatMoney()}"
-        else -> "${tx.type.code.uppercase()}:${tx.amount.formatQty()}"
-    }
-    val name = tx.clientName.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    val name = clientName.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = Color(0xFFF7F7F9),
         tonalElevation = 1.dp
     ) {
-        Column(Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp)) {
-            // 1-qator: ism + entry + tahrir/o'chirish
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).background(colorFor(tx.type), CircleShape))
-                Spacer(Modifier.width(10.dp))
-                Text("$index.", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF555555))
-                Spacer(Modifier.width(6.dp))
-                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                    color = Color(0xFF111111), modifier = Modifier.weight(1f))
-                Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace, fontSize = 14.sp)
-                IconButton(onClick = onEdit, modifier = Modifier.size(38.dp)) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = cC)
+        Column(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp)) {
+            // Mijoz sarlavhasi
+            Text("$index. $name", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF111111))
+            Spacer(Modifier.height(4.dp))
+            // Har bir yozuv (yuk va pul birga, bitta kartada)
+            rows.forEachIndexed { i, r ->
+                val tx = r.tx
+                val isCargo = tx.type != TxType.P && tx.type != TxType.Q
+                val entry = when (tx.type) {
+                    TxType.P -> "P:${tx.amount.formatMoney()}"
+                    TxType.Q -> "Q:${tx.amount.formatMoney()}"
+                    else -> "${tx.type.code.uppercase()}:${tx.amount.formatQty()}"
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = cP)
+                if (i > 0) HorizontalDivider(color = Color(0x0D000000), modifier = Modifier.padding(vertical = 3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(9.dp).background(colorFor(tx.type), CircleShape))
+                    Spacer(Modifier.width(10.dp))
+                    Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { onEdit(tx.id) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = cC)
+                    }
+                    IconButton(onClick = { onDelete(tx.id) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = cP)
+                    }
                 }
-            }
-            // 2-qator (faqat yuk uchun): T narx + T/T1 tarif tugmasi
-            if (isCargo) {
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 20.dp, end = 6.dp)
-                ) {
-                    val manual = tx.tOverride != null
-                    Text(
-                        "T narx: " + (costPrice?.let { "${it.formatQty()} so'm" } ?: "—") +
-                            (if (manual) "  (qo'lda)" else ""),
-                        fontSize = 13.sp, color = Color(0xFF444444),
-                        fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)
-                    )
-                    TierToggle(tx.costTier, onSetTier)
+                if (isCargo) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 19.dp, end = 6.dp, top = 1.dp)
+                    ) {
+                        val manual = tx.tOverride != null
+                        Text(
+                            "T narx: " + (r.costPrice?.let { "${it.formatQty()} so'm" } ?: "—") +
+                                (if (manual) "  (qo'lda)" else ""),
+                            fontSize = 12.sp, color = Color(0xFF444444),
+                            fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)
+                        )
+                        TierToggle(tx.costTier) { onSetTier(tx, it) }
+                    }
                 }
             }
         }

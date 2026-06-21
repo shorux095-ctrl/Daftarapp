@@ -721,7 +721,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v77", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v78", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -784,6 +784,7 @@ private fun ChatTopBar(
                     MenuItem("🏬", "Sklad", "Ombor ma'lumoti", Color(0xFFEDE3FF), onSklad),
                     MenuItem("🧮", "Kalkulyator", "Hisob-kitob vositasi", Color(0xFFFFE9D1), onCalc),
                     MenuItem("❓", "Yordam", "Yordam va qo'llanma", Color(0xFFFFDCE6), onHelp),
+                    MenuItem("⚙️", "Sozlama", "Sozlamalar", Color(0xFFE6E8EB), onSettings),
                 )
                 tiles.chunked(3).forEach { rowTiles ->
                     Row(

@@ -223,7 +223,7 @@ fun DaftarNavHost() {
         composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { if (canNav()) nav.popBackStack() }) }
-        composable(Routes.TAHRIR) { DiagIn("tahrir"); TahrirScreen(onBack = { if (canNav()) nav.popBackStack() }, onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") }) }
+        composable(Routes.TAHRIR) { DiagIn("tahrir"); TahrirScreen(onBack = { if (canNav()) nav.popBackStack() }, onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") }, onOpenClient = { name -> if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name") }) }
     }
     // (diagnostika olib tashlandi)
     }
