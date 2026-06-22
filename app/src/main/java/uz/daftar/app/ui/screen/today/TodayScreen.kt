@@ -721,7 +721,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v78", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v79", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -751,6 +751,7 @@ private fun ChatTopBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 28.dp)
             ) {

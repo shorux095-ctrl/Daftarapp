@@ -89,6 +89,7 @@ fun SettingsScreen(
     var tgToken by remember(tgTokenInit) { mutableStateOf(tgTokenInit) }
     var tgChat by remember(tgChatInit) { mutableStateOf(tgChatInit) }
     var showDriveSignOut by remember { mutableStateOf(false) }
+    var showTgClear by remember { mutableStateOf(false) }
     val driveSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -321,8 +322,24 @@ fun SettingsScreen(
                     }
                     if (tgConfigured) {
                         androidx.compose.material3.TextButton(
-                            onClick = { vm.clearTgConfig() }
+                            onClick = { showTgClear = true }
                         ) { Text("O'chirish", color = MaterialTheme.colorScheme.error) }
+                    }
+                    if (showTgClear) {
+                        AlertDialog(
+                            onDismissRequest = { showTgClear = false },
+                            title = { Text("Telegram zaxira o'chirilsinmi?") },
+                            text = { Text("Bot token va Chat ID o'chiriladi — Telegramга avto-zaxira to'xtaydi. Ma'lumotlaringiz telefonda saqlanib qoladi. Qayta kiritsangiz davom etadi.") },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    showTgClear = false
+                                    vm.clearTgConfig()
+                                }) { Text("Ha, o'chirish", color = MaterialTheme.colorScheme.error) }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { showTgClear = false }) { Text("Bekor") }
+                            }
+                        )
                     }
                 }
             }
