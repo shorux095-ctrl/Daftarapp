@@ -17,12 +17,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.data.db.entity.RasxodEntity
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -111,6 +114,66 @@ fun RasxodScreen(
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     Text("${state.items.size} ta yozuv", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // ── YUK RASXODI (alohida — narx qo'yish + ko'rish) ──
+            var yukExpanded by remember { mutableStateOf(false) }
+            val yukInputs = remember(state.yukRateInputs) {
+                androidx.compose.runtime.mutableStateMapOf<String, String>().apply { putAll(state.yukRateInputs) }
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E9))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    TextButton(onClick = { yukExpanded = !yukExpanded }, modifier = Modifier.fillMaxWidth()) {
+                        Text("🚛 Yuk rasxodi", fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                            color = Color(0xFF8A4B1F), modifier = Modifier.weight(1f))
+                        Text("${state.yukTotal.formatMoney()} so'm  ${if (yukExpanded) "▴" else "▾"}",
+                            fontWeight = FontWeight.Bold, color = Color(0xFF8A4B1F))
+                    }
+                    if (yukExpanded) {
+                        // Hisob (tur: miqdor × narx = summa)
+                        if (state.yukBreakdown.isEmpty()) {
+                            Text("Bu davrda sotilgan yuk yo'q", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 4.dp))
+                        } else {
+                            state.yukBreakdown.forEach { ln ->
+                                Text(
+                                    "${ln.type}: ${ln.qty.formatQty()} × ${ln.rate.formatQty()} = ${ln.cost.formatMoney()}",
+                                    fontSize = 14.sp, color = Color(0xFF333333),
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                            Text("Jami yuk: ${state.yukTotal.formatMoney()} so'm",
+                                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF8A4B1F))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Narx qo'yish (bugundan boshlab hisoblanadi):",
+                            style = MaterialTheme.typography.labelMedium, color = Color(0xFF8A4B1F))
+                        Spacer(Modifier.height(4.dp))
+                        listOf("a", "b", "c", "d", "k").forEach { t ->
+                            OutlinedTextField(
+                                value = yukInputs[t] ?: "",
+                                onValueChange = { yukInputs[t] = it },
+                                label = { Text("${t.uppercase()} narx (1 birlik uchun)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Button(
+                            onClick = { vm.saveYukRates(yukInputs.toMap()) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("💾 Narxlarni saqlash") }
+                        Spacer(Modifier.height(6.dp))
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))

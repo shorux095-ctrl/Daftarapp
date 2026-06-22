@@ -153,6 +153,7 @@ fun ToliqHisobotScreen(
                     val q = (r.totals[TxType.Q] ?: 0.0).roundToLong()
                     if (q != 0L) MoneyRow("\uD83D\uDCDD Qarz yozildi (Q)", q.formatMoney())
                     MoneyRow("\uD83D\uDCB8 Rasxod", r.expenses.formatMoney())
+                    MoneyRow("\uD83D\uDE9B Yuk rasxodi", r.yukRasxodi.formatMoney(), color = if (r.yukRasxodi > 0) RED else INK)
                     Spacer(Modifier.height(10.dp))
                     // Sof foyda — ajratilgan qator
                     Box(

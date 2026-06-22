@@ -36,7 +36,8 @@ data class PeriodReport(
     val grossProfit: Long,               // yalpi foyda = N − T
     val payments: Long,                  // jami P
     val expenses: Long,                  // rasxod
-    val profit: Long,                    // sof foyda = (N − T) − rasxod
+    val yukRasxodi: Long,                // yuk rasxodi = sotilgan miqdor × narx (sana bo'yicha)
+    val profit: Long,                    // sof foyda = (N − T) − rasxod − yuk rasxodi
     val transactionCount: Int,
     val clientCount: Int
 )
@@ -177,19 +178,23 @@ internal suspend fun buildReport(
     var revenue = 0.0
     var tCost = 0.0
     var payments = 0.0
+    var yukRasxodi = 0.0
     val clientNames = mutableSetOf<String>()
 
     // Global T narx TARIXI (har yozuv sanasiga qarab) — turlar bo'yicha
     val cargo = setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
     val tHist = mutableMapOf<String, List<Pair<String, Double>>>()
     val t1Hist = mutableMapOf<String, List<Pair<String, Double>>>()
+    val yrHist = mutableMapOf<String, List<Pair<String, Double>>>()
     run {
         val allT = yukDao.getAllGlobalGroup(userId, "t").groupBy { it.type.lowercase() }
         val allT1 = yukDao.getAllGlobalGroup(userId, "t1").groupBy { it.type.lowercase() }
+        val allYr = yukDao.getAllGlobalGroup(userId, "yr").groupBy { it.type.lowercase() }
         for (t in cargo) {
             val code = t.code.lowercase()
             tHist[code] = (allT[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
             t1Hist[code] = (allT1[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
+            yrHist[code] = (allYr[code] ?: emptyList()).map { it.date to it.price }.sortedBy { it.first }
         }
     }
     // PRELOAD: N narx tarixi + mijoz joriy narxlari — BIR MARTA (N+1 emas)
@@ -230,6 +235,14 @@ internal suspend fun buildReport(
         for ((d, p) in list) { if (d.take(10) <= day) best = p else break }
         return best ?: list.first().second
     }
+    // Yuk rasxodi narxi — sana bo'yicha; narx YO'Q bo'lsa 0 (fallback yo'q → eski yozuvga tushmaydi)
+    fun yrAt(list: List<Pair<String, Double>>?, date: String): Double {
+        if (list.isNullOrEmpty()) return 0.0
+        val day = date.take(10)
+        var best = 0.0; var found = false
+        for ((d, p) in list) { if (d.take(10) <= day) { best = p; found = true } else break }
+        return if (found) best else 0.0
+    }
 
     for (tx in txs) {
         val type = TxType.fromCode(tx.type) ?: continue
@@ -250,12 +263,15 @@ internal suspend fun buildReport(
                 else globalAt(tHist[tx.type.lowercase()], tx.date)
                 val tPrice = tx.tOverride ?: globalCost
                 if (tPrice != null) tCost += tx.amount * tPrice
+                // Yuk rasxodi: O'SHA SANADAGI narx × miqdor (narx yo'q = 0, eski yozuvga tushmaydi)
+                yukRasxodi += tx.amount * yrAt(yrHist[tx.type.lowercase()], tx.date)
             }
             else -> { /* boshqa turlar e'tibordan chiqarilgan */ }
         }
     }
 
     val grossProfit = revenue - tCost
+    val yrLong = yukRasxodi.roundToLong()
     return PeriodReport(
         title = "",
         rangeLabel = "",
@@ -265,7 +281,8 @@ internal suspend fun buildReport(
         grossProfit = grossProfit.roundToLong(),
         payments = payments.roundToLong(),
         expenses = rasxodTotal,
-        profit = grossProfit.roundToLong() - rasxodTotal,
+        yukRasxodi = yrLong,
+        profit = grossProfit.roundToLong() - rasxodTotal - yrLong,
         transactionCount = txs.size,
         clientCount = clientNames.size
     )

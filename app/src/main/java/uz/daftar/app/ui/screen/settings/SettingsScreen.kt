@@ -218,6 +218,15 @@ fun SettingsScreen(
                 FilterChip(selected = themeMode == 1, onClick = { vm.setThemeMode(1) }, label = { Text("Yorug'") })
                 FilterChip(selected = themeMode == 2, onClick = { vm.setThemeMode(2) }, label = { Text("Tungi") })
             }
+            // ── 👤 PROFIL (zaxira va hisob) ──
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "👤 Profil — zaxira va hisob",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            )
+
             // 2) Zaxira (DB backup / fayldan tiklash)
             SettingsItem(
                 icon = Icons.Outlined.Backup,
