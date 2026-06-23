@@ -724,7 +724,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v83", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v84", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -776,7 +776,6 @@ private fun ChatTopBar(
                 Spacer(Modifier.height(16.dp))
                 val tiles = listOf(
                     MenuItem("📦", "Yuk hisoboti", "Yuklar va holatlar", Color(0xFFD6F5E0), onYukReport),
-                    MenuItem("📊", "Hisobot", "Umumiy hisobotlar", Color(0xFFD9E8FF), onReports),
                     MenuItem("✏️", "Tahrirlash", "Ma'lumotlarni tahrirlash", Color(0xFFEDE3FF), onTahrir),
                     MenuItem("📋", "To'liq", "To'liq ma'lumot", Color(0xFFFFE9D1), onToliq),
                     MenuItem("📅", "Kunlik", "Kun bo'yicha", Color(0xFFD9ECFF), onDaily),

@@ -48,7 +48,8 @@ class ClientsViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             try {
                 val data = getAll(userId)
-                _state.update { it.copy(isLoading = false, clients = data, error = null) }
+                val sorted = data.sortedBy { it.name.trim().lowercase() }
+                _state.update { it.copy(isLoading = false, clients = sorted, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }

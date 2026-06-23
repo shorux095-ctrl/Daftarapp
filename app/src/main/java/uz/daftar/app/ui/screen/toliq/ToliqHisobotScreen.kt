@@ -96,10 +96,11 @@ fun ToliqHisobotScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // ── Bugun / Shu oy togglelar ──
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            // ── Bugun / Shu oy / Yil togglelar ──
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Toggle("\uD83D\uDCC5 Bugun", state.mode == 0, Modifier.weight(1f)) { vm.setMode(0) }
                 Toggle("\uD83D\uDCC6 Shu oy", state.mode == 1, Modifier.weight(1f)) { vm.setMode(1) }
+                Toggle("\uD83D\uDDD3\uFE0F Yil", state.mode == 2, Modifier.weight(1f)) { vm.setMode(2) }
             }
 
             if (state.isLoading) {

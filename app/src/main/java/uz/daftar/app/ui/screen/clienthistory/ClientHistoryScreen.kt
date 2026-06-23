@@ -6,6 +6,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -179,7 +184,7 @@ fun ClientHistoryScreen(
         }
         val monthTxs = state.transactions.filter { it.date.startsWith(monthPrefix) }.sortedBy { it.date }
 
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 // 1) Yashil header
                 item("header") {
@@ -236,6 +241,9 @@ fun ClientHistoryScreen(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+            }
+            if (state.debt > 0L) {
+                PayButton(debt = state.debt) { amt -> vm.addEntry("p $amt") }
             }
             AddEntryBar(onSend = { vm.addEntry(it) })
         }
@@ -427,7 +435,6 @@ private fun AddEntryBar(onSend: (String) -> Unit) {
             value = text,
             onValueChange = { text = it },
             modifier = Modifier.weight(1f),
-            placeholder = { Text("a5 · p 50000 · 05.06 a5") },
             singleLine = true,
             shape = RoundedCornerShape(20.dp)
         )
@@ -435,6 +442,52 @@ private fun AddEntryBar(onSend: (String) -> Unit) {
         IconButton(onClick = { if (text.isNotBlank()) { onSend(text); text = "" } }) {
             Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Saqlash")
         }
+    }
+}
+
+@Composable
+private fun PayButton(debt: Long, onPay: (String) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    Button(
+        onClick = { show = true },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = GreenA),
+        shape = RoundedCornerShape(14.dp)
+    ) { Text("💵 To'lov qilish (qarzni yopish)") }
+
+    if (show) {
+        var amount by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { show = false },
+            title = { Text("💵 To'lov qilish") },
+            text = {
+                Column {
+                    Text("Joriy qarz: ${debt.formatMoney()} so'm", fontWeight = FontWeight.Bold, color = DebtRed)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = { Text("To'lov summasi (so'm)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { amount = debt.toString() }) {
+                        Text("Hammasini to'lash — ${debt.formatMoney()} so'm")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val v = amount.trim().replace(" ", "").replace(".", "").toLongOrNull()
+                    if (v != null && v > 0) {
+                        onPay(v.toString()); show = false
+                    }
+                }) { Text("Saqlash") }
+            },
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Bekor") } }
+        )
     }
 }
 
