@@ -145,6 +145,7 @@ fun TodayScreen(
     onYukReport: () -> Unit = onSettings,
     onToliq: () -> Unit = onSettings,
     onDaily: () -> Unit = onSettings,
+    onBashorat: () -> Unit = onSettings,
     onGrafik: () -> Unit = onSettings,
     onCalc: () -> Unit = onSettings,
     onNReport: () -> Unit = {},
@@ -372,6 +373,7 @@ fun TodayScreen(
                     onYukReport = onYukReport,
                     onToliq = onToliq,
                     onDaily = onDaily,
+                    onBashorat = onBashorat,
                     onGrafik = onGrafik,
                     onCalc = onCalc,
                     onNReport = { vm.showDateReportButton(java.time.LocalDate.now(), useNarx = true) },
@@ -686,6 +688,7 @@ private fun ChatTopBar(
     onYukReport: () -> Unit,
     onToliq: () -> Unit,
     onDaily: () -> Unit,
+    onBashorat: () -> Unit,
     onGrafik: () -> Unit,
     onCalc: () -> Unit,
     onNReport: () -> Unit,
@@ -721,7 +724,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v82", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v83", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -779,6 +782,7 @@ private fun ChatTopBar(
                     MenuItem("📅", "Kunlik", "Kun bo'yicha", Color(0xFFD9ECFF), onDaily),
                     MenuItem("📈", "Grafik", "Statistik grafiklar", Color(0xFFFFDCE6), onGrafik),
                     MenuItem("👥", "Mijozlar", "Mijozlar ro'yxati", Color(0xFFD5F2EE), onClients),
+                    MenuItem("🔮", "Bashorat", "Kim qachon oladi", Color(0xFFE3E0FF), onBashorat),
                     MenuItem("💳", "Qarzdorlar", "Qarzdorlar ro'yxati", Color(0xFFFFEEC2), onQarz),
                     MenuItem("🚚", "Narx", "Narxlar ro'yxati", Color(0xFFDCE8FF), onYukNarx),
                     MenuItem("💵", "Rasxod", "Rasxodlar hisobi", Color(0xFFD6F5E0), onRasxod),
