@@ -54,6 +54,7 @@ object Routes {
     const val CLIENT_NARX = "client_narx"
     const val REMINDER = "reminder"
     const val MANAGER = "manager"
+    const val PROFIL = "profil"
     const val DASHBOARD = "dashboard"
     const val HELP = "help"
     const val ESLAT = "eslat"
@@ -203,7 +204,8 @@ fun DaftarNavHost() {
                 onRasxod = { if (canNav()) nav.navigate(Routes.RASXOD) },
                 onKarzina = { if (canNav()) nav.navigate(Routes.KARZINA) },
                 onReminder = { if (canNav()) nav.navigate(Routes.REMINDER) },
-                onManager = { if (canNav()) nav.navigate(Routes.MANAGER) }
+                onManager = { if (canNav()) nav.navigate(Routes.MANAGER) },
+                onProfil = { if (canNav()) nav.navigate(Routes.PROFIL) }
             )
         }
 
@@ -219,6 +221,7 @@ fun DaftarNavHost() {
         composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.REMINDER) { DiagIn("reminder"); ReminderLimitScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.MANAGER) { DiagIn("manager"); uz.daftar.app.ui.screen.manager.ManagerScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.PROFIL) { DiagIn("profil"); uz.daftar.app.ui.screen.profil.ProfilScreen(onBack = { if (canNav()) nav.popBackStack() }, onManager = { if (canNav()) nav.navigate(Routes.MANAGER) }) }
         composable(Routes.DASHBOARD) { DiagIn("dashboard"); uz.daftar.app.ui.screen.dashboard.DashboardScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }

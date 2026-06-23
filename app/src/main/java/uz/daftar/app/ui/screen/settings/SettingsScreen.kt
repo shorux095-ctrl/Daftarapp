@@ -65,6 +65,7 @@ fun SettingsScreen(
     onKarzina: () -> Unit = {},
     onReminder: () -> Unit = {},
     onManager: () -> Unit = {},
+    onProfil: () -> Unit = {},
     vm: SettingsViewModel = hiltViewModel()
 ) {
     val lockEnabled by vm.lockEnabled.collectAsStateWithLifecycle()
@@ -77,55 +78,6 @@ fun SettingsScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val autoBackupOn by vm.autoBackup.collectAsStateWithLifecycle()
-    val driveEmail by vm.driveEmail.collectAsStateWithLifecycle()
-    val driveMsg by vm.driveMsg.collectAsStateWithLifecycle()
-    val driveBusy by vm.driveBusy.collectAsStateWithLifecycle()
-    val tgConfigured by vm.tgConfigured.collectAsStateWithLifecycle()
-    val tgMsg by vm.tgMsg.collectAsStateWithLifecycle()
-    val tgBusy by vm.tgBusy.collectAsStateWithLifecycle()
-    val tgTokenInit by vm.tgToken.collectAsStateWithLifecycle()
-    val tgChatInit by vm.tgChat.collectAsStateWithLifecycle()
-    var tgToken by remember(tgTokenInit) { mutableStateOf(tgTokenInit) }
-    var tgChat by remember(tgChatInit) { mutableStateOf(tgChatInit) }
-    var showDriveSignOut by remember { mutableStateOf(false) }
-    var showTgClear by remember { mutableStateOf(false) }
-    val driveSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        runCatching {
-            com.google.android.gms.auth.api.signin.GoogleSignIn
-                .getSignedInAccountFromIntent(result.data)
-                .getResult(com.google.android.gms.common.api.ApiException::class.java)
-        }.onSuccess { vm.onSignedIn() }
-            .onFailure { vm.onSignInFailed(it.message ?: "bekor qilindi") }
-    }
-    androidx.compose.runtime.LaunchedEffect(driveMsg) {
-        driveMsg?.let {
-            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
-            vm.clearDriveMsg()
-        }
-    }
-    androidx.compose.runtime.LaunchedEffect(tgMsg) {
-        tgMsg?.let {
-            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
-            vm.clearTgMsg()
-        }
-    }
-    val autoBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-            vm.enableAutoBackup(uri)
-            android.widget.Toast.makeText(context, "☁️ Avto-zaxira yoqildi", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
 
     // Import launcher (.db yoki .csv)
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -218,146 +170,13 @@ fun SettingsScreen(
                 FilterChip(selected = themeMode == 1, onClick = { vm.setThemeMode(1) }, label = { Text("Yorug'") })
                 FilterChip(selected = themeMode == 2, onClick = { vm.setThemeMode(2) }, label = { Text("Tungi") })
             }
-            // ── 👤 PROFIL (zaxira va hisob) ──
+            // ── 👤 PROFIL (alohida sahifa ochiladi) ──
             Spacer(Modifier.height(18.dp))
-            Text(
-                "👤 Profil — zaxira va hisob",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-            )
-
-            // 2) Zaxira (DB backup / fayldan tiklash)
             SettingsItem(
                 icon = Icons.Outlined.Backup,
-                title = "🗂 Zaxira",
-                subtitle = "Bazani zaxiralash yoki fayldan tiklash",
-                onClick = onManager
-            )
-            // 2b) Avto-zaxira (fayl) — ilovadan chiqqanda avtomatik saqlash
-            ToggleItem(
-                icon = Icons.Outlined.Backup,
-                title = "☁️ Avto-zaxira (fayl)",
-                subtitle = if (autoBackupOn) "Yoqilgan ✓ — chiqishda avto saqlanadi" else "Faylni Google Drive'da yarating — bulutga avto saqlanadi",
-                checked = autoBackupOn,
-                onCheckedChange = { on -> if (on) autoBackupLauncher.launch("daftar_avto_backup.db") else vm.disableAutoBackup() }
-            )
-            // 2c) Google Drive zaxira (bulut, 40 kunlik tarix)
-            SettingsItem(
-                icon = Icons.Outlined.Backup,
-                title = if (driveEmail != null) "☁️ Google Drive ✓" else "☁️ Google Drive zaxira",
-                subtitle = when {
-                    driveBusy -> "Saqlanmoqda…"
-                    driveEmail != null -> "$driveEmail — chiqishda avto, 40 kun saqlanadi"
-                    else -> "Google bilan kiring — bulutga avto-zaxira"
-                },
-                onClick = {
-                    if (driveEmail == null) driveSignInLauncher.launch(vm.signInClientIntent())
-                    else vm.backupNowDrive()
-                }
-            )
-            if (driveEmail != null) {
-                // Hozir zaxiralash tugmasi (aniq)
-                androidx.compose.material3.OutlinedButton(
-                    onClick = { vm.backupNowDrive() },
-                    enabled = !driveBusy,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) { Text(if (driveBusy) "Saqlanmoqda…" else "💾 Hozir Drive'ga zaxiralash") }
-
-                // Chiqish — faqat tasdiqdan keyin (tasodifan bosilmasin)
-                androidx.compose.material3.TextButton(
-                    onClick = { showDriveSignOut = true },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) { Text("Google hisobidan chiqish", color = MaterialTheme.colorScheme.error) }
-            }
-
-            if (showDriveSignOut) {
-                AlertDialog(
-                    onDismissRequest = { showDriveSignOut = false },
-                    title = { Text("Hisobdan chiqish?") },
-                    text = { Text("Google hisobidan chiqsangiz, avtomatik zaxira to'xtaydi. Ma'lumotlaringiz telefonda va Drive'da saqlanib qoladi. Qayta kirsangiz davom etadi.") },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = {
-                            showDriveSignOut = false
-                            vm.signOutDrive()
-                        }) { Text("Ha, chiqish", color = MaterialTheme.colorScheme.error) }
-                    },
-                    dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { showDriveSignOut = false }) {
-                            Text("Bekor qilish")
-                        }
-                    }
-                )
-            }
-
-            // 2d) Telegram zaxira — botingizga bazani (.db) yuboradi
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text(
-                        if (tgConfigured) "\uD83D\uDCE8 Telegram zaxira \u2713" else "\uD83D\uDCE8 Telegram zaxira",
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Bot token + chat_id kiriting \u2014 baza har kuni Telegramga yuboriladi. Telefon yo'qolsa ham ma'lumot saqlanadi.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = tgToken, onValueChange = { tgToken = it },
-                        label = { Text("Bot token") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = tgChat, onValueChange = { tgChat = it },
-                        label = { Text("Chat ID (sizning ID)") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        androidx.compose.material3.Button(
-                            onClick = { vm.saveTelegram(tgToken, tgChat) }
-                        ) { Text("Saqlash") }
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = { vm.backupNowTelegram() },
-                            enabled = tgConfigured && !tgBusy
-                        ) { Text(if (tgBusy) "Yuborilmoqda\u2026" else "\uD83D\uDCE8 Hozir yubor") }
-                    }
-                    if (tgConfigured) {
-                        androidx.compose.material3.TextButton(
-                            onClick = { showTgClear = true }
-                        ) { Text("O'chirish", color = MaterialTheme.colorScheme.error) }
-                    }
-                    if (showTgClear) {
-                        AlertDialog(
-                            onDismissRequest = { showTgClear = false },
-                            title = { Text("Telegram zaxira o'chirilsinmi?") },
-                            text = { Text("Bot token va Chat ID o'chiriladi — Telegramга avto-zaxira to'xtaydi. Ma'lumotlaringiz telefonda saqlanib qoladi. Qayta kiritsangiz davom etadi.") },
-                            confirmButton = {
-                                androidx.compose.material3.TextButton(onClick = {
-                                    showTgClear = false
-                                    vm.clearTgConfig()
-                                }) { Text("Ha, o'chirish", color = MaterialTheme.colorScheme.error) }
-                            },
-                            dismissButton = {
-                                androidx.compose.material3.TextButton(onClick = { showTgClear = false }) { Text("Bekor") }
-                            }
-                        )
-                    }
-                }
-            }
-
-            SettingsItem(
-                icon = Icons.Outlined.Download,
-                title = "☁️ Drive'dan yangilash",
-                subtitle = "2-telefon: so'nggi ma'lumotni Drive'dan oladi",
-                onClick = { vm.refreshFromDrive() }
+                title = "👤 Profil — zaxira va hisob",
+                subtitle = "Zaxira, Google Drive, Telegram, Drive'dan yangilash",
+                onClick = onProfil
             )
 
             // 3) Alias
@@ -535,7 +354,7 @@ private fun PinDialog(
 }
 
 @Composable
-private fun SettingsItem(
+internal fun SettingsItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -568,7 +387,7 @@ private fun SettingsItem(
 }
 
 @Composable
-private fun ToggleItem(
+internal fun ToggleItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
