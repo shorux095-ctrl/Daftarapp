@@ -151,7 +151,7 @@ class RasxodViewModel @Inject constructor(
     }
 
     /** Yuk rasxodi narxlarini saqlash — BUGUNGI sanadan boshlab (eski hisobot o'zgarmaydi) */
-    fun saveYukRates(inputs: Map<String, String>) {
+    fun saveYukRates(inputs: Map<String, String>, date: LocalDate? = null) {
         val prices = inputs.mapNotNull { (t, str) ->
             val v = str.trim().replace(",", ".").toDoubleOrNull()
             if (v != null && v >= 0.0) t.lowercase() to v else null
@@ -160,9 +160,10 @@ class RasxodViewModel @Inject constructor(
             _state.update { it.copy(message = "❌ Narx kiritilmadi") }
             return
         }
+        val d = date ?: LocalDate.now()
         viewModelScope.launch {
-            setGlobalUC(userId, "yr", prices, LocalDate.now())
-            _state.update { it.copy(message = "✅ Yuk rasxodi narxi saqlandi (bugundan)") }
+            setGlobalUC(userId, "yr", prices, d)
+            _state.update { it.copy(message = "✅ Yuk rasxodi narxi saqlandi ($d dan)") }
             load()
         }
     }

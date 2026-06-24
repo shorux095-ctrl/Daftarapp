@@ -15,8 +15,8 @@ import javax.inject.Inject
 class SetYukNarxUseCase @Inject constructor(
     private val yukNarxDao: YukNarxDao
 ) {
-    suspend operator fun invoke(userId: Long, prices: Map<TxType, Double>, group: String = "t") {
-        val now = LocalDateTime.now(ZONE).format(ISO)
+    suspend operator fun invoke(userId: Long, prices: Map<TxType, Double>, group: String = "t", date: java.time.LocalDate? = null) {
+        val now = (date?.atTime(12, 0) ?: LocalDateTime.now(ZONE)).format(ISO)
         for ((type, price) in prices) {
             if (type.code !in setOf("a", "b", "c", "d", "k")) continue
             yukNarxDao.insert(

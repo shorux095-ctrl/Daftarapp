@@ -66,6 +66,9 @@ fun RasxodScreen(
     ) { padding ->
         // Yuk rasxodi: input holati va ochiq/yopiq — ekran darajasida saqlanadi
         var yukExpanded by remember { mutableStateOf(false) }
+        var yukDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
+        var showYukDatePicker by remember { mutableStateOf(false) }
+        val yukDmy = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy") }
         val yukInputs = remember(state.yukRateInputs) {
             androidx.compose.runtime.mutableStateMapOf<String, String>().apply { putAll(state.yukRateInputs) }
         }
@@ -74,6 +77,22 @@ fun RasxodScreen(
         val liveTotal = listOf("a", "b", "c", "d", "k").sumOf { t ->
             val rate = (yukInputs[t] ?: "").trim().replace(",", ".").toDoubleOrNull() ?: 0.0
             (qtyMap[t] ?: 0.0) * rate
+        }
+
+        if (showYukDatePicker) {
+            val dps = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+            DatePickerDialog(
+                onDismissRequest = { showYukDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        dps.selectedDateMillis?.let {
+                            yukDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        }
+                        showYukDatePicker = false
+                    }) { Text("OK") }
+                },
+                dismissButton = { TextButton(onClick = { showYukDatePicker = false }) { Text("Bekor") } }
+            ) { DatePicker(state = dps) }
         }
 
         LazyColumn(
@@ -169,7 +188,7 @@ fun RasxodScreen(
                                     fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF8A4B1F))
                             }
                             Spacer(Modifier.height(10.dp))
-                            Text("Narx qo'yish (bugundan boshlab hisoblanadi):",
+                            Text("Narx qo'yish (tanlangan sanadan boshlab):",
                                 style = MaterialTheme.typography.labelMedium, color = Color(0xFF8A4B1F))
                             Spacer(Modifier.height(4.dp))
                             listOf("a", "b", "c", "d", "k").forEach { t ->
@@ -182,6 +201,10 @@ fun RasxodScreen(
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                                 )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedButton(onClick = { showYukDatePicker = true }) {
+                                Text("📅 Sana: ${yukDate?.format(yukDmy) ?: "bugun"}")
                             }
                             // Jonli hisob — yozayotgan narx bo'yicha (sotuv bo'lsa)
                             if (qtyMap.isNotEmpty()) {
@@ -202,7 +225,7 @@ fun RasxodScreen(
                             Button(
                                 onClick = {
                                     focusManager.clearFocus()
-                                    vm.saveYukRates(yukInputs.toMap())
+                                    vm.saveYukRates(yukInputs.toMap(), yukDate)
                                 },
                                 modifier = Modifier.fillMaxWidth().height(50.dp),
                                 shape = RoundedCornerShape(12.dp)

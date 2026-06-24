@@ -32,6 +32,14 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +66,9 @@ fun YukNarxScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val inputs = remember { mutableStateMapOf<TxType, String>() }
+    var narxDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
+    var showNarxDate by remember { mutableStateOf(false) }
+    val narxDmy = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy") }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -85,6 +96,7 @@ fun YukNarxScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
         ) {
             // ── T / T1 tab ──
@@ -147,8 +159,13 @@ fun YukNarxScreen(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
+            OutlinedButton(onClick = { showNarxDate = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("📅 Narx sanasi: ${narxDate?.format(narxDmy) ?: "bugun"}")
+            }
+            Spacer(Modifier.height(8.dp))
+
             Button(
-                onClick = { vm.setPrices(inputs.toMap()); inputs.clear() },
+                onClick = { vm.setPrices(inputs.toMap(), narxDate); inputs.clear() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = inputs.values.any { it.isNotBlank() }
             ) {
@@ -157,6 +174,22 @@ fun YukNarxScreen(
                 Text(if (state.group == "t") "T narxni saqlash" else "T1 narxni saqlash")
             }
             Spacer(Modifier.height(16.dp))
+
+            if (showNarxDate) {
+                val dps = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+                DatePickerDialog(
+                    onDismissRequest = { showNarxDate = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            dps.selectedDateMillis?.let {
+                                narxDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                            }
+                            showNarxDate = false
+                        }) { Text("OK") }
+                    },
+                    dismissButton = { TextButton(onClick = { showNarxDate = false }) { Text("Bekor") } }
+                ) { DatePicker(state = dps) }
+            }
         }
     }
 }

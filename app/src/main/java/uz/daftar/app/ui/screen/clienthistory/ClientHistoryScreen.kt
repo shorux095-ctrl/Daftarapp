@@ -313,11 +313,30 @@ private fun TimelineRow(
     val type = TxType.fromCode(tx.type)
     val isPayment = type == TxType.P
     val isManualDebt = type == TxType.Q
-    val desc = when {
-        isPayment -> "P(pul): ${tx.amount.formatMoney()}"
-        isManualDebt -> "Q(qarz): ${tx.amount.formatMoney()}"
-        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} × ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
-        else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
+    val typeColor = when (tx.type.lowercase()) {
+        "a" -> Color(0xFF1565C0)
+        "b" -> Color(0xFF7B1FA2)
+        "c" -> Color(0xFFEF6C00)
+        "d" -> Color(0xFF00838F)
+        "k" -> Color(0xFFC2185B)
+        "p" -> GreenB
+        else -> DebtRed
+    }
+    val badge = when {
+        isPayment -> "P"
+        isManualDebt -> "Q"
+        else -> tx.type.uppercase()
+    }
+    val mainText = when {
+        isPayment -> "To'lov qabul qilindi"
+        isManualDebt -> "Qo'lda qarz qo'shildi"
+        unitPrice != null -> "${tx.amount.formatQty()} × ${unitPrice.formatQty()} so'm"
+        else -> "${tx.amount.formatQty()} dona (narx yo'q)"
+    }
+    val amountText = when {
+        isPayment || isManualDebt -> "${tx.amount.formatMoney()} so'm"
+        unitPrice != null -> "${(tx.amount * unitPrice).formatMoney()} so'm"
+        else -> ""
     }
     val day = if (tx.date.length >= 10) tx.date.substring(8, 10) else "--"
     val monIdx = (if (tx.date.length >= 7) tx.date.substring(5, 7).toIntOrNull() else null) ?: 1
@@ -328,38 +347,46 @@ private fun TimelineRow(
     Row(
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Timeline rail (chiziq + nuqta)
-        Box(modifier = Modifier.width(26.dp).fillMaxHeight()) {
-            Box(modifier = Modifier.width(2.dp).fillMaxHeight().align(Alignment.Center).background(GreenB.copy(alpha = 0.22f)))
-            Box(modifier = Modifier.size(11.dp).align(Alignment.Center).clip(CircleShape).background(GreenB))
+        // Timeline chizig'i
+        Box(modifier = Modifier.width(20.dp).fillMaxHeight()) {
+            Box(modifier = Modifier.width(2.dp).fillMaxHeight().align(Alignment.Center).background(GreenB.copy(alpha = 0.18f)))
         }
         // Sana rozetkasi
         Column(
-            modifier = Modifier.width(48.dp).padding(vertical = 8.dp)
+            modifier = Modifier.width(46.dp).padding(vertical = 6.dp)
                 .clip(RoundedCornerShape(10.dp)).background(Color(0xFFEFF3F0)).padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(day, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = InkDark)
             Text(monAbbr, fontSize = 9.sp, color = InkGray)
         }
-        Spacer(Modifier.width(10.dp))
-        // Tavsif + vaqt
-        Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
-            Text(desc, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isPayment) GreenB else InkDark)
-            if (time.isNotEmpty()) Text("🕐 $time", fontSize = 11.sp, color = Color(0xFF9AA0A6))
-        }
         Spacer(Modifier.width(8.dp))
-        // Qoldiq
+        // Rangli tur belgisi (A/B/C/D/K/P/Q)
+        Box(
+            modifier = Modifier.size(36.dp).clip(CircleShape).background(typeColor.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(badge, color = typeColor, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+        Spacer(Modifier.width(10.dp))
+        // Tavsif + summa
+        Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text(mainText, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = InkDark)
+            if (amountText.isNotEmpty())
+                Text(amountText, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isPayment) GreenB else typeColor)
+            if (time.isNotEmpty()) Text("🕐 $time", fontSize = 10.sp, color = Color(0xFF9AA0A6))
+        }
+        Spacer(Modifier.width(6.dp))
+        // Joriy qoldiq
         Column(horizontalAlignment = Alignment.End) {
+            Text("qoldiq", fontSize = 9.sp, color = InkGray)
             if (debtNow > 0) {
                 Text(debtNow.formatMoney(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DebtRed)
-                Text("so'm", fontSize = 10.sp, color = DebtRed)
             } else {
                 Text("✅ 0", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = GreenB)
-                Text("so'm", fontSize = 10.sp, color = GreenB)
             }
         }
     }

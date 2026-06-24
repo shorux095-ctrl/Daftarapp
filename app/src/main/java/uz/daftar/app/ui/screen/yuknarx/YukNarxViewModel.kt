@@ -47,7 +47,7 @@ class YukNarxViewModel @Inject constructor(
         }
     }
 
-    fun setPrices(input: Map<TxType, String>) {
+    fun setPrices(input: Map<TxType, String>, date: java.time.LocalDate? = null) {
         val parsed: Map<TxType, Double> = input.mapNotNull { (type, str) ->
             val v = str.trim().replace(",", ".").toDoubleOrNull()
             if (v != null && v > 0) type to v else null
@@ -59,7 +59,7 @@ class YukNarxViewModel @Inject constructor(
         }
         val group = _state.value.group
         viewModelScope.launch {
-            setNarx(userId, parsed, group)
+            setNarx(userId, parsed, group, date)
             _state.update {
                 it.copy(message = "✅ ${parsed.size} ta ${group.uppercase()} narx saqlandi")
             }
