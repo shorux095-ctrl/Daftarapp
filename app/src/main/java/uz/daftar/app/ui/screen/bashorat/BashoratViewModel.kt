@@ -120,7 +120,7 @@ class BashoratViewModel @Inject constructor(
                         reliable = reliable,
                         status = status
                     )
-                }.sortedBy { it.daysUntilNext }  // kechikkan + yaqinlar tepada
+                }.sortedWith(compareBy({ statusOrder(it.status) }, { it.daysUntilNext }))  // Bugun → Ertaga → yaqin → Kechikkan
 
                 _state.update {
                     it.copy(
@@ -139,6 +139,14 @@ class BashoratViewModel @Inject constructor(
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
         }
+    }
+
+    private fun statusOrder(s: PredStatus): Int = when (s) {
+        PredStatus.TODAY -> 0
+        PredStatus.TOMORROW -> 1
+        PredStatus.SOON -> 2
+        PredStatus.LATER -> 3
+        PredStatus.OVERDUE -> 4
     }
 
     private fun parseDay(date: String): LocalDate? = try {

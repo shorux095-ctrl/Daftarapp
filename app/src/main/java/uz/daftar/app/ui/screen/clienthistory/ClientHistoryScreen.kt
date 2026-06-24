@@ -45,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,6 +86,16 @@ fun ClientHistoryScreen(
     vm: ClientHistoryViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+
+    // Tahrir/boshqa ekrandan qaytganda ro'yxatni yangilash (o'zgarish darrov ko'rinsin)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.load()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     var toDelete by remember { mutableStateOf<TransactionEntity?>(null) }
     val context = LocalContext.current
 
