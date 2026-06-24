@@ -1235,13 +1235,17 @@ class TodayViewModel @Inject constructor(
         }
         // Autocomplete — OXIRGI qatordagi birinchi so'z (har bir qatorda ishlaydi)
         val lastLine0 = text.substringAfterLast('\n').trimStart()
-        val firstWord = lastLine0.substringBefore(' ').trim()
-        // Ism yozilyapti deb hisoblaymiz: birinchi so'z harf bilan boshlansa
-        // (qator oxirida yuk bo'lsa ham, yangi qator ismiga yordam chiqsin)
-        val onlyName = firstWord.isNotBlank() &&
-            firstWord.first().isLetter() &&
-            firstWord.all { it.isLetter() || it == '\'' || it == '-' }
-        updateSuggestions(if (onlyName) firstWord else "")
+        // Sana (15.06) yoki o'chirish so'zi (x/ochir) bo'lsa — ulardan keyingi so'z ISM
+        val partsLL = lastLine0.split(' ').filter { it.isNotBlank() }
+        val dateRe = Regex("""^\d{1,2}[.,]\d{1,2}([.,]\d{2,4})?$""")
+        val delWords = setOf("x", "ochir", "o'chir", "ochirish")
+        var wi = 0
+        while (wi < partsLL.size && (dateRe.matches(partsLL[wi]) || partsLL[wi].lowercase() in delWords)) wi++
+        val nameWord = if (wi < partsLL.size) partsLL[wi] else ""
+        val onlyName = nameWord.isNotBlank() &&
+            nameWord.first().isLetter() &&
+            nameWord.all { it.isLetter() || it == '\'' || it == '-' }
+        updateSuggestions(if (onlyName) nameWord else "")
 
         // Jonli tarix preview — ism yozilsa (parsing yozuv topa olmasa)
         loadPreviewIfName(text)

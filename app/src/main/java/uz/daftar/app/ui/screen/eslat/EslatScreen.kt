@@ -18,9 +18,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.daftar.app.data.db.entity.EslatmaEntity
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +38,9 @@ fun EslatScreen(
 
     var text by remember { mutableStateOf("") }
     var dayIdx by remember { mutableStateOf(1) } // 0=Bugun, 1=Ertaga...
+    var customDate by remember { mutableStateOf<LocalDate?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val dmy = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
     var hour by remember { mutableStateOf("9") }
     var minute by remember { mutableStateOf("00") }
 
@@ -71,14 +78,22 @@ fun EslatScreen(
                     Spacer(Modifier.height(10.dp))
                     Text("Qachon:", style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
                         dayOptions.forEach { (label, idx) ->
                             FilterChip(
-                                selected = dayIdx == idx,
-                                onClick = { dayIdx = idx },
+                                selected = dayIdx == idx && customDate == null,
+                                onClick = { dayIdx = idx; customDate = null },
                                 label = { Text(label) }
                             )
                         }
+                        FilterChip(
+                            selected = customDate != null,
+                            onClick = { showDatePicker = true },
+                            label = { Text(customDate?.format(dmy) ?: "📅 Sana") }
+                        )
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -102,12 +117,32 @@ fun EslatScreen(
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = {
-                            vm.add(text, dayIdx, hour.toIntOrNull() ?: 9, minute.toIntOrNull() ?: 0)
-                            text = ""
+                            val cd = customDate
+                            val days = if (cd != null)
+                                ChronoUnit.DAYS.between(LocalDate.now(), cd).toInt().coerceAtLeast(0)
+                            else dayIdx
+                            vm.add(text, days, hour.toIntOrNull() ?: 9, minute.toIntOrNull() ?: 0)
+                            text = ""; customDate = null
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("➕ Eslatma qo'yish") }
                 }
+            }
+
+            if (showDatePicker) {
+                val dps = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            dps.selectedDateMillis?.let {
+                                customDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                            }
+                            showDatePicker = false
+                        }) { Text("OK") }
+                    },
+                    dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Bekor") } }
+                ) { DatePicker(state = dps) }
             }
 
             Spacer(Modifier.height(16.dp))
