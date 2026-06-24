@@ -61,6 +61,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Qarz eslatma: har kuni 10:00 aniq alarm (DaftarApplication + EslatmaBootReceiver rejalashtiradi) -->
+        <receiver
+            android:name=".core.notify.DebtReminderReceiver"
+            android:exported="false" />
+
         <!-- PDF ulashish uchun -->
         <provider
             android:name="androidx.core.content.FileProvider"
