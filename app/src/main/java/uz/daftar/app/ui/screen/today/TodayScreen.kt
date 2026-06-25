@@ -159,6 +159,7 @@ fun TodayScreen(
     onEslat: () -> Unit = onSettings,
     onSklad: () -> Unit = onSettings,
     onTahrir: () -> Unit = onSettings,
+    onQoshimcha: () -> Unit = onSettings,
     vm: TodayViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -387,6 +388,7 @@ fun TodayScreen(
                     onEslat = onEslat,
                     onSklad = onSklad,
                     onTahrir = onTahrir,
+                    onQoshimcha = onQoshimcha,
                     onYukType = { yukTypeDialog = it },
                     menuOpen = menuOpen,
                     onMenuOpenChange = { menuOpen = it }
@@ -702,6 +704,7 @@ private fun ChatTopBar(
     onEslat: () -> Unit,
     onSklad: () -> Unit,
     onTahrir: () -> Unit = {},
+    onQoshimcha: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onJumpToDate: (java.time.LocalDate) -> Unit = {},
     onImport: () -> Unit = {},
@@ -724,7 +727,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v89", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v91", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -775,6 +778,7 @@ private fun ChatTopBar(
                 }
                 Spacer(Modifier.height(16.dp))
                 val tiles = listOf(
+                    MenuItem("📋", "Qo'shimcha", "Qarz, statistika, qidiruv", Color(0xFFE3E0FF), onQoshimcha),
                     MenuItem("📦", "Yuk hisoboti", "Yuklar va holatlar", Color(0xFFD6F5E0), onYukReport),
                     MenuItem("✏️", "Tahrirlash", "Ma'lumotlarni tahrirlash", Color(0xFFEDE3FF), onTahrir),
                     MenuItem("📋", "To'liq", "To'liq ma'lumot", Color(0xFFFFE9D1), onToliq),

@@ -191,6 +191,8 @@ class TodayViewModel @Inject constructor(
     // "12.03 x" yoki "x 12.03" formatini tanish
     private val DELETE_X_RE = Regex("""^(\d{1,2}\.\d{1,2})\s+x$|^x\s+(\d{1,2}\.\d{1,2})$""")
 
+    private var restored = false
+
     init {
         restoreChat()
         // Har qanday tranzaksiya o'zgarsa (edit/o'chirish ham) — History kartalarni jonli DB bilan yangilash
@@ -301,6 +303,8 @@ class TodayViewModel @Inject constructor(
     /** 🔄 Bosh ekran yangilash — kartalarni jonli DB bilan qayta yasaydi. */
     fun refresh() {
         viewModelScope.launch {
+            // Dastlabki yuklash tugamaguncha kutamiz (widjet yozuvi 2 marta qo'shilmasin / sakramasin)
+            if (!restored) return@launch
             // Avval widjet yozuvlarini chatga qo'shamiz, keyin kartalarni yangilaymiz
             val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
             for (line in pend) {
@@ -312,15 +316,13 @@ class TodayViewModel @Inject constructor(
     }
 
     /** Widjetdan qo'shilgan yozuvlarni chatda "✅ Saqlandi" sifatida ko'rsatish. */
-    private fun drainPendingWidget() {
-        viewModelScope.launch {
-            val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
-            if (pend.isEmpty()) return@launch
-            for (line in pend) {
-                appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
-            }
-            persistChat()
+    private suspend fun drainPendingWidget() {
+        val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
+        if (pend.isEmpty()) return
+        for (line in pend) {
+            appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
         }
+        persistChat()
     }
 
     private fun refreshHistoryCards() {
@@ -453,6 +455,7 @@ class TodayViewModel @Inject constructor(
             drainPendingWidget()
             refreshHistoryCards()
             runCatching { ensureDebtReminder() }
+            restored = true
         }
     }
 
