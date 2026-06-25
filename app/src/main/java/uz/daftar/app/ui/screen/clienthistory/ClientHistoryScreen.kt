@@ -72,6 +72,8 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 private val GreenA = Color(0xFF1AA35A)
+private val BlueA = Color(0xFF3B6FF6)
+private val BlueB = Color(0xFF2451E0)
 private val GreenB = Color(0xFF13B86C)
 private val DebtRed = Color(0xFFE53935)
 private val InkDark = Color(0xFF1A1A1A)
@@ -281,11 +283,11 @@ private fun GreenHeader(name: String, monthLabel: String, year: Int, monthDebt: 
     Box(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
-            .background(Brush.horizontalGradient(listOf(GreenA, GreenB)))
+            .background(Brush.horizontalGradient(listOf(BlueA, BlueB)))
             .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
     ) {
         Column {
-            Text("$disp — $monthLabel $year", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text("💰 $disp — $monthLabel $year", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(20.dp))
@@ -313,80 +315,61 @@ private fun TimelineRow(
     val type = TxType.fromCode(tx.type)
     val isPayment = type == TxType.P
     val isManualDebt = type == TxType.Q
-    val typeColor = when (tx.type.lowercase()) {
-        "a" -> Color(0xFF1565C0)
-        "b" -> Color(0xFF7B1FA2)
-        "c" -> Color(0xFFEF6C00)
-        "d" -> Color(0xFF00838F)
-        "k" -> Color(0xFFC2185B)
-        "p" -> GreenB
-        else -> DebtRed
-    }
-    val badge = when {
-        isPayment -> "P"
-        isManualDebt -> "Q"
-        else -> tx.type.uppercase()
-    }
-    val mainText = when {
-        isPayment -> "To'lov qabul qilindi"
-        isManualDebt -> "Qo'lda qarz qo'shildi"
-        unitPrice != null -> "${tx.amount.formatQty()} × ${unitPrice.formatQty()} so'm"
-        else -> "${tx.amount.formatQty()} dona (narx yo'q)"
-    }
-    val amountText = when {
-        isPayment || isManualDebt -> "${tx.amount.formatMoney()} so'm"
-        unitPrice != null -> "${(tx.amount * unitPrice).formatMoney()} so'm"
-        else -> ""
+    val desc = when {
+        isPayment -> "P(pul): ${tx.amount.formatMoney()}"
+        isManualDebt -> "Q(qarz): ${tx.amount.formatMoney()}"
+        unitPrice != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} × ${unitPrice.formatQty()} = ${(tx.amount * unitPrice).formatMoney()} so'm"
+        else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
     }
     val day = if (tx.date.length >= 10) tx.date.substring(8, 10) else "--"
     val monIdx = (if (tx.date.length >= 7) tx.date.substring(5, 7).toIntOrNull() else null) ?: 1
-    val monAbbr = MONTHS_UZ[(monIdx - 1).coerceIn(0, 11)].take(3).uppercase()
+    val monAbbr = MONTHS_UZ[(monIdx - 1).coerceIn(0, 11)].take(4).uppercase()
     val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
     val debtNow = balance.roundToLong()
 
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+        modifier = Modifier.fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Timeline chizig'i
-        Box(modifier = Modifier.width(20.dp).fillMaxHeight()) {
-            Box(modifier = Modifier.width(2.dp).fillMaxHeight().align(Alignment.Center).background(GreenB.copy(alpha = 0.18f)))
-        }
-        // Sana rozetkasi
+        // Sana rozetkasi (qizil oy yorlig'i + kun)
         Column(
-            modifier = Modifier.width(46.dp).padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(10.dp)).background(Color(0xFFEFF3F0)).padding(vertical = 6.dp),
+            modifier = Modifier.width(48.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFF4F5F7)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(day, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = InkDark)
-            Text(monAbbr, fontSize = 9.sp, color = InkGray)
+            Text(
+                monAbbr, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                    .background(Color(0xFFE5484D)).padding(vertical = 2.dp)
+            )
+            Text(day, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = InkDark,
+                modifier = Modifier.padding(vertical = 4.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        // Tavsif + vaqt
+        Column(modifier = Modifier.weight(1f)) {
+            Text(desc, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                color = if (isPayment) Color(0xFF1E54E8) else InkDark)
+            if (time.isNotEmpty()) {
+                Spacer(Modifier.height(2.dp))
+                Text("🕐 $time", fontSize = 11.sp, color = Color(0xFF9AA0A6))
+            }
         }
         Spacer(Modifier.width(8.dp))
-        // Rangli tur belgisi (A/B/C/D/K/P/Q)
-        Box(
-            modifier = Modifier.size(36.dp).clip(CircleShape).background(typeColor.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center
+        // "Qoldi" yashil quti (Image 1 uslubida)
+        Column(
+            modifier = Modifier.width(108.dp).clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFE3F7E8)).padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(badge, color = typeColor, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        }
-        Spacer(Modifier.width(10.dp))
-        // Tavsif + summa
-        Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
-            Text(mainText, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = InkDark)
-            if (amountText.isNotEmpty())
-                Text(amountText, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isPayment) GreenB else typeColor)
-            if (time.isNotEmpty()) Text("🕐 $time", fontSize = 10.sp, color = Color(0xFF9AA0A6))
-        }
-        Spacer(Modifier.width(6.dp))
-        // Joriy qoldiq
-        Column(horizontalAlignment = Alignment.End) {
-            Text("qoldiq", fontSize = 9.sp, color = InkGray)
             if (debtNow > 0) {
-                Text(debtNow.formatMoney(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DebtRed)
+                Text("Qoldi:", fontSize = 11.sp, color = Color(0xFF4A4A4A))
+                Text("${debtNow.formatMoney()} so'm", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B7F3B))
             } else {
-                Text("✅ 0", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = GreenB)
+                Text("0 so'm", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B7F3B))
             }
         }
     }
