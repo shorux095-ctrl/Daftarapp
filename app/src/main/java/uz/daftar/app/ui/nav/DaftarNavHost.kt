@@ -31,6 +31,8 @@ import uz.daftar.app.ui.screen.rasxod.RasxodScreen
 import uz.daftar.app.ui.screen.reminder.ReminderLimitScreen
 import uz.daftar.app.ui.screen.reports.ReportsScreen
 import uz.daftar.app.ui.screen.search.SearchScreen
+import uz.daftar.app.ui.screen.qoshimcha.QoshimchaScreen
+import uz.daftar.app.ui.screen.statistika.StatistikaScreen
 import uz.daftar.app.ui.screen.tahrir.TahrirScreen
 import uz.daftar.app.ui.screen.settings.SettingsScreen
 import uz.daftar.app.ui.screen.today.TodayScreen
@@ -63,6 +65,8 @@ object Routes {
     const val DAILY = "daily"
     const val BASHORAT = "bashorat"
     const val GRAFIK = "grafik"
+    const val QOSHIMCHA = "qoshimcha"
+    const val STATISTIKA = "statistika"
     const val CALC = "calc"
     const val TAHRIR = "tahrir"
 }
@@ -135,6 +139,7 @@ fun DaftarNavHost() {
                 onQarz = { if (canNav()) nav.navigate(Routes.QARZ) },
                 onManager = { if (canNav()) nav.navigate(Routes.MANAGER) },
                 onDashboard = { if (canNav()) nav.navigate(Routes.DASHBOARD) },
+                onQoshimcha = { if (canNav()) nav.navigate(Routes.QOSHIMCHA) },
                 onHelp = { if (canNav()) nav.navigate(Routes.HELP) },
                 onEslat = { if (canNav()) nav.navigate(Routes.ESLAT) },
                 onSklad = { if (canNav()) nav.navigate(Routes.SKLAD) },
@@ -156,12 +161,11 @@ fun DaftarNavHost() {
         }
 
         composable(Routes.QARZ) { DiagIn("qarz");
-            ClientsScreen(
+            uz.daftar.app.ui.screen.qarzdorlar.QarzdorlarScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
-                onClientClick = { name ->
+                onOpenClient = { name ->
                     if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
-                },
-                debtorsOnly = true
+                }
             )
         }
 
@@ -219,6 +223,16 @@ fun DaftarNavHost() {
         composable(Routes.DAILY) { DiagIn("daily"); uz.daftar.app.ui.screen.daily.DailyReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.BASHORAT) { DiagIn("bashorat"); uz.daftar.app.ui.screen.bashorat.BashoratScreen(onBack = { if (canNav()) nav.popBackStack() }, onOpenClient = { name -> if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name") }) }
         composable(Routes.GRAFIK) { DiagIn("grafik"); uz.daftar.app.ui.screen.grafik.GrafikScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.STATISTIKA) { DiagIn("statistika"); StatistikaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
+        composable(Routes.QOSHIMCHA) { DiagIn("qoshimcha");
+            QoshimchaScreen(
+                onBack = { if (canNav()) nav.popBackStack() },
+                onQarz = { if (canNav()) nav.navigate(Routes.QARZ) },
+                onStatistika = { if (canNav()) nav.navigate(Routes.STATISTIKA) },
+                onGrafik = { if (canNav()) nav.navigate(Routes.GRAFIK) },
+                onSearch = { if (canNav()) nav.navigate(Routes.SEARCH) }
+            )
+        }
         composable(Routes.CALC) { DiagIn("calc"); uz.daftar.app.ui.screen.calc.CalcScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.RASXOD) { DiagIn("rasxod"); RasxodScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.KARZINA) { DiagIn("karzina"); KarzinaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
