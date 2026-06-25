@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -35,8 +36,10 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalcScreen(onBack: () -> Unit) {
-    var expr by remember { mutableStateOf("") }
-    var memory by remember { mutableStateOf(0.0) }
+    var expr by remember { mutableStateOf(CalcStore.expr) }
+    var memory by remember { mutableStateOf(CalcStore.memory) }
+    LaunchedEffect(expr) { CalcStore.expr = expr }
+    LaunchedEffect(memory) { CalcStore.memory = memory }
     val res = remember(expr) { evalExpr(expr) }
 
     Scaffold(
@@ -229,4 +232,10 @@ private fun evalExpr(s: String): Double? {
     while (ops.isNotEmpty()) { if (!apply()) return null }
     val r = vals.lastOrNull() ?: return null
     return if (r.isNaN() || r.isInfinite()) null else r
+}
+
+/** Kalkulator holatini navigatsiya orasida saqlaydi (chiqib-kirganda yo'qolmaydi). */
+object CalcStore {
+    var expr: String = ""
+    var memory: Double = 0.0
 }
