@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -113,9 +114,10 @@ fun ToliqHisobotScreen(
                 val r = state.report ?: return@Column
 
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    NavArrow("◀") { vm.step(-1) }
                     Text(r.rangeLabel, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = INK,
-                        modifier = Modifier.weight(1f))
-                    Text("\uD83D\uDDD3\uFE0F", fontSize = 18.sp)
+                        textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                    NavArrow("▶") { vm.step(1) }
                 }
 
                 // ── 1) SOTILGAN YUKLAR ──
@@ -195,6 +197,14 @@ fun ToliqHisobotScreen(
             }
         }
     }
+}
+
+@Composable
+private fun NavArrow(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFEDEFF7)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Text(symbol, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4A4A6A)) }
 }
 
 @Composable

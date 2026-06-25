@@ -17,7 +17,8 @@ import javax.inject.Inject
 
 data class ToliqState(
     val isLoading: Boolean = true,
-    val mode: Int = 0,                 // 0 = Bugun, 1 = Shu oy
+    val mode: Int = 0,                 // 0 = Bugun, 1 = Shu oy, 2 = Yil
+    val selectedDate: LocalDate = LocalDate.now(),
     val report: PeriodReport? = null,
     val error: String? = null
 )
@@ -38,7 +39,19 @@ class ToliqHisobotViewModel @Inject constructor(
 
     fun setMode(m: Int) {
         if (_state.value.mode == m) return
-        _state.update { it.copy(mode = m) }
+        _state.update { it.copy(mode = m, selectedDate = LocalDate.now()) }
+        load()
+    }
+
+    /** Oldingi/keyingi davr: Bugun→kun, Shu oy→oy, Yil→yil */
+    fun step(delta: Int) {
+        val cur = _state.value.selectedDate
+        val next = when (_state.value.mode) {
+            0 -> cur.plusDays(delta.toLong())
+            2 -> cur.plusYears(delta.toLong())
+            else -> cur.plusMonths(delta.toLong())
+        }
+        _state.update { it.copy(selectedDate = next) }
         load()
     }
 
@@ -46,11 +59,11 @@ class ToliqHisobotViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             try {
-                val today = LocalDate.now()
+                val d = _state.value.selectedDate
                 val r = when (_state.value.mode) {
-                    0 -> getDaily(userId, today)
-                    2 -> getYearly(userId, today.year)
-                    else -> getMonthly(userId, today.year, today.monthValue)
+                    0 -> getDaily(userId, d)
+                    2 -> getYearly(userId, d.year)
+                    else -> getMonthly(userId, d.year, d.monthValue)
                 }
                 _state.update { it.copy(isLoading = false, report = r, error = null) }
             } catch (e: Exception) {
