@@ -50,6 +50,7 @@ object Routes {
     const val YUK_REPORT = "yuk_report"
     const val CLIENT_HISTORY = "client_history"
     const val QARZ = "qarz"
+    const val QARZ_REYTING = "qarz_reyting"
     const val EDIT_TX = "edit_tx"
     const val RASXOD = "rasxod"
     const val KARZINA = "karzina"
@@ -161,6 +162,16 @@ fun DaftarNavHost() {
         }
 
         composable(Routes.QARZ) { DiagIn("qarz");
+            ClientsScreen(
+                onBack = { if (canNav()) nav.popBackStack() },
+                onClientClick = { name ->
+                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                },
+                debtorsOnly = true
+            )
+        }
+
+        composable(Routes.QARZ_REYTING) { DiagIn("qarz_reyting");
             uz.daftar.app.ui.screen.qarzdorlar.QarzdorlarScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
                 onOpenClient = { name ->
@@ -227,7 +238,7 @@ fun DaftarNavHost() {
         composable(Routes.QOSHIMCHA) { DiagIn("qoshimcha");
             QoshimchaScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
-                onQarz = { if (canNav()) nav.navigate(Routes.QARZ) },
+                onQarz = { if (canNav()) nav.navigate(Routes.QARZ_REYTING) },
                 onStatistika = { if (canNav()) nav.navigate(Routes.STATISTIKA) },
                 onGrafik = { if (canNav()) nav.navigate(Routes.GRAFIK) },
                 onSearch = { if (canNav()) nav.navigate(Routes.SEARCH) }
