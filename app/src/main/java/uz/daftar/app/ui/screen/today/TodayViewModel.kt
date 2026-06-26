@@ -56,6 +56,7 @@ data class ClientPreview(
 data class TodayUiState(
     val filter: Filter = Filter.TODAY,
     val isLoading: Boolean = true,
+    val restored: Boolean = false,
     val transactions: List<Transaction> = emptyList(),
     val totalByType: Map<TxType, Double> = emptyMap(),
     val clientCount: Int = 0,
@@ -451,6 +452,7 @@ class TodayViewModel @Inject constructor(
                 val list = runCatching { deserializeChat(json) }.getOrDefault(emptyList())
                 if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
             }
+            _state.update { it.copy(restored = true) }   // chat tayyor (yoki bo'sh) — endi ko'rsatish mumkin
             runCatching { maybeShowAutoReports() }
             drainPendingWidget()
             refreshHistoryCards()
@@ -470,7 +472,8 @@ class TodayViewModel @Inject constructor(
             val y = today.minusDays(1)
             val r = getDateReport(userId, y, null, false)
             if (r.clientLines.isNotEmpty() || r.totalPayments > 0) {
-                appendChat(ChatItem.Info(nextChatId(), "🗓 Kechagi hisobot\n" + dateReportText(r)))
+                val labeled = r.copy(title = "Kecha · " + y.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")))
+                appendChat(ChatItem.DateRep(nextChatId(), labeled))
             }
         }
         // Dushanba — o'tgan haftalik

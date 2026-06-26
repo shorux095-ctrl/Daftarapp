@@ -407,14 +407,7 @@ fun TodayScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        BottomNavBtn("🏠", "Bosh ekran") {
-                            // Oxirgi (eng yangi) yozuvga qaytadi
-                            calScope.launch {
-                                runCatching {
-                                    if (state.chat.isNotEmpty()) listState.animateScrollToItem(state.chat.size - 1)
-                                }
-                            }
-                        }
+                        BottomNavBtn("🔮", "Bashorat") { onBashorat() }
                         BottomNavBtn("📦", "Yuk") { onYukReport() }
                         // ➕ Yozish tugmasi: bosilsa klaviatura, bosib turilsa ovoz
                         Surface(
@@ -512,7 +505,7 @@ fun TodayScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) { Snackbar(snackbarData = it) } }
     ) { padding ->
-        if (state.isLoading) {
+        if (state.isLoading || !state.restored) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -727,7 +720,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v95", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v96", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1895,10 +1888,10 @@ private fun DebtReminderCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            DebtBucket("🔴 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
-            DebtBucket("🟠 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
-            DebtBucket("🟡 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
             DebtBucket("🔵 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
+            DebtBucket("🟡 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
+            DebtBucket("🟠 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
+            DebtBucket("🔴 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
         }
     }
 }
@@ -1915,7 +1908,7 @@ private fun DebtBucket(
         title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = accent,
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
     )
-    items.sortedByDescending { it.daysOverdue }.forEach { d ->
+    items.sortedBy { it.daysOverdue }.forEach { d ->
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
