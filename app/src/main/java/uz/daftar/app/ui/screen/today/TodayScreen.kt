@@ -720,7 +720,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v96", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v97", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1324,169 +1324,211 @@ private fun PreviewHistoryCard(
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var actionTx by remember { mutableStateOf<uz.daftar.app.data.db.entity.TransactionEntity?>(null) }
     val monthPrefix = "%04d-%02d".format(month.year, month.monthValue)
-    val monthTxs = allTxs.filter { it.date.startsWith(monthPrefix) }
-    val monthLabel = "${MONTHS_UZ_TODAY[month.monthValue - 1]} ${month.year}"
+    val monthTxs = allTxs.filter { it.date.startsWith(monthPrefix) }.sortedBy { it.date }
+    val monthLabel = MONTHS_UZ_TODAY[month.monthValue - 1]
 
-    // Oylik JAMI
-    val byType = monthTxs.groupBy { it.type }.mapValues { (_, l) -> l.sumOf { it.amount } }
-    val payTotal = monthTxs.filter { it.type.lowercase() == "p" }.sumOf { it.amount }
-    var revenue = 0.0
-    for (tx in monthTxs) {
-        val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
-        if (t in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
-            val p = priceByTx[tx.id]
-            if (p != null) revenue += tx.amount * p
-        }
-    }
-    // Oylik qarz (oxirgi tx oxirigacha)
+    // Oylik qarz (oy oxiri)
     val monthDebt: Long = run {
         var r = 0.0
-        for (tx in monthTxs.sortedBy { it.date }) {
+        for (tx in monthTxs) {
             when (tx.type.lowercase()) {
                 "p" -> r -= tx.amount
                 "q" -> r += tx.amount
                 else -> { val p = priceByTx[tx.id]; if (p != null) r += tx.amount * p }
             }
         }
-        r.toLong()
+        Math.round(r)
+    }
+
+    // Har bir yozuvdan keyingi umumiy qoldiq (timeline o'ngi uchun)
+    val balMap = remember(allTxs, priceByTx) {
+        var b = 0.0
+        val m = HashMap<Long, Double>()
+        allTxs.sortedBy { it.date }.forEach { tx ->
+            when (tx.type.lowercase()) {
+                "p" -> b -= tx.amount
+                "q" -> b += tx.amount
+                else -> { val p = priceByTx[tx.id]; if (p != null) b += tx.amount * p }
+            }
+            m[tx.id] = b
+        }
+        m
+    }
+
+    val cGreen = androidx.compose.ui.graphics.Color(0xFF1AA35A)
+    val cRed = androidx.compose.ui.graphics.Color(0xFFE53935)
+    val cGray = androidx.compose.ui.graphics.Color(0xFF6B7280)
+    fun typeColor(code: String) = when (code.lowercase()) {
+        "a" -> androidx.compose.ui.graphics.Color(0xFF1976D2)
+        "b" -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+        "c" -> androidx.compose.ui.graphics.Color(0xFF2E9E4F)
+        "d" -> androidx.compose.ui.graphics.Color(0xFF00838F)
+        "k" -> androidx.compose.ui.graphics.Color(0xFFC2185B)
+        "p" -> cGreen
+        else -> cRed
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Sarlavha
-            Text(
-                "👤 ${name.replaceFirstChar { it.titlecase(Locale.getDefault()) }} — $monthLabel",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "💳 ${MONTHS_UZ_TODAY[month.monthValue - 1]} qarzi: ${monthDebt.toDouble().formatMoney()} so'm",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (monthDebt > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // 1) Yashil header
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .background(cGreen)
+                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp)
+            ) {
+                Text(
+                    "${name.replaceFirstChar { it.titlecase(Locale.getDefault()) }} \u2014 $monthLabel ${month.year}",
+                    color = androidx.compose.ui.graphics.Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.20f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "$monthLabel qarzi: ${monthDebt.toDouble().formatMoney()} so'm",
+                        color = androidx.compose.ui.graphics.Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
             if (monthTxs.isEmpty()) {
-                Text(
-                    "Bu oyda yozuv yo'q",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                    Text("Bu oyda yozuv yo'q", color = cGray, style = MaterialTheme.typography.bodySmall)
+                }
             } else {
-                // Maksimal balandlik — uzun bo'lsa scroll
                 val scrollState = rememberScrollState()
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 280.dp)
+                        .heightIn(max = 320.dp)
                         .verticalScroll(scrollState)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    val byDay = monthTxs.groupBy { it.date.take(10) }
-                        .toSortedMap(compareBy { it })
-                    for ((day, dayTxsRaw) in byDay) {
-                        val dayTxs = dayTxsRaw.sortedBy { it.date }
-                        val dayLabel = if (day.length >= 10)
-                            "📅 ${day.substring(8, 10)}.${day.substring(5, 7)}"
-                        else "📅 $day"
-                        Text(
-                            dayLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
-                        )
-                        for (tx in dayTxs) {
-                            val type = uz.daftar.app.domain.model.TxType.fromCode(tx.type)
-                            val isPayment = type == uz.daftar.app.domain.model.TxType.P
-                            val up = priceByTx[tx.id]
-                            val main = when {
-                                isPayment -> "P(pul): ${tx.amount.formatMoney()}"
-                                up != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} × ${up.formatQty()} = ${(tx.amount * up).formatMoney()} so'm"
-                                else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
-                            }
-                            val ba = balanceAfter[tx.id]
-                            val bal = if (isPayment && ba != null) {
-                                when {
-                                    ba > 0 -> " → 💳 Qoldi: ${ba.formatMoney()}"
-                                    ba == 0L -> " → ✅ 0"
-                                    else -> " → 💚 Ortiq: ${(-ba).formatMoney()}"
+                    for (tx in monthTxs) {
+                        val tc = typeColor(tx.type)
+                        val isP = tx.type.equals("p", true)
+                        val isQ = tx.type.equals("q", true)
+                        val up = priceByTx[tx.id]
+                        val desc = when {
+                            isP -> "P(pul): ${tx.amount.formatMoney()}"
+                            isQ -> "Q(qarz): ${tx.amount.formatMoney()}"
+                            up != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} \u00d7 ${up.formatQty()} = ${(tx.amount * up).formatMoney()} so'm"
+                            else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
+                        }
+                        val dayTxt = if (tx.date.length >= 10) "${tx.date.substring(8, 10)}.${tx.date.substring(5, 7)}" else tx.date
+                        val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
+                        val bal = Math.round(balMap[tx.id] ?: 0.0)
+                        val balColor = if (bal > 0) cRed else cGreen
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { actionTx = tx }
+                                .padding(vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.size(42.dp).clip(CircleShape).background(tc.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(tx.type.uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tc)
+                                    Text(tx.amount.formatQty(), fontSize = 10.sp, color = tc)
                                 }
-                            } else ""
-                            val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(desc, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = tc)
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    if (time.isNotEmpty()) "$dayTxt \u00b7 \uD83D\uDD50 $time" else dayTxt,
+                                    fontSize = 11.sp, color = cGray
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(bal.toDouble().formatMoney(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = balColor)
+                                Text("so'm", fontSize = 10.sp, color = balColor)
+                            }
+                        }
+                        HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x12000000))
+                    }
+                }
+
+                // JAMI HISOBOT
+                run {
+                    var cargo = 0.0
+                    for (tx in monthTxs) {
+                        val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
+                        if (t == TxType.A || t == TxType.B || t == TxType.C || t == TxType.D || t == TxType.K) {
+                            val p = priceByTx[tx.id]; if (p != null) cargo += tx.amount * p
+                        }
+                    }
+                    val pay = monthTxs.filter { it.type.equals("p", true) }.sumOf { it.amount }
+                    val farq = cargo - pay
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Color(0xFFF4F8F5)).padding(12.dp)
+                    ) {
+                        Text("JAMI HISOBOT", fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFF1A1A1A),
+                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(10.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            PrevJamiCol("A", "Yuk", Math.round(cargo), androidx.compose.ui.graphics.Color(0xFF1976D2), Modifier.weight(1f))
+                            PrevJamiCol("B", "To'lov", Math.round(pay), androidx.compose.ui.graphics.Color(0xFFF9A825), Modifier.weight(1f))
+                            PrevJamiCol("C", "Farq", Math.round(farq), androidx.compose.ui.graphics.Color(0xFF2E9E4F), Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(if (debt > 0) cRed.copy(alpha = 0.10f) else cGreen.copy(alpha = 0.12f))
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                "  $main  $time$bal",
-                                modifier = Modifier.fillMaxWidth().clickable { actionTx = tx },
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = if (isPayment) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                if (debt > 0) "\uD83D\uDCB3 Qarz: ${debt.toDouble().formatMoney()} so'm"
+                                else if (debt == 0L) "\u2705 Qarz yo'q"
+                                else "\uD83D\uDC9A Ortiq: ${(-debt).toDouble().formatMoney()} so'm",
+                                fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                                color = if (debt > 0) cRed else cGreen
                             )
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                // JAMI
-                Text("📊 JAMI:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                for (t in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
-                    val amt = byType[t.code] ?: 0.0
-                    if (amt > 0) Text(
-                        "  ${t.label}: ${amt.formatQty()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-                if (payTotal > 0) Text(
-                    "  P(pul): ${payTotal.formatMoney()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    "  J: ${revenue.formatMoney()} so'm",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (debt > 0) "💳 Qarz: ${debt.toDouble().formatMoney()} so'm"
-                    else if (debt == 0L) "✅ Qarz yo'q"
-                    else "💚 Ortiq: ${(-debt).toDouble().formatMoney()} so'm",
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        debt > 0 -> MaterialTheme.colorScheme.error
-                        debt == 0L -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.tertiary
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
             }
-            // Oylik tugma
-            Spacer(Modifier.height(6.dp))
+
+            // Oldingi / Keyingi
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f).padding(end = 4.dp)) {
-                    Text("⬅️ Oldingi")
-                }
-                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-                    Text("Keyingi ➡️")
-                }
+                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f)) { Text("\u2190 Oldingi") }
+                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f)) { Text("Keyingi \u2192") }
             }
             if (debt > 0) {
-                Spacer(Modifier.height(6.dp))
                 Button(
                     onClick = onCloseDebt,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = cGreen)
                 ) {
-                    Text("💰 Qarzni yopish (${debt.formatMoney()})")
+                    Text("\uD83D\uDCB0 Qarzni yopish (${debt.formatMoney()})")
                 }
+            } else {
+                Spacer(Modifier.height(10.dp))
             }
         }
     }
@@ -1523,6 +1565,20 @@ private fun PreviewHistoryCard(
     }
 }
 
+
+@Composable
+private fun PrevJamiCol(letter: String, label: String, value: Long, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier.size(32.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) { Text(letter, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+        Spacer(Modifier.height(4.dp))
+        Text(label, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        Spacer(Modifier.height(2.dp))
+        Text("${value.toDouble().formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
 private fun isSameDay(a: Long, b: Long): Boolean {
     val z = java.time.ZoneId.systemDefault()
     return java.time.Instant.ofEpochMilli(a).atZone(z).toLocalDate() ==
