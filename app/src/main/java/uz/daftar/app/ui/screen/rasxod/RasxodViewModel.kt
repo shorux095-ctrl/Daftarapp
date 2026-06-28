@@ -113,7 +113,7 @@ class RasxodViewModel @Inject constructor(
                 (1..12).map { m ->
                     val mt = items.filter { it.date.length >= 7 && it.date.substring(5, 7).toIntOrNull() == m }
                         .sumOf { it.amount }
-                    MonthRasxod(m, mt)
+                    MonthRasxod(m, Math.round(mt))
                 }
             } else emptyList()
 
