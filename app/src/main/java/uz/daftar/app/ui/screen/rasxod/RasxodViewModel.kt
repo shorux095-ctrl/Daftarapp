@@ -26,6 +26,9 @@ enum class RasxodPeriod { DAY, MONTH, YEAR }
 /** Yuk rasxodi bitta turi: A: qty × rate = cost */
 data class YukLine(val type: String, val qty: Double, val rate: Double, val cost: Long)
 
+/** Yil ko'rinishida har oy jami xarajati */
+data class MonthRasxod(val month: Int, val total: Long)
+
 data class RasxodState(
     val period: RasxodPeriod = RasxodPeriod.DAY,
     val anchor: LocalDate = LocalDate.now(),
@@ -34,6 +37,8 @@ data class RasxodState(
     val label: String = "",
     val isLoading: Boolean = true,
     val message: String? = null,
+    // Yil ko'rinishida har oy jami
+    val monthlyBreakdown: List<MonthRasxod> = emptyList(),
     // Yuk rasxodi
     val yukRateInputs: Map<String, String> = emptyMap(),  // joriy narxlar (input uchun)
     val yukBreakdown: List<YukLine> = emptyList(),         // tur bo'yicha hisob
@@ -103,6 +108,15 @@ class RasxodViewModel @Inject constructor(
             val items = rangeUC(userId, from, to).sortedByDescending { it.date }
             val total = totalUC(userId, from, to)
 
+            // Yil ko'rinishi: har oy jami (items'dan guruhlash — qo'shimcha so'rovsiz)
+            val monthly = if (s.period == RasxodPeriod.YEAR) {
+                (1..12).map { m ->
+                    val mt = items.filter { it.date.length >= 7 && it.date.substring(5, 7).toIntOrNull() == m }
+                        .sumOf { it.amount }
+                    MonthRasxod(m, mt)
+                }
+            } else emptyList()
+
             // ── Yuk rasxodi: tur bo'yicha (sotilgan miqdor × joriy narx) ──
             val startStr = from.atStartOfDay().format(ISO)
             val endStr = to.plusDays(1).atStartOfDay().format(ISO)
@@ -144,6 +158,7 @@ class RasxodViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     items = items, total = total, label = label, isLoading = false,
+                    monthlyBreakdown = monthly,
                     yukBreakdown = breakdown, yukTotal = yukTot, yukRateInputs = rateInputs
                 )
             }

@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -127,32 +132,82 @@ fun RasxodScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Jami xarajat kartasi
+            // Jami xarajat kartasi (chiroyli)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    shape = RoundedCornerShape(16.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFD32F2F)),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            when (state.period) {
-                                RasxodPeriod.DAY -> "Kunlik jami xarajat"
-                                RasxodPeriod.MONTH -> "Oylik jami xarajat"
-                                RasxodPeriod.YEAR -> "Yillik jami xarajat"
-                            },
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        Text(
-                            "${state.total.formatMoney()} so'm",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text("${state.items.size} ta yozuv", style = MaterialTheme.typography.bodySmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("💸", fontSize = 26.sp)
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                when (state.period) {
+                                    RasxodPeriod.DAY -> "Kunlik xarajat"
+                                    RasxodPeriod.MONTH -> "Oylik xarajat"
+                                    RasxodPeriod.YEAR -> "Yillik xarajat"
+                                },
+                                fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f)
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "${state.total.formatMoney()} so'm",
+                                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White
+                            )
+                            Text("${state.items.size} ta yozuv", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f))
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
+            }
+
+            // Har oy xarajat (faqat Yil ko'rinishida)
+            if (state.period == RasxodPeriod.YEAR && state.monthlyBreakdown.any { it.total > 0 }) {
+                item {
+                    val maxM = state.monthlyBreakdown.maxOf { it.total }.coerceAtLeast(1)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F9))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text("📊 Har oy xarajat", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A1A1A))
+                            Spacer(Modifier.height(10.dp))
+                            state.monthlyBreakdown.forEach { mr ->
+                                val frac = (mr.total.toFloat() / maxM).coerceIn(0f, 1f)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                                ) {
+                                    Text(MONTHS_RZ[mr.month - 1], fontSize = 13.sp, color = Color(0xFF555555), modifier = Modifier.width(42.dp))
+                                    Box(modifier = Modifier.weight(1f).height(18.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFFECECEF))) {
+                                        if (mr.total > 0) {
+                                            Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(frac).clip(RoundedCornerShape(6.dp)).background(Color(0xFFE53935)))
+                                        }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        if (mr.total > 0) mr.total.formatMoney() else "—",
+                                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                        color = if (mr.total > 0) Color(0xFFC62828) else Color(0xFFAAAAAA),
+                                        modifier = Modifier.width(78.dp), textAlign = TextAlign.End
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
             }
 
             // ── YUK RASXODI (narx qo'yish + ko'rish) ──
@@ -336,6 +391,8 @@ private fun RasxodRow(item: RasxodEntity, onDelete: () -> Unit) {
         }
     }
 }
+
+private val MONTHS_RZ = listOf("Yan", "Fev", "Mar", "Apr", "May", "Iyn", "Iyl", "Avg", "Sen", "Okt", "Noy", "Dek")
 
 private fun formatDate(iso: String): String {
     return try {

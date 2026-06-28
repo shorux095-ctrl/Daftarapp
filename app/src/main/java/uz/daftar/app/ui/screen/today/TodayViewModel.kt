@@ -132,6 +132,10 @@ data class TextReport(val title: String, val body: String)
 data class GlobalPriceCmd(val group: String, val prices: Map<String, Double>, val date: java.time.LocalDate?)
 data class T1SetOp(val client: String, val type: String?, val start: java.time.LocalDate, val end: java.time.LocalDate)
 
+/** "✅ Saqlandi" kartasi uchun ma'lumot */
+data class SavedLine(val type: String, val main: String, val sub: String)
+data class SavedInfo(val name: String, val dateLabel: String, val timeLabel: String, val lines: List<SavedLine>, val debt: Long)
+
 /** Chat oqimidagi bitta xabar */
 sealed interface ChatItem {
     val id: Long
@@ -147,6 +151,8 @@ sealed interface ChatItem {
     /** Mijoz tarixi (chap) */
     data class History(override val id: Long, val preview: ClientPreview, override val ts: Long = System.currentTimeMillis()) : ChatItem
     data class DebtRep(override val id: Long, val debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    /** ✅ Saqlandi — chiroyli karta (chap) */
+    data class Saved(override val id: Long, val info: SavedInfo, override val ts: Long = System.currentTimeMillis()) : ChatItem
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -373,6 +379,13 @@ class TodayViewModel @Inject constructor(
                     o.put("month", c.preview.month.toString())
                 }
                 is ChatItem.DebtRep -> { o.put("k", "debt") }
+                is ChatItem.Saved -> {
+                    o.put("k", "i")
+                    val t = StringBuilder("✅ Saqlandi\n📅 ${c.info.dateLabel}   🕒 ${c.info.timeLabel}\n${c.info.name}\n")
+                    c.info.lines.forEach { t.append("  ${it.main}\n") }
+                    t.append("💳 Qarz: ${c.info.debt.formatMoney()} so'm")
+                    o.put("t", t.toString())
+                }
             }
             arr.put(o)
         }
@@ -779,7 +792,7 @@ class TodayViewModel @Inject constructor(
                 .entries.sortedBy { it.value.first().date }
             val items = mutableListOf<ChatItem>()
             for (e in saves) {
-                items.add(ChatItem.Info(nextChatId(), buildSavedTextFromTxs(e.value)))
+                items.add(ChatItem.Saved(nextChatId(), buildSavedInfoFromTxs(e.value)))
             }
             _state.update { st -> st.copy(chat = items + st.chat) }
         }
@@ -897,6 +910,31 @@ class TodayViewModel @Inject constructor(
         }
         sb.append("💳 Qarz: ${debt.formatMoney()} so'm")
         return sb.toString()
+    }
+
+    private suspend fun buildSavedInfoFromTxs(txs: List<Transaction>): SavedInfo {
+        val first = txs.first()
+        val cn = first.clientName.lowercase()
+        val prices = runCatching { getUnitPrices(userId, cn) }.getOrDefault(emptyMap())
+        val debt = runCatching { calcDebt(userId, cn) }.getOrDefault(0L)
+        val nameCap = first.clientName.replaceFirstChar { it.uppercase() }
+        val lines = txs.map { tx ->
+            when (tx.type) {
+                TxType.P -> SavedLine("p", "P: ${tx.amount.formatMoney()}", "Pul kirimi")
+                TxType.Q -> SavedLine("q", "Q: ${tx.amount.formatMoney()}", "Qo'lda qarz")
+                else -> {
+                    val p = prices[tx.type]
+                    if (p != null) SavedLine(tx.type.code, "${tx.type.code.uppercase()}: ${tx.amount.formatQty()} × ${p.formatQty()} = ${(tx.amount * p).formatMoney()} so'm", "Yuk")
+                    else SavedLine(tx.type.code, "${tx.type.code.uppercase()}: ${tx.amount.formatQty()}", "Narx yo'q")
+                }
+            }
+        }
+        return SavedInfo(
+            nameCap,
+            first.date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")),
+            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+            lines, debt
+        )
     }
 
     fun onInputChange(text: String) {
@@ -1736,7 +1774,14 @@ class TodayViewModel @Inject constructor(
     fun applySuggestion(name: String) {
         val cur = state.value.input
         val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
-        val lastLine = cur.substringAfterLast('\n').trimStart()
+        var lastLine = cur.substringAfterLast('\n').trimStart()
+        // Sana prefiksi bo'lsa ("19.06 olim sh") — sanani saqlab qolamiz, ism faqat sanadan keyin almashadi
+        var datePrefix = ""
+        val dm = Regex("""^(\d{1,2}[.,]\d{1,2}(?:[.,]\d{2,4})?)\s+(.*)$""").matchEntire(lastLine)
+        if (dm != null) {
+            datePrefix = dm.groupValues[1] + " "
+            lastLine = dm.groupValues[2]
+        }
         // Yozilgan ism qismini topamiz (ko'p so'zli ismlar uchun ham): "olim shash" -> butun shu qism almashadi
         val lname = name.lowercase()
         var typed = ""
@@ -1748,7 +1793,7 @@ class TodayViewModel @Inject constructor(
         val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
                    else lastLine.removePrefix(typed).trimStart()
         val tail = if (rest.isBlank()) "$name " else "$name $rest"
-        onInputChange(prefix + tail)
+        onInputChange(prefix + datePrefix + tail)
     }
 
     /**
@@ -1950,7 +1995,7 @@ class TodayViewModel @Inject constructor(
                     appendChat(ChatItem.User(nextChatId(), raw))
                     for (entry in s.parsed) {
                         addTx(userId, entry)
-                        appendChat(ChatItem.Info(nextChatId(), buildSavedText(entry)))
+                        appendChat(ChatItem.Saved(nextChatId(), buildSavedInfoFromEntry(entry)))
                     }
                     _state.update { it.copy(isSending = false, input = "", parsed = emptyList(), isDeleteCommand = false, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), pinnedView = false, isViewCommand = false) }
                 } catch (e: Exception) {
@@ -2010,7 +2055,33 @@ class TodayViewModel @Inject constructor(
         return sb.toString()
     }
 
-    // ────────── X bilan o'chirish (matn komandasi) ──────────
+    /** ✅ Saqlandi — chiroyli karta uchun struktura (ParsedEntry'dan) */
+    private suspend fun buildSavedInfoFromEntry(entry: uz.daftar.app.core.parser.ParsedEntry): SavedInfo {
+        val cn = entry.clientName.lowercase()
+        val prices = runCatching { getUnitPrices(userId, cn) }.getOrDefault(emptyMap())
+        val debt = runCatching { calcDebt(userId, cn) }.getOrDefault(0L)
+        val nameCap = entry.clientName.replaceFirstChar { it.uppercase() }
+        val lines = mutableListOf<SavedLine>()
+        val cargo = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+        for (t in cargo) {
+            val q = entry.items[t] ?: continue
+            val p = prices[t]
+            if (p != null) lines.add(SavedLine(t.code, "${t.code.uppercase()}: ${q.formatQty()} × ${p.formatQty()} = ${(q * p).formatMoney()} so'm", "Yuk"))
+            else lines.add(SavedLine(t.code, "${t.code.uppercase()}: ${q.formatQty()}", "Narx yo'q"))
+        }
+        entry.items[TxType.P]?.let { lines.add(SavedLine("p", "P: ${it.formatMoney()}", "Pul kirimi")) }
+        entry.items[TxType.Q]?.let { lines.add(SavedLine("q", "Q: ${it.formatMoney()}", "Qo'lda qarz")) }
+        if (lines.isEmpty() && entry.clientPrices.isNotEmpty()) {
+            val pr = entry.clientPrices.entries.joinToString(", ") { "${it.key.code.uppercase()}=${it.value.formatQty()}" }
+            lines.add(SavedLine("c", "Narx: $pr", "Narx yangilandi"))
+        }
+        return SavedInfo(
+            nameCap,
+            LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")),
+            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+            lines, debt
+        )
+    }
 
     /** "x", "DD.MM x", "x DD.MM", "x NAME", "x NAME a10", "DD.MM\nx NAME" — barchasini taniydi */
     private fun isDeleteCommandText(text: String): Boolean {

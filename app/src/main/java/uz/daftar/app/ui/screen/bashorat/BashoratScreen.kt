@@ -114,11 +114,11 @@ fun BashoratScreen(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterPill("Hammasi", state.all.size, state.filter == PredFilter.ALL) { vm.setFilter(PredFilter.ALL) }
-                FilterPill("Kechikkan", state.countOverdue, state.filter == PredFilter.OVERDUE) { vm.setFilter(PredFilter.OVERDUE) }
                 FilterPill("Bugun", state.countToday, state.filter == PredFilter.TODAY) { vm.setFilter(PredFilter.TODAY) }
                 FilterPill("Ertaga", state.countTomorrow, state.filter == PredFilter.TOMORROW) { vm.setFilter(PredFilter.TOMORROW) }
                 FilterPill("Bu hafta", state.countWeek, state.filter == PredFilter.WEEK) { vm.setFilter(PredFilter.WEEK) }
+                FilterPill("Kechikkan", state.countOverdue, state.filter == PredFilter.OVERDUE) { vm.setFilter(PredFilter.OVERDUE) }
+                FilterPill("Hammasi", state.all.size, state.filter == PredFilter.ALL) { vm.setFilter(PredFilter.ALL) }
             }
 
             Spacer(Modifier.height(10.dp))

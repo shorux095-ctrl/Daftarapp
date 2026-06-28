@@ -35,7 +35,7 @@ data class BashoratState(
     val isLoading: Boolean = true,
     val all: List<ClientPrediction> = emptyList(),
     val query: String = "",
-    val filter: PredFilter = PredFilter.ALL,
+    val filter: PredFilter = PredFilter.TODAY,
     val countToday: Int = 0,
     val countTomorrow: Int = 0,
     val countOverdue: Int = 0,

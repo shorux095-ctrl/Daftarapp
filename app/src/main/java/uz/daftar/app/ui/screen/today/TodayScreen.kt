@@ -11,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -505,7 +507,7 @@ fun TodayScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) { Snackbar(snackbarData = it) } }
     ) { padding ->
-        if (state.isLoading || !state.restored) {
+        if (!state.restored) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -570,6 +572,7 @@ fun TodayScreen(
                                         debtors = item.debtors,
                                         onClose = { vm.removeChat(item.id) }
                                     )
+                                    is ChatItem.Saved -> SavedCard(item.info)
                                 }
                                 if (deleteChatId == item.id) {
                                     val clip = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -720,7 +723,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v97", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v102", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -734,12 +737,11 @@ private fun ChatTopBar(
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash")
             }
-            // Bugun + Kalendar (Kecha olib tashlandi)
-            TextButton(onClick = { onJumpToDate(java.time.LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("Bugun")
-            }
-            IconButton(onClick = onOpenCalendar) {
-                Icon(Icons.Outlined.CalendarMonth, contentDescription = "Kalendar")
+            // 📅 Sana — istalgan kun yozuvlarini ko'rsatadi (Bugun o'rniga)
+            TextButton(onClick = onOpenCalendar, contentPadding = PaddingValues(horizontal = 10.dp)) {
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("Sana")
             }
         }
     )
@@ -1418,6 +1420,9 @@ private fun PreviewHistoryCard(
                         .verticalScroll(scrollState)
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
+                        Text("\uD83D\uDCC5 KUNLIK YOZUVLAR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cGray)
+                    }
                     for (tx in monthTxs) {
                         val tc = typeColor(tx.type)
                         val isP = tx.type.equals("p", true)
@@ -1429,42 +1434,47 @@ private fun PreviewHistoryCard(
                             up != null -> "${tx.type.uppercase()}: ${tx.amount.formatQty()} \u00d7 ${up.formatQty()} = ${(tx.amount * up).formatMoney()} so'm"
                             else -> "${tx.type.uppercase()}: ${tx.amount.formatQty()}"
                         }
-                        val dayTxt = if (tx.date.length >= 10) "${tx.date.substring(8, 10)}.${tx.date.substring(5, 7)}" else tx.date
+                        val dayNum = if (tx.date.length >= 10) tx.date.substring(8, 10) else "--"
+                        val monIdx = (if (tx.date.length >= 7) tx.date.substring(5, 7).toIntOrNull() else null) ?: month.monthValue
+                        val monAbbr = MONTHS_UZ_TODAY[(monIdx - 1).coerceIn(0, 11)].take(4).uppercase()
                         val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
                         val bal = Math.round(balMap[tx.id] ?: 0.0)
                         val balColor = if (bal > 0) cRed else cGreen
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
                                 .clickable { actionTx = tx }
-                                .padding(vertical = 7.dp),
+                                .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier.size(42.dp).clip(CircleShape).background(tc.copy(alpha = 0.16f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(tx.type.uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tc)
-                                    Text(tx.amount.formatQty(), fontSize = 10.sp, color = tc)
-                                }
+                            // Timeline rail + yashil nuqta
+                            Box(modifier = Modifier.width(24.dp).fillMaxHeight()) {
+                                Box(modifier = Modifier.width(2.dp).fillMaxHeight().align(Alignment.Center).background(cGreen.copy(alpha = 0.35f)))
+                                Box(modifier = Modifier.size(13.dp).align(Alignment.Center).clip(CircleShape).background(cGreen))
                             }
-                            Spacer(Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(desc, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = tc)
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    if (time.isNotEmpty()) "$dayTxt \u00b7 \uD83D\uDD50 $time" else dayTxt,
-                                    fontSize = 11.sp, color = cGray
-                                )
+                            Spacer(Modifier.width(8.dp))
+                            // Rangli kun raqami + oy
+                            Column(modifier = Modifier.width(46.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(dayNum, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = tc)
+                                Text(monAbbr, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = tc)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            // Tavsif + vaqt
+                            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
+                                Text(desc, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tc)
+                                if (time.isNotEmpty()) {
+                                    Spacer(Modifier.height(3.dp))
+                                    Text("\uD83D\uDD50 $time", fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
+                                }
                             }
                             Spacer(Modifier.width(8.dp))
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(bal.toDouble().formatMoney(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = balColor)
-                                Text("so'm", fontSize = 10.sp, color = balColor)
+                                Text(bal.toDouble().formatMoney(), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = balColor)
+                                Text("so'm", fontSize = 11.sp, color = balColor)
                             }
                         }
-                        HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x12000000))
+                        HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x14000000))
                     }
                 }
 
@@ -1915,6 +1925,102 @@ private fun JamiBadge(
     }
 }
 
+
+@Composable
+private fun SavedCard(info: SavedInfo) {
+    val green = androidx.compose.ui.graphics.Color(0xFF1AA35A)
+    val greenTint = androidx.compose.ui.graphics.Color(0xFFE9F6EF)
+    val red = androidx.compose.ui.graphics.Color(0xFFE53935)
+    val gray = androidx.compose.ui.graphics.Color(0xFF6B7280)
+    val ink = androidx.compose.ui.graphics.Color(0xFF1A1A1A)
+    fun typeColor(code: String) = when (code.lowercase()) {
+        "a" -> androidx.compose.ui.graphics.Color(0xFF1976D2)
+        "b" -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+        "c" -> androidx.compose.ui.graphics.Color(0xFF2E9E4F)
+        "d" -> androidx.compose.ui.graphics.Color(0xFF00838F)
+        "k" -> androidx.compose.ui.graphics.Color(0xFFC2185B)
+        "p" -> green
+        else -> red
+    }
+    val firstType = info.lines.firstOrNull()?.type ?: "c"
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Chap: Saqlandi paneli
+            Column(
+                modifier = Modifier.width(108.dp).fillMaxHeight().background(greenTint).padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Saqlandi", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ink)
+                Spacer(Modifier.height(4.dp))
+                Text("\uD83D\uDCC5 ${info.dateLabel}", fontSize = 12.sp, color = gray)
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier.size(46.dp).clip(CircleShape).background(green),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("\u2713", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+            // O'ng: tafsilotlar
+            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(38.dp).clip(CircleShape).background(typeColor(firstType).copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(firstType.uppercase(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = typeColor(firstType))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(info.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink)
+                }
+                Spacer(Modifier.height(8.dp))
+                info.lines.forEach { line ->
+                    val lc = typeColor(line.type)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(32.dp).clip(CircleShape).background(lc.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(line.type.uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = lc)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(line.main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = lc)
+                            Text(line.sub, fontSize = 11.sp, color = gray)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        .background(if (info.debt > 0) red.copy(alpha = 0.08f) else green.copy(alpha = 0.10f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (info.debt > 0) "\uD83D\uDCB3" else "\u2705", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                if (info.debt > 0) "Qarz: ${info.debt.formatMoney()} so'm" else "Qarz yo'q",
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                                color = if (info.debt > 0) red else green
+                            )
+                            Text(if (info.debt > 0) "Qarz mavjud" else "To'liq to'langan", fontSize = 11.sp, color = gray)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun DebtReminderCard(
