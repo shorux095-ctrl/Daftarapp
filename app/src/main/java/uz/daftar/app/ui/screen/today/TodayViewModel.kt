@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -230,54 +232,17 @@ class TodayViewModel @Inject constructor(
             }.collectLatest { txs ->
                 val totals = txs.groupBy { it.type }
                     .mapValues { (_, l) -> l.sumOf { it.amount } }
-                // Har mijozning joriy qarzini hisoblash (bot'day ko'rsatish uchun)
-                val clients = txs.map { it.clientName.lowercase() }.distinct()
-                val debts = mutableMapOf<String, Long>()
-                val prices = mutableMapOf<String, Map<TxType, Double>>()
-                for (c in clients) {
-                    debts[c] = runCatching { calcDebt(userId, c) }.getOrDefault(0L)
-                    prices[c] = runCatching { getUnitPrices(userId, c) }.getOrDefault(emptyMap())
-                }
-                // Per-save kumulyativ qarz — joriy jami'дан orqaga yurib hisoblaymiz
-                val debtBySave = mutableMapOf<String, Long>()
-                for (c in clients) {
-                    val ctxs = txs.filter { it.clientName.lowercase() == c }
-                        .sortedBy { it.date }
-                    if (ctxs.isEmpty()) continue
-                    val pm = prices[c] ?: emptyMap()
-                    fun effect(tx: uz.daftar.app.domain.model.Transaction): Double {
-                        return when (tx.type) {
-                            TxType.P -> -tx.amount
-                            TxType.Q -> tx.amount
-                            else -> {
-                                val price = pm[tx.type]  // N narx (tannarx emas)
-                                if (price != null) tx.amount * price else 0.0
-                            }
-                        }
-                    }
-                    var cum = (debts[c] ?: 0L).toDouble()
-                    val cumAfter = DoubleArray(ctxs.size)
-                    for (i in ctxs.indices.reversed()) {
-                        cumAfter[i] = cum
-                        cum -= effect(ctxs[i])
-                    }
-                    for (i in ctxs.indices) {
-                        val isLastOfSave = (i == ctxs.size - 1) || (ctxs[i].date != ctxs[i + 1].date)
-                        if (isLastOfSave) {
-                            debtBySave["$c|${ctxs[i].date}"] = Math.round(cumAfter[i])
-                        }
-                    }
-                }
+                val clientCount = txs.map { it.clientName.lowercase() }.distinct().size
+                // TEZLIK: debtByClient/debtBySave/priceByClient olib tashlandi —
+                // UI'da hech qayerda o'qilmasdi, lekin har mijoz uchun 2 DB so'rovi
+                // (calcDebt + getUnitPrices) ochilishni juda sekinlashtirardi.
                 _state.update {
                     it.copy(
                         filter = filterFlow.value,
                         isLoading = false,
                         transactions = txs,
                         totalByType = totals,
-                        debtByClient = debts,
-                        debtBySave = debtBySave,
-                        priceByClient = prices,
-                        clientCount = clients.size
+                        clientCount = clientCount
                     )
                 }
             }
@@ -300,7 +265,9 @@ class TodayViewModel @Inject constructor(
 
     /** Chatni telefonga saqlaydi (matn ko'rinishida). */
     private fun persistChat() {
-        val snapshot = _state.value.chat
+        // TEZLIK: chat cheksiz o'smasin — faqat oxirgi 120 yozuv saqlanadi (eski data bazada qoladi)
+        val full = _state.value.chat
+        val snapshot = if (full.size > 120) full.takeLast(120) else full
         viewModelScope.launch {
             runCatching { chatStore.save(serializeChat(snapshot)) }
         }
@@ -336,11 +303,11 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             val histories = _state.value.chat.filterIsInstance<ChatItem.History>()
             if (histories.isEmpty()) return@launch
+            // TEZLIK: har tarix kartasini PARALLEL hisoblaymiz (sekvensial emas)
             val freshById = HashMap<Long, ClientPreview>()
-            for (h in histories) {
-                runCatching { buildClientPreview(h.preview.name, h.preview.month) }.getOrNull()
-                    ?.let { freshById[h.id] = it }
-            }
+            histories.map { h ->
+                async { h.id to runCatching { buildClientPreview(h.preview.name, h.preview.month) }.getOrNull() }
+            }.awaitAll().forEach { (id, preview) -> if (preview != null) freshById[id] = preview }
             // ATOMAR yangilash: orada kelgan xabarlar ("✅ Saqlandi" va h.k.) YO'QOLMAYDI
             _state.update { st ->
                 st.copy(chat = st.chat.map { item ->
@@ -460,11 +427,13 @@ class TodayViewModel @Inject constructor(
     /** Ilova ochilganda saqlangan chatni tiklaydi (qayta generatsiya yo'q). */
     private fun restoreChat() {
         viewModelScope.launch {
-            val json = runCatching { chatStore.load() }.getOrDefault("")
-            if (json.isNotBlank()) {
-                val list = runCatching { deserializeChat(json) }.getOrDefault(emptyList())
-                if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
+            // Og'ir disk o'qish + JSON parse — fon thread'da (Main qotmasin, tez ochilsin)
+            val list = withContext(Dispatchers.Default) {
+                val json = runCatching { chatStore.load() }.getOrDefault("")
+                val full = if (json.isNotBlank()) runCatching { deserializeChat(json) }.getOrDefault(emptyList()) else emptyList()
+                if (full.size > 120) full.takeLast(120) else full   // TEZLIK: faqat oxirgi 120 yozuv
             }
+            if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
             _state.update { it.copy(restored = true) }   // chat tayyor (yoki bo'sh) — endi ko'rsatish mumkin
             runCatching { maybeShowAutoReports() }
             drainPendingWidget()

@@ -31,15 +31,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalcScreen(onBack: () -> Unit) {
-    var expr by remember { mutableStateOf(CalcStore.expr) }
-    var memory by remember { mutableStateOf(CalcStore.memory) }
-    LaunchedEffect(expr) { CalcStore.expr = expr }
-    LaunchedEffect(memory) { CalcStore.memory = memory }
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("daftar_calc", Context.MODE_PRIVATE) }
+    var expr by remember { mutableStateOf(prefs.getString("expr", "") ?: "") }
+    var memory by remember { mutableStateOf(prefs.getString("memory", null)?.toDoubleOrNull() ?: 0.0) }
+    LaunchedEffect(expr) { prefs.edit().putString("expr", expr).apply() }
+    LaunchedEffect(memory) { prefs.edit().putString("memory", memory.toString()).apply() }
     val res = remember(expr) { evalExpr(expr) }
 
     Scaffold(

@@ -216,11 +216,17 @@ fun TodayScreen(
     var yukTypeDialog by remember { mutableStateOf<String?>(null) }
     var crashText by remember { mutableStateOf<String?>(null) }
 
-    // Yangi xabar qo'shilsa, chat oxiriga scroll
+    // Yangi xabar qo'shilsa, chat oxiriga scroll (birinchi marta — DARHOL, sakramasdan)
+    var firstScrollDone by remember { mutableStateOf(false) }
     LaunchedEffect(state.chat.size) {
         runCatching {
             if (state.chat.isNotEmpty()) {
-                listState.animateScrollToItem(state.chat.size - 1)
+                if (!firstScrollDone) {
+                    listState.scrollToItem(state.chat.size - 1)
+                    firstScrollDone = true
+                } else {
+                    listState.animateScrollToItem(state.chat.size - 1)
+                }
             }
         }
     }
@@ -490,9 +496,10 @@ fun TodayScreen(
                         onVoice = vm::onVoiceInput,
                         onSend = {
                             bottomMenuOpen = false
-                            keyboardController?.hide(); focusManager.clearFocus()
+                            showInput = false   // avval input yopiladi → klaviatura aniq yo'qoladi
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
                             vm.send()
-                            showInput = false
                         },
                         canSend = state.canSend,
                         isSending = state.isSending,
@@ -723,7 +730,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v102", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v104", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {

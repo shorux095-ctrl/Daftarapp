@@ -413,13 +413,18 @@ class GetOverdueDebtorsUseCase @Inject constructor(
     private val priceDao: PriceHistoryDao
 ) {
     suspend operator fun invoke(userId: Long): List<OverdueDebtor> {
-        val names = txDao.getAllClientNames(userId)
         val today = LocalDate.now()
+        // TEZLIK: har mijoz uchun alohida so'rov o'rniga — HAMMASI 2 ta so'rovda
+        val allTxs = txDao.getRange(userId, "2000-01-01", today.plusDays(1).toString())
+        val txByClient = allTxs.groupBy { it.clientName.lowercase() }   // getRange allaqachon date bo'yicha tartibli
+        val pricesByClient = priceDao.getAllForUser(userId)
+            .groupBy { it.clientName.lowercase() }
+            .mapValues { (_, l) -> l.sortedBy { it.date }.groupBy { it.priceType } }
         val out = mutableListOf<OverdueDebtor>()
-        for (name in names) {
-            val txs = txDao.getByClient(userId, name.lowercase()).sortedBy { it.date }
+        for ((cn, txs) in txByClient) {
             if (txs.isEmpty()) continue
-            val pricesByType = priceDao.getAllForClient(userId, name.lowercase()).groupBy { it.priceType }
+            val name = txs.first().clientName
+            val pricesByType = pricesByClient[cn] ?: emptyMap()
             var bal = 0.0
             var firstDebtDate: LocalDate? = null    // qarz 0'dan musbatga o'tgan sana
             var lastPaymentDate: LocalDate? = null   // oxirgi to'lov (P) sanasi
