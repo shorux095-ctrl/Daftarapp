@@ -382,29 +382,46 @@ private fun JamiHisobotCard(
     priceByTx: Map<Long, Double?>,
     debt: Long
 ) {
-    var cargo = 0.0
-    for (tx in txs) {
-        val t = TxType.fromCode(tx.type) ?: continue
-        if (t == TxType.A || t == TxType.B || t == TxType.C || t == TxType.D || t == TxType.K) {
-            val p = priceByTx[tx.id]; if (p != null) cargo += tx.amount * p
-        }
+    // Har yuk turi bo'yicha: soni (qty) va summasi (money) — Farq KERAK EMAS
+    val cargoCodes = listOf("a", "b", "c", "d", "k")
+    val perType = cargoCodes.mapNotNull { code ->
+        val rows = txs.filter { it.type.equals(code, true) }
+        if (rows.isEmpty()) return@mapNotNull null
+        val qty = rows.sumOf { it.amount }
+        val money = rows.sumOf { r -> val p = priceByTx[r.id]; if (p != null) r.amount * p else 0.0 }
+        Triple(code.uppercase(), qty, money)
     }
     val pay = txs.filter { it.type.equals("p", true) }.sumOf { it.amount }
-    val farq = cargo - pay
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp)).background(Color(0xFFF4F8F5)).padding(14.dp)
     ) {
-        Text("JAMI HISOBOT", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = InkDark,
+        Text("OLINGAN YUK", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = InkDark,
             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         Spacer(Modifier.height(10.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            JamiCol("A", "Yuk", cargo.roundToLong(), Color(0xFF1976D2), Modifier.weight(1f))
-            JamiCol("B", "To'lov", pay.roundToLong(), Color(0xFFF9A825), Modifier.weight(1f))
-            JamiCol("C", "Farq", farq.roundToLong(), Color(0xFF2E9E4F), Modifier.weight(1f))
+        if (perType.isEmpty()) {
+            Text("Yuk olinmagan", fontSize = 12.sp, color = InkGray,
+                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        } else {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                for (c in perType) {
+                    JamiCargoCol(c.first, c.second, c.third, cargoColor(c.first), Modifier.weight(1f))
+                }
+            }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
+        Box(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(GreenB.copy(alpha = 0.12f))
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("💵 Jami to'lov: ${pay.roundToLong().formatMoney()} so'm",
+                fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GreenB)
+        }
+        Spacer(Modifier.height(8.dp))
         Box(
             modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
@@ -422,17 +439,26 @@ private fun JamiHisobotCard(
 }
 
 @Composable
-private fun JamiCol(letter: String, label: String, value: Long, color: Color, modifier: Modifier = Modifier) {
+private fun JamiCargoCol(letter: String, qty: Double, money: Double, color: Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier.size(34.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center
         ) { Text(letter, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color) }
         Spacer(Modifier.height(5.dp))
-        Text(label, fontSize = 12.sp, color = InkGray)
+        Text("${qty.formatQty()} dona", fontSize = 12.sp, color = InkGray)
         Spacer(Modifier.height(2.dp))
-        Text("${value.formatMoney()} so'm", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
+        Text("${money.roundToLong().formatMoney()} so'm", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
     }
+}
+
+private fun cargoColor(code: String) = when (code.lowercase()) {
+    "a" -> Color(0xFF1976D2)
+    "b" -> Color(0xFFF9A825)
+    "c" -> Color(0xFF2E9E4F)
+    "d" -> Color(0xFF00838F)
+    "k" -> Color(0xFFC2185B)
+    else -> Color(0xFF1976D2)
 }
 
 @Composable

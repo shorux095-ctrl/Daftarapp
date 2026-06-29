@@ -730,7 +730,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v104", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v105", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1487,15 +1487,19 @@ private fun PreviewHistoryCard(
 
                 // JAMI HISOBOT
                 run {
-                    var cargo = 0.0
+                    val cargoTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+                    // Har yuk turi: SONI (amount yig'indisi) + summasi (amount × narx)
+                    val qtyByType = LinkedHashMap<TxType, Double>()
+                    val valByType = HashMap<TxType, Double>()
                     for (tx in monthTxs) {
                         val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
-                        if (t == TxType.A || t == TxType.B || t == TxType.C || t == TxType.D || t == TxType.K) {
-                            val p = priceByTx[tx.id]; if (p != null) cargo += tx.amount * p
+                        if (t in cargoTypes) {
+                            qtyByType[t] = (qtyByType[t] ?: 0.0) + tx.amount
+                            val p = priceByTx[tx.id]; if (p != null) valByType[t] = (valByType[t] ?: 0.0) + tx.amount * p
                         }
                     }
                     val pay = monthTxs.filter { it.type.equals("p", true) }.sumOf { it.amount }
-                    val farq = cargo - pay
+                    val takenTypes = cargoTypes.filter { (qtyByType[it] ?: 0.0) > 0.0 }
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                             .clip(RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Color(0xFFF4F8F5)).padding(12.dp)
@@ -1503,13 +1507,34 @@ private fun PreviewHistoryCard(
                         Text("JAMI HISOBOT", fontWeight = FontWeight.Bold, fontSize = 12.sp,
                             color = androidx.compose.ui.graphics.Color(0xFF1A1A1A),
                             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(3.dp))
+                        Text("Olingan yuklar (soni)", fontSize = 10.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFF6B7280),
+                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(Modifier.height(10.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            PrevJamiCol("A", "Yuk", Math.round(cargo), androidx.compose.ui.graphics.Color(0xFF1976D2), Modifier.weight(1f))
-                            PrevJamiCol("B", "To'lov", Math.round(pay), androidx.compose.ui.graphics.Color(0xFFF9A825), Modifier.weight(1f))
-                            PrevJamiCol("C", "Farq", Math.round(farq), androidx.compose.ui.graphics.Color(0xFF2E9E4F), Modifier.weight(1f))
+                        // Har olingan yuk turi — O'Z RANGIDA, soni bilan (Farq olib tashlandi)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            for (t in takenTypes) {
+                                PrevTypeCol(
+                                    letter = t.code.uppercase(),
+                                    qty = qtyByType[t] ?: 0.0,
+                                    value = valByType[t] ?: 0.0,
+                                    color = typeColor(t.code),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                         Spacer(Modifier.height(10.dp))
+                        // To'lov — YASHIL (pul kirimi; sariq = B yuk rangi, shuning uchun bu yerda emas)
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(cGreen.copy(alpha = 0.10f)).padding(vertical = 9.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("\uD83D\uDCB5 To'lov: ${Math.round(pay).toDouble().formatMoney()} so'm",
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = cGreen)
+                        }
+                        Spacer(Modifier.height(8.dp))
                         Box(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                                 .background(if (debt > 0) cRed.copy(alpha = 0.10f) else cGreen.copy(alpha = 0.12f))
