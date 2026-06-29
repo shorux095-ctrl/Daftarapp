@@ -730,7 +730,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v105", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v106", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1523,16 +1523,40 @@ private fun PreviewHistoryCard(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
+                            // Pul (pul olganim) — yuklar yonida, QIZIL
+                            if (pay > 0.0) {
+                                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        modifier = Modifier.size(32.dp).clip(CircleShape).background(cRed.copy(alpha = 0.18f)),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text("P", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = cRed) }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Pul", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+                                    Spacer(Modifier.height(2.dp))
+                                    Text("${Math.round(pay).toDouble().formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cRed)
+                                }
+                            }
                         }
                         Spacer(Modifier.height(10.dp))
-                        // To'lov — YASHIL (pul kirimi; sariq = B yuk rangi, shuning uchun bu yerda emas)
+                        // Jami yuk (barcha yuk puli) — to'q kulrang
+                        val jamiYuk = valByType.values.sum()
                         Box(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(cGreen.copy(alpha = 0.10f)).padding(vertical = 9.dp),
+                                .background(androidx.compose.ui.graphics.Color(0xFF374151).copy(alpha = 0.10f)).padding(vertical = 9.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("\uD83D\uDCB5 To'lov: ${Math.round(pay).toDouble().formatMoney()} so'm",
-                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = cGreen)
+                            Text("\uD83D\uDCE6 Jami yuk: ${Math.round(jamiYuk).toDouble().formatMoney()} so'm",
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = androidx.compose.ui.graphics.Color(0xFF374151))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // Pul (pul olganim) — QIZIL
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(cRed.copy(alpha = 0.10f)).padding(vertical = 9.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("\uD83D\uDCB5 Pul: ${Math.round(pay).toDouble().formatMoney()} so'm",
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = cRed)
                         }
                         Spacer(Modifier.height(8.dp))
                         Box(

@@ -408,18 +408,43 @@ private fun JamiHisobotCard(
                 for (c in perType) {
                     JamiCargoCol(c.first, c.second, c.third, cargoColor(c.first), Modifier.weight(1f))
                 }
+                // Pul (pul olganim) — yuklar yonida, QIZIL
+                if (pay > 0.0) {
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier.size(34.dp).clip(CircleShape).background(DebtRed.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) { Text("P", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DebtRed) }
+                        Spacer(Modifier.height(5.dp))
+                        Text("Pul", fontSize = 12.sp, color = InkGray)
+                        Spacer(Modifier.height(2.dp))
+                        Text("${pay.roundToLong().formatMoney()} so'm", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DebtRed)
+                    }
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
+        val jamiYuk = perType.sumOf { it.third }
         Box(
             modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(GreenB.copy(alpha = 0.12f))
+                .background(Color(0xFF374151).copy(alpha = 0.10f))
                 .padding(vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("💵 Jami to'lov: ${pay.roundToLong().formatMoney()} so'm",
-                fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GreenB)
+            Text("📦 Jami yuk: ${jamiYuk.roundToLong().formatMoney()} so'm",
+                fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF374151))
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(DebtRed.copy(alpha = 0.10f))
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("💵 Pul: ${pay.roundToLong().formatMoney()} so'm",
+                fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DebtRed)
         }
         Spacer(Modifier.height(8.dp))
         Box(
