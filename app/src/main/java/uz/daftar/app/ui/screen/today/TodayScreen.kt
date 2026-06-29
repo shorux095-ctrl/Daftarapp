@@ -1609,6 +1609,19 @@ private fun PreviewHistoryCard(
 
 
 @Composable
+private fun PrevTypeCol(letter: String, qty: Double, value: Double, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier.size(32.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) { Text(letter, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+        Spacer(Modifier.height(4.dp))
+        Text("${qty.formatQty()} dona", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        Spacer(Modifier.height(2.dp))
+        Text("${value.formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+@Composable
 private fun PrevJamiCol(letter: String, label: String, value: Long, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
