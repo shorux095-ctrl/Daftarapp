@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -382,46 +383,50 @@ class TodayViewModel @Inject constructor(
     }
 
     /** Saqlangan chatni tiklaydi. Tarix to'liq karta sifatida qayta tortiladi. */
-    private suspend fun deserializeChat(json: String): List<ChatItem> {
-        val arr = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return emptyList()
-        val list = mutableListOf<ChatItem>()
+    private suspend fun deserializeChat(json: String): List<ChatItem> = kotlinx.coroutines.coroutineScope {
+        val arr = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return@coroutineScope emptyList()
         // Faqat oxirgi 120 ta yozuvni tiklaymiz (juda katta tarix sekinlashtirmasin / oq ekran bo'lmasin)
         val startAt = if (arr.length() > 120) arr.length() - 120 else 0
-        for (i in startAt until arr.length()) {
-            // Har bir element alohida himoyalangan — bittasi buzuq bo'lsa, qolganlari tiklanadi
-            runCatching {
-                val o = arr.getJSONObject(i)
-                val k = o.optString("k", if (o.has("u")) { if (o.optBoolean("u")) "u" else "i" } else "i")
-                val ts = o.optLong("ts", System.currentTimeMillis())
-                when (k) {
-                    "h" -> {
-                        val name = o.optString("name", "")
-                        val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
-                        if (name.isNotBlank()) {
-                            val cp = runCatching { buildClientPreview(name, month) }.getOrNull()
-                            if (cp != null) list.add(ChatItem.History(nextChatId(), cp, ts))
-                            else list.add(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts))
+        // TEZLIK: har karta uchun DB so'rovlar KETMA-KET emas, PARALLEL ishlaydi (tartib saqlanadi).
+        // ID'lar tartibda oldindan beriladi — parallel bo'lsa ham chat tartibi buzilmaydi.
+        val deferreds = (startAt until arr.length()).map { i ->
+            val id = nextChatId()
+            async {
+                // Har bir element alohida himoyalangan — bittasi buzuq bo'lsa, qolganlari tiklanadi
+                runCatching {
+                    val o = arr.getJSONObject(i)
+                    val k = o.optString("k", if (o.has("u")) { if (o.optBoolean("u")) "u" else "i" } else "i")
+                    val ts = o.optLong("ts", System.currentTimeMillis())
+                    when (k) {
+                        "h" -> {
+                            val name = o.optString("name", "")
+                            val month = runCatching { java.time.YearMonth.parse(o.optString("month")) }.getOrNull()
+                            if (name.isNotBlank()) {
+                                val cp = runCatching { buildClientPreview(name, month) }.getOrNull()
+                                if (cp != null) ChatItem.History(id, cp, ts)
+                                else ChatItem.Info(id, "👤 ${name.replaceFirstChar { it.uppercase() }} — tarix", ts)
+                            } else null
                         }
-                    }
-                    "d" -> {
-                        val ds = o.optString("date")
-                        val narx = o.optBoolean("narx", false)
-                        val date = runCatching { LocalDate.parse(ds) }.getOrNull()
-                        if (date != null) {
-                            val r = runCatching { getDateReport(userId, date, null, narx) }.getOrNull()
-                            if (r != null) list.add(ChatItem.DateRep(nextChatId(), r, ts))
+                        "d" -> {
+                            val ds = o.optString("date")
+                            val narx = o.optBoolean("narx", false)
+                            val date = runCatching { LocalDate.parse(ds) }.getOrNull()
+                            if (date != null) {
+                                val r = runCatching { getDateReport(userId, date, null, narx) }.getOrNull()
+                                if (r != null) ChatItem.DateRep(id, r, ts) else null
+                            } else null
                         }
+                        "u" -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.User(id, t, ts) else null }
+                        "debt" -> {
+                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
+                            if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
+                        }
+                        else -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.Info(id, t, ts) else null }
                     }
-                    "u" -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.User(nextChatId(), t, ts)) }
-                    "debt" -> {
-                        val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
-                        if (!l.isNullOrEmpty()) list.add(ChatItem.DebtRep(nextChatId(), l, ts))
-                    }
-                    else -> { val t = o.optString("t"); if (t.isNotBlank()) list.add(ChatItem.Info(nextChatId(), t, ts)) }
-                }
+                }.getOrNull()
             }
         }
-        return list
+        deferreds.awaitAll().filterNotNull()
     }
 
     /** Ilova ochilganda saqlangan chatni tiklaydi (qayta generatsiya yo'q). */
@@ -437,7 +442,8 @@ class TodayViewModel @Inject constructor(
             _state.update { it.copy(restored = true) }   // chat tayyor (yoki bo'sh) — endi ko'rsatish mumkin
             runCatching { maybeShowAutoReports() }
             drainPendingWidget()
-            refreshHistoryCards()
+            // refreshHistoryCards() OLIB TASHLANDI: deserializeChat endi kartalarni yangi (jonli DB) yasaydi,
+            // jonli o'zgarishlarni observer kuzatadi — bu yerda takroriy so'rov shart emas (tezroq, miltillamaydi)
             runCatching { ensureDebtReminder() }
             restored = true
         }
