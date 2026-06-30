@@ -209,6 +209,7 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             repo.observeBetween(userId, java.time.LocalDate.of(2000, 1, 1), java.time.LocalDate.of(2100, 1, 1))
                 .collectLatest {
+                    getOverdue.invalidate()   // har yozuv o'zgarganda qarz keshini yangilaymiz (eskirmasin)
                     kotlinx.coroutines.delay(300)   // ketma-ket saqlashlarni jamlaymiz
                     refreshHistoryCards()
                 }

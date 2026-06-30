@@ -412,7 +412,19 @@ class GetOverdueDebtorsUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao
 ) {
+    // TEZLIK/KESH: ochilganda getOverdue 2-3 marta chaqiriladi (eslatma + karta + bosh ekran).
+    // Qisqa kesh shu burst'ni birlashtiradi — ko'p tranzaksiyada ham qayta-qayta hisoblanmaydi.
+    @Volatile private var cache: List<OverdueDebtor>? = null
+    @Volatile private var cacheUser: Long = -1L
+    @Volatile private var cacheAt: Long = 0L
+    private val cacheTtlMs = 1200L
+
+    /** Yozuv qo'shilgach/o'chgach chaqiriladi — keyingi so'rov yangidan hisoblaydi. */
+    fun invalidate() { cache = null }
+
     suspend operator fun invoke(userId: Long): List<OverdueDebtor> {
+        val nowMs = System.currentTimeMillis()
+        cache?.let { if (cacheUser == userId && nowMs - cacheAt < cacheTtlMs) return it }
         val today = LocalDate.now()
         // TEZLIK: har mijoz uchun alohida so'rov o'rniga — HAMMASI 2 ta so'rovda
         val allTxs = txDao.getRange(userId, "2000-01-01", today.plusDays(1).toString())
@@ -460,7 +472,9 @@ class GetOverdueDebtorsUseCase @Inject constructor(
                 out.add(OverdueDebtor(name, bal.roundToLong(), days, since))
             }
         }
-        return out.sortedByDescending { it.daysOverdue }
+        val result = out.sortedByDescending { it.daysOverdue }
+        cache = result; cacheUser = userId; cacheAt = System.currentTimeMillis()
+        return result
     }
 
     private fun findPriceAtSimple(prices: List<uz.daftar.app.data.db.entity.PriceHistoryEntity>?, at: String): Double? {
