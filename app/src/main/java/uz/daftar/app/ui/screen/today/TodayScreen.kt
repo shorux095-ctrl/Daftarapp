@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.today
 
+import uz.daftar.app.core.util.yukRangi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.ModalBottomSheet
@@ -730,7 +731,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v112", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v113", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1367,15 +1368,7 @@ private fun PreviewHistoryCard(
     val cGreen = androidx.compose.ui.graphics.Color(0xFF1AA35A)
     val cRed = androidx.compose.ui.graphics.Color(0xFFE53935)
     val cGray = androidx.compose.ui.graphics.Color(0xFF6B7280)
-    fun typeColor(code: String) = when (code.lowercase()) {
-        "a" -> androidx.compose.ui.graphics.Color(0xFF1976D2)
-        "b" -> androidx.compose.ui.graphics.Color(0xFFF9A825)
-        "c" -> androidx.compose.ui.graphics.Color(0xFF2E9E4F)
-        "d" -> androidx.compose.ui.graphics.Color(0xFF00838F)
-        "k" -> androidx.compose.ui.graphics.Color(0xFFC2185B)
-        "p" -> cGreen
-        else -> cRed
-    }
+    fun typeColor(code: String) = yukRangi(code)
 
     Card(
         modifier = Modifier
@@ -1821,10 +1814,7 @@ private fun JamiSummary(report: uz.daftar.app.domain.usecase.DateReport) {
     val cC = androidx.compose.ui.graphics.Color(0xFF1565C0)
     val cDK = androidx.compose.ui.graphics.Color(0xFF7B1FA2)
     val cP = androidx.compose.ui.graphics.Color(0xFFD32F2F)
-    fun colorFor(t: TxType) = when (t) {
-        TxType.A -> cA; TxType.B -> cB; TxType.C -> cC
-        TxType.D, TxType.K -> cDK; else -> cP
-    }
+    fun colorFor(t: TxType) = yukRangi(t)
     val cargoTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
     val present = cargoTypes.filter { (report.totalsByType[it] ?: 0.0) != 0.0 }
     if (present.isEmpty() && report.totalPayments == 0.0) return
@@ -1890,10 +1880,7 @@ private fun DateReportCard(
     val cDK = androidx.compose.ui.graphics.Color(0xFF7B1FA2)
     val cP = androidx.compose.ui.graphics.Color(0xFFD32F2F)
     val cQ = androidx.compose.ui.graphics.Color(0xFF616161)
-    fun colorFor(t: TxType) = when (t) {
-        TxType.A -> cA; TxType.B -> cB; TxType.C -> cC
-        TxType.D, TxType.K -> cDK; TxType.P -> cP; TxType.Q -> cQ
-    }
+    fun colorFor(t: TxType) = yukRangi(t)
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -2066,15 +2053,7 @@ private fun SavedCard(info: SavedInfo) {
     val red = androidx.compose.ui.graphics.Color(0xFFE53935)
     val gray = androidx.compose.ui.graphics.Color(0xFF6B7280)
     val ink = androidx.compose.ui.graphics.Color(0xFF1A1A1A)
-    fun typeColor(code: String) = when (code.lowercase()) {
-        "a" -> androidx.compose.ui.graphics.Color(0xFF1976D2)
-        "b" -> androidx.compose.ui.graphics.Color(0xFFF9A825)
-        "c" -> androidx.compose.ui.graphics.Color(0xFF2E9E4F)
-        "d" -> androidx.compose.ui.graphics.Color(0xFF00838F)
-        "k" -> androidx.compose.ui.graphics.Color(0xFFC2185B)
-        "p" -> green
-        else -> red
-    }
+    fun typeColor(code: String) = yukRangi(code)
     val firstType = info.lines.firstOrNull()?.type ?: "c"
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
