@@ -40,6 +40,10 @@ class GetDateReportUseCase @Inject constructor(
     private val priceDao: PriceHistoryDao,
     private val clientPriceDao: ClientPriceDao
 ) {
+    // KESH: bir xil hisobot (sana/filtr) qayta so'ralsa qayta hisoblanmaydi — Hisobot ekrani tez.
+    // Parallel chaqiriladi (deserialize) → ConcurrentHashMap. Yozuvda invalidate() chaqiriladi.
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, DateReport>()
+    fun invalidate() { cache.clear() }
     suspend operator fun invoke(userId: Long, date: LocalDate, types: Set<String>? = null, useNarx: Boolean = false): DateReport {
         val title = date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))
         return build(userId, date, date.plusDays(1), title, types, useNarx)
@@ -61,6 +65,24 @@ class GetDateReportUseCase @Inject constructor(
     }
 
     private suspend fun build(
+        userId: Long,
+        startInclusive: LocalDate,
+        endExclusive: LocalDate,
+        title: String,
+        types: Set<String>?,
+        useNarx: Boolean,
+        clientFilter: String? = null
+    ): DateReport {
+        // KESH: bir xil so'rov qayta hisoblanmaydi
+        val key = "$userId|$startInclusive|$endExclusive|${types?.sorted()?.joinToString(",")}|$useNarx|$clientFilter"
+        cache[key]?.let { return it }
+        if (cache.size > 24) cache.clear()   // oddiy cheklov (cheksiz o'smasin)
+        val result = buildUncached(userId, startInclusive, endExclusive, title, types, useNarx, clientFilter)
+        cache[key] = result
+        return result
+    }
+
+    private suspend fun buildUncached(
         userId: Long,
         startInclusive: LocalDate,
         endExclusive: LocalDate,

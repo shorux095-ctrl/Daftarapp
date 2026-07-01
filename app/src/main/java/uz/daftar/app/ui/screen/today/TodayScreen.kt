@@ -730,7 +730,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v108", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v111", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1814,6 +1814,67 @@ private fun BottomNavBtn(emoji: String, label: String, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun JamiSummary(report: uz.daftar.app.domain.usecase.DateReport) {
+    val cA = androidx.compose.ui.graphics.Color(0xFF2E7D32)
+    val cB = androidx.compose.ui.graphics.Color(0xFFF57F17)
+    val cC = androidx.compose.ui.graphics.Color(0xFF1565C0)
+    val cDK = androidx.compose.ui.graphics.Color(0xFF7B1FA2)
+    val cP = androidx.compose.ui.graphics.Color(0xFFD32F2F)
+    fun colorFor(t: TxType) = when (t) {
+        TxType.A -> cA; TxType.B -> cB; TxType.C -> cC
+        TxType.D, TxType.K -> cDK; else -> cP
+    }
+    val cargoTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+    val present = cargoTypes.filter { (report.totalsByType[it] ?: 0.0) != 0.0 }
+    if (present.isEmpty() && report.totalPayments == 0.0) return
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = androidx.compose.ui.graphics.Color(0xFFF4F8F5)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "— JAMI —", fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = androidx.compose.ui.graphics.Color(0xFF6B7280),
+                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
+            )
+            if (present.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    for (t in present) {
+                        val cnt = report.totalsByType[t] ?: 0.0
+                        val money = report.revenueByType[t] ?: 0.0
+                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier.size(36.dp).background(colorFor(t).copy(alpha = 0.16f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) { Text(t.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colorFor(t)) }
+                            Spacer(Modifier.height(5.dp))
+                            Text("${cnt.formatQty()} dona", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+                            Text(money.formatMoney(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colorFor(t))
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            val pay = report.totalPayments
+            val farq = report.totalRevenue - pay
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier.weight(1f).background(cP.copy(alpha = 0.10f), RoundedCornerShape(10.dp)).padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text("💵 Pul: ${pay.formatMoney()}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = cP) }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier.weight(1f).background(androidx.compose.ui.graphics.Color(0xFF374151).copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text("Farq: ${if (farq >= 0) "+" else ""}${farq.formatMoney()}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF374151)) }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DateReportCard(
@@ -1862,6 +1923,9 @@ private fun DateReportCard(
                 )
                 return@Column
             }
+
+            // JAMI xulosa (yuk turlari: soni + puli, pul, farq)
+            JamiSummary(report)
 
             // Raqamlangan mijoz qatorlari — har biri alohida kartochka + rangli nuqta
             Column(modifier = Modifier.fillMaxWidth()) {

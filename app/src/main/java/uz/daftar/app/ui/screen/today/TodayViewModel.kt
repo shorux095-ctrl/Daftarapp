@@ -6,6 +6,7 @@ import uz.daftar.app.core.util.formatQty
 import uz.daftar.app.core.util.formatPrice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.Immutable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,26 +137,27 @@ data class GlobalPriceCmd(val group: String, val prices: Map<String, Double>, va
 data class T1SetOp(val client: String, val type: String?, val start: java.time.LocalDate, val end: java.time.LocalDate)
 
 /** "✅ Saqlandi" kartasi uchun ma'lumot */
-data class SavedLine(val type: String, val main: String, val sub: String)
-data class SavedInfo(val name: String, val dateLabel: String, val timeLabel: String, val lines: List<SavedLine>, val debt: Long)
+@Immutable data class SavedLine(val type: String, val main: String, val sub: String)
+@Immutable data class SavedInfo(val name: String, val dateLabel: String, val timeLabel: String, val lines: List<SavedLine>, val debt: Long)
 
 /** Chat oqimidagi bitta xabar */
+@Immutable
 sealed interface ChatItem {
     val id: Long
     val ts: Long
     /** Foydalanuvchi yozgan matn (o'ng tomon) */
-    data class User(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class User(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Oddiy javob matni — ✅ Saqlandi, narx yangilandi, global narx, xato (chap tomon) */
-    data class Info(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class Info(override val id: Long, val text: String, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Sana hisoboti (chap) */
-    data class DateRep(override val id: Long, val report: uz.daftar.app.domain.usecase.DateReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class DateRep(override val id: Long, val report: uz.daftar.app.domain.usecase.DateReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Matnli hisobot: foyda/qarz/eslatma (chap) */
-    data class TextRep(override val id: Long, val report: TextReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class TextRep(override val id: Long, val report: TextReport, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** Mijoz tarixi (chap) */
-    data class History(override val id: Long, val preview: ClientPreview, override val ts: Long = System.currentTimeMillis()) : ChatItem
-    data class DebtRep(override val id: Long, val debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class History(override val id: Long, val preview: ClientPreview, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class DebtRep(override val id: Long, val debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>, override val ts: Long = System.currentTimeMillis()) : ChatItem
     /** ✅ Saqlandi — chiroyli karta (chap) */
-    data class Saved(override val id: Long, val info: SavedInfo, override val ts: Long = System.currentTimeMillis()) : ChatItem
+    @Immutable data class Saved(override val id: Long, val info: SavedInfo, override val ts: Long = System.currentTimeMillis()) : ChatItem
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -210,6 +212,7 @@ class TodayViewModel @Inject constructor(
             repo.observeBetween(userId, java.time.LocalDate.of(2000, 1, 1), java.time.LocalDate.of(2100, 1, 1))
                 .collectLatest {
                     getOverdue.invalidate()   // har yozuv o'zgarganda qarz keshini yangilaymiz (eskirmasin)
+                    getDateReport.invalidate()   // hisobot keshini ham yangilaymiz
                     kotlinx.coroutines.delay(300)   // ketma-ket saqlashlarni jamlaymiz
                     refreshHistoryCards()
                 }
@@ -480,13 +483,13 @@ class TodayViewModel @Inject constructor(
         if (today.dayOfMonth == 1) {
             runCatching {
                 val prev = today.minusMonths(1)
-                val r = getMonthlyReport(userId, prev.year, prev.monthValue)
-                val txt = "📆 Oylik hisobot (${prev.monthValue}.${prev.year})\n" +
-                        "Daromad: ${r.revenue.toLong().formatMoney()} so'm\n" +
-                        "Foyda: ${r.grossProfit.toLong().formatMoney()} so'm\n" +
-                        "To'lov: ${r.payments.toLong().formatMoney()} so'm\n" +
-                        "Sof foyda: ${r.profit.toLong().formatMoney()} so'm"
-                appendChat(ChatItem.Info(nextChatId(), txt))
+                val mStart = prev.withDayOfMonth(1)
+                val mEnd = prev.withDayOfMonth(prev.lengthOfMonth())
+                val r = getDateReport.range(userId, mStart, mEnd, null, false)
+                if (r.clientLines.isNotEmpty() || r.totalPayments > 0) {
+                    val titled = r.copy(title = "Oylik: ${prev.monthValue}.${prev.year}")
+                    appendChat(ChatItem.DateRep(nextChatId(), titled))
+                }
             }
         }
         // ⏰ Qarz eslatmasi — chiroyli karta (kuniga bir marta)

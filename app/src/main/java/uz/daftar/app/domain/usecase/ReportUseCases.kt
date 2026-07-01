@@ -152,7 +152,10 @@ class GetMonthClientDebtUseCase @Inject constructor(
             }
         }
         val rows = map.map { (c, a) ->
-            MonthClientDebt(c, a[0].roundToLong(), a[1].roundToLong(), (a[0] - a[1]).roundToLong())
+            // YAXLITLASH: qoldi = ko'rinadigan (roundlangan) yuk − to'lov, shunda qatorlar to'g'ri qo'shiladi (−1 chiqmaydi)
+            val yk = a[0].roundToLong()
+            val tl = a[1].roundToLong()
+            MonthClientDebt(c, yk, tl, yk - tl)
         }.filter { it.yuk != 0L || it.tolov != 0L }
             .sortedByDescending { it.qoldi }
         return MonthDebtReport(
@@ -270,19 +273,22 @@ internal suspend fun buildReport(
         }
     }
 
-    val grossProfit = revenue - tCost
+    // YAXLITLASH: grossProfit = ko'rinadigan (roundlangan) revenue − tCost, shunda mos qo'shiladi
+    val revLong = revenue.roundToLong()
+    val tCostLong = tCost.roundToLong()
+    val grossLong = revLong - tCostLong
     val yrLong = yukRasxodi.roundToLong()
     return PeriodReport(
         title = "",
         rangeLabel = "",
         totals = totals,
-        revenue = revenue.roundToLong(),
-        tCost = tCost.roundToLong(),
-        grossProfit = grossProfit.roundToLong(),
+        revenue = revLong,
+        tCost = tCostLong,
+        grossProfit = grossLong,
         payments = payments.roundToLong(),
         expenses = rasxodTotal,
         yukRasxodi = yrLong,
-        profit = grossProfit.roundToLong() - rasxodTotal - yrLong,
+        profit = grossLong - rasxodTotal - yrLong,
         transactionCount = txs.size,
         clientCount = clientNames.size
     )
@@ -437,52 +443,72 @@ class GetOverdueDebtorsUseCase @Inject constructor(
             if (txs.isEmpty()) continue
             val name = txs.first().clientName
             val pricesByType = pricesByClient[cn] ?: emptyMap()
-            var bal = 0.0
-            var firstDebtDate: LocalDate? = null    // qarz 0'dan musbatga o'tgan sana
-            var lastPaymentDate: LocalDate? = null   // oxirgi to'lov (P) sanasi
-            for (tx in txs) {
-                val before = bal
-                val d = runCatching {
-                    LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate()
-                }.getOrNull()
-                when (tx.type) {
-                    "p" -> { bal -= tx.amount; if (d != null) lastPaymentDate = d }
-                    "q" -> bal += tx.amount
-                    else -> {
-                        val pr = tx.tOverride ?: findPriceAtSimple(pricesByType[tx.type], tx.date)
-                        if (pr != null) bal += tx.amount * pr
-                    }
-                }
-                if (before <= 0.0 && bal > 0.0 && d != null) firstDebtDate = d
-                if (bal <= 0.0) firstDebtDate = null
-            }
-            if (bal > 0.5) {
-                // since = qarz boshi va oxirgi to'lovдан ENG YANGISI.
-                // Shunda: qarzni to'lab bo'lib, keyin YANGI qarz olса — yangi qarz sanasидан sanaydi
-                // (eski to'lov sanasидан emas). 17.06 yangi qarz → bugun 20.06 bo'lsa = 3 kun.
-                val fdd = firstDebtDate
-                val lpd = lastPaymentDate
-                val since = when {
-                    fdd != null && lpd != null -> maxOf(fdd, lpd)
-                    fdd != null -> fdd
-                    lpd != null -> lpd
-                    else -> continue
-                }
-                val days = ChronoUnit.DAYS.between(since, today).toInt().coerceAtLeast(0)
-                out.add(OverdueDebtor(name, bal.roundToLong(), days, since))
-            }
+            // Pure hisob — DebtMath (unit test bilan qoplangan)
+            val cb = DebtMath.clientBalance(txs, pricesByType, today) ?: continue
+            out.add(OverdueDebtor(name, cb.balance.roundToLong(), cb.days, cb.since))
         }
         val result = out.sortedByDescending { it.daysOverdue }
         cache = result; cacheUser = userId; cacheAt = System.currentTimeMillis()
         return result
     }
 
-    private fun findPriceAtSimple(prices: List<uz.daftar.app.data.db.entity.PriceHistoryEntity>?, at: String): Double? {
+}
+
+/**
+ * Qarz hisobining SOF (pure) mantiqi — DB'siz, unit test bilan qoplangan.
+ * GetOverdueDebtorsUseCase shu yerdan foydalanadi (mantiq AYNAN bir xil).
+ */
+data class ClientBalance(val balance: Double, val since: LocalDate, val days: Int)
+
+object DebtMath {
+    /** Berilgan sanadagi (yoki undan oldingi eng yaqin) narx. prices sana bo'yicha tartiblangan. */
+    fun priceAt(prices: List<uz.daftar.app.data.db.entity.PriceHistoryEntity>?, at: String): Double? {
         if (prices.isNullOrEmpty()) return null
         var best: uz.daftar.app.data.db.entity.PriceHistoryEntity? = null
         for (p in prices) {
             if (p.date.take(10) <= at.take(10)) best = p else break
         }
         return best?.price ?: prices.firstOrNull()?.price
+    }
+
+    /**
+     * Bitta mijozning yakuniy qarzi (running balance). txs sana bo'yicha tartiblangan.
+     * Qarz yo'q (<= 0.5) bo'lsa null. p=to'lov(-), q=qo'lda qarz(+), a/b/c/d/k=yuk(+miqdor×narx).
+     */
+    fun clientBalance(
+        txs: List<uz.daftar.app.data.db.entity.TransactionEntity>,
+        pricesByType: Map<String, List<uz.daftar.app.data.db.entity.PriceHistoryEntity>>,
+        today: LocalDate
+    ): ClientBalance? {
+        var bal = 0.0
+        var firstDebtDate: LocalDate? = null    // qarz 0'dan musbatga o'tgan sana
+        var lastPaymentDate: LocalDate? = null   // oxirgi to'lov (P) sanasi
+        for (tx in txs) {
+            val before = bal
+            val d = runCatching {
+                LocalDateTime.parse(tx.date, GetDailyReportUseCase.ISO).toLocalDate()
+            }.getOrNull()
+            when (tx.type) {
+                "p" -> { bal -= tx.amount; if (d != null) lastPaymentDate = d }
+                "q" -> bal += tx.amount
+                else -> {
+                    val pr = tx.tOverride ?: priceAt(pricesByType[tx.type], tx.date)
+                    if (pr != null) bal += tx.amount * pr
+                }
+            }
+            if (before <= 0.0 && bal > 0.0 && d != null) firstDebtDate = d
+            if (bal <= 0.0) firstDebtDate = null
+        }
+        if (bal <= 0.5) return null
+        val fdd = firstDebtDate
+        val lpd = lastPaymentDate
+        val since = when {
+            fdd != null && lpd != null -> maxOf(fdd, lpd)
+            fdd != null -> fdd
+            lpd != null -> lpd
+            else -> return null
+        }
+        val days = ChronoUnit.DAYS.between(since, today).toInt().coerceAtLeast(0)
+        return ClientBalance(bal, since, days)
     }
 }
