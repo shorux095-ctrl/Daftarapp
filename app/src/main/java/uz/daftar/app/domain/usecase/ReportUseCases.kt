@@ -411,7 +411,8 @@ data class OverdueDebtor(
     val client: String,
     val debt: Long,
     val daysOverdue: Int,                // oxirgi to'lovdan (yo'q bo'lsa qarz boshidan) beri kunlar
-    val sinceDate: LocalDate             // sanash boshlangan sana
+    val sinceDate: LocalDate,            // sanash boshlangan sana
+    val topType: String? = null          // asosiy (eng ko'p) yuk turi kodi — rang uchun
 )
 
 class GetOverdueDebtorsUseCase @Inject constructor(
@@ -445,7 +446,11 @@ class GetOverdueDebtorsUseCase @Inject constructor(
             val pricesByType = pricesByClient[cn] ?: emptyMap()
             // Pure hisob — DebtMath (unit test bilan qoplangan)
             val cb = DebtMath.clientBalance(txs, pricesByType, today) ?: continue
-            out.add(OverdueDebtor(name, cb.balance.roundToLong(), cb.days, cb.since))
+            // Asosiy yuk turi (eng ko'p miqdordagi) — rang uchun
+            val topType = txs.filter { it.type.lowercase() in setOf("a", "b", "c", "d", "k") }
+                .groupBy { it.type.lowercase() }
+                .maxByOrNull { (_, l) -> l.sumOf { it.amount } }?.key
+            out.add(OverdueDebtor(name, cb.balance.roundToLong(), cb.days, cb.since, topType))
         }
         val result = out.sortedByDescending { it.daysOverdue }
         cache = result; cacheUser = userId; cacheAt = System.currentTimeMillis()

@@ -108,10 +108,15 @@ private fun DebtorRow(rank: Int, d: OverdueDebtor, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Yuk turi rangi (asosiy yuk turi): A=yashil, B=sariq, C=ko'k, D/K=binafsha
+        val typeColor = when (d.topType) {
+            "a" -> Color(0xFF2E7D32); "b" -> Color(0xFFF57F17); "c" -> Color(0xFF1565C0)
+            "d", "k" -> Color(0xFF7B1FA2); else -> Color(0xFF9AA0A6)
+        }
         Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF0F0F0)),
+            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(typeColor.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center
-        ) { Text("$rank", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF555555)) }
+        ) { Text(d.topType?.uppercase() ?: "$rank", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = typeColor) }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(d.client.replaceFirstChar { it.uppercase() }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1A1A1A))
