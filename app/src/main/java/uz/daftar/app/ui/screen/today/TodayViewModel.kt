@@ -487,7 +487,8 @@ class TodayViewModel @Inject constructor(
                 val mEnd = prev.withDayOfMonth(prev.lengthOfMonth())
                 val r = getDateReport.range(userId, mStart, mEnd, null, false)
                 if (r.clientLines.isNotEmpty() || r.totalPayments > 0) {
-                    val titled = r.copy(title = "Oylik: ${prev.monthValue}.${prev.year}")
+                    // MUHIM: r.title ichida "–" bor (01.06–30.06) — saqlashda diapazon deb tanilishi uchun uni yo'qotmaymiz
+                    val titled = r.copy(title = "Oylik: " + r.title)
                     appendChat(ChatItem.DateRep(nextChatId(), titled))
                 }
             }

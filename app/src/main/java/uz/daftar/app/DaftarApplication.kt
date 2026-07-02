@@ -9,7 +9,10 @@ import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import uz.daftar.app.core.notify.AutoReportWorker
 import uz.daftar.app.core.notify.DebtReminderWorker
+import uz.daftar.app.core.notify.DriveSyncWorker
 import uz.daftar.app.core.notify.TelegramBackupWorker
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import uz.daftar.app.core.notify.createReminderChannel
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -51,6 +54,7 @@ class DaftarApplication : Application(), Configuration.Provider {
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
         // scheduleDailyReminder() — bildirishnoma O'CHIRILDI (eslatma faqat bosh ekranda chiqadi)
         scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
+        scheduleDriveSync()      // har 30 daqiqa — Drive'ga fon sinxron (internet bo'lganda; yo'q bo'lsa kutadi)
         // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)
         Thread { runCatching { backupManager.dailyLocalBackupIfNeeded() } }.apply { isDaemon = true }.start()
         // scheduleDailyAutoReport()
@@ -85,6 +89,25 @@ class DaftarApplication : Application(), Configuration.Provider {
                 }
             }
         }.apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Har 30 daqiqa — bazani Google Drive'ga fon sinxron.
+     * INTERNET SHART (constraint): internet yo'q bo'lsa WorkManager KUTADI,
+     * internet qaytgach avtomatik yuboradi — ma'lumot yo'qolmaydi.
+     */
+    private fun scheduleDriveSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<DriveSyncWorker>(30, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "drive_sync",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
     }
 
     /** Har kuni 08:00 — zaxira + kechagi/haftalik/oylik hisobot */

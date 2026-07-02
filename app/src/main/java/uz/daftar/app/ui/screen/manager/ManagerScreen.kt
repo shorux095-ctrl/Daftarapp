@@ -34,7 +34,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -160,6 +163,32 @@ fun ManagerScreen(
 
             // Amallar
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // ☁️ Drive avto-sinxron holati: qachon saqlanganini shu yerdan bilasiz
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val lastSync = remember {
+                    ctx.getSharedPreferences("drive_sync", android.content.Context.MODE_PRIVATE)
+                        .getLong("last_sync", 0L)
+                }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (lastSync > 0L) Color(0xFFE3F7E8) else Color(0xFFFFF4E0)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            if (lastSync > 0L) "☁️ Drive avto-sinxron: YOQILGAN" else "☁️ Drive avto-sinxron: kutilmoqda",
+                            fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                            color = if (lastSync > 0L) Color(0xFF2E7D32) else Color(0xFF8A6D00)
+                        )
+                        Text(
+                            if (lastSync > 0L)
+                                "Oxirgi saqlash: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(lastSync)) + " · har 30 daqiqada avtomatik"
+                            else
+                                "Hali sinxron bo'lmagan. Internet bo'lganda har 30 daqiqada avtomatik saqlanadi (internet yo'q bo'lsa — kutadi, qaytgach yuboradi).",
+                            fontSize = 11.sp, color = Color(0xFF6B7280)
+                        )
+                    }
+                }
                 Button(
                     onClick = { vm.createBackup() },
                     modifier = Modifier.fillMaxWidth()

@@ -731,7 +731,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v113", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v115", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1982,27 +1982,7 @@ private fun DateReportCard(
             }
 
             Spacer(Modifier.height(10.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(8.dp))
-
-            Text("\u2014 JAMI \u2014", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                for (type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
-                    val total = report.totalsByType[type] ?: 0.0
-                    if (total <= 0.0) continue
-                    val rev = report.revenueByType[type] ?: 0.0
-                    JamiBadge(type.code.uppercase(), colorFor(type), total.formatQty(), "${rev.formatMoney()} so'm")
-                }
-                if (report.totalPayments > 0) {
-                    JamiBadge("P", cP, report.totalPayments.formatMoney(), "so'm")
-                }
-                JamiBadge("J", cDK, report.totalRevenue.formatMoney(), if (report.useNarx) "jami pul" else "jami")
-            }
+            // Eski "— JAMI —" bloki OLIB TASHLANDI: JAMI xulosa endi kartaning TEPASIDA (JamiSummary)
         }
     }
 }
