@@ -422,7 +422,7 @@ class TodayViewModel @Inject constructor(
                         }
                         "u" -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.User(id, t, ts) else null }
                         "debt" -> {
-                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
+                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 1 } }.getOrNull()
                             if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
                         }
                         else -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.Info(id, t, ts) else null }
@@ -494,21 +494,24 @@ class TodayViewModel @Inject constructor(
             }
         }
         // ⏰ Qarz eslatmasi — chiroyli karta (kuniga bir marta)
-        runCatching {
-            val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
-            if (list.isNotEmpty()) appendChat(ChatItem.DebtRep(nextChatId(), list))
-        }
+        // Qarz eslatmasi bu yerdan OLIB TASHLANDI — endi ensureDebtReminder kuniga 1 marta
+        // (soat 10:00 dan keyin) ko'rsatadi, takror bo'lmasin
         runCatching { chatStore.setLastReportDate(today.toString()) }
     }
 
-    /** Eslatma kartasi HAR OCHILGANDA ishonchli ko'rinsin: agar 10+ kunlik qarz bor-u,
-     *  chatda eslatma karta yo'q bo'lsa — qo'shamiz. (Karta bor bo'lsa, restore qayta hisoblaydi.) */
+    /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        if (_state.value.chat.any { it is ChatItem.DebtRep }) return
-        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull() ?: return
+        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 1 } }.getOrNull() ?: return
+        // Kuniga 1 marta, soat 10:00 dan keyin (birinchi ochilishda) chiqadi
+        val today = LocalDate.now().toString()
+        val hour = java.time.LocalTime.now().hour
+        if (hour < 10) return
+        val last = runCatching { chatStore.getLastDebtRemDate() }.getOrDefault("")
+        if (last == today) return
         if (list.isNotEmpty()) {
             appendChat(ChatItem.DebtRep(nextChatId(), list))
             persistChat()
+            runCatching { chatStore.setLastDebtRemDate(today) }
         }
     }
 
@@ -1600,7 +1603,7 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
+                val list = getOverdue(userId).filter { it.daysOverdue >= 1 }
                 if (list.isEmpty()) {
                     appendChat(ChatItem.Info(nextChatId(), "✅ 10 kundan oshgan qarz yo'q."))
                 } else {

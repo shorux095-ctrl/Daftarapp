@@ -51,4 +51,14 @@ class ChatStore @Inject constructor(
     suspend fun setLastReportDate(date: String) {
         context.chatDataStore.edit { it[lastReportKey] = date }
     }
+
+    private val lastDebtRemKey = stringPreferencesKey("last_debt_rem_date")
+
+    /** Qarz eslatmasi oxirgi ko'rsatilgan sana (kuniga 1 marta, 10:00 dan keyin). */
+    suspend fun getLastDebtRemDate(): String =
+        context.chatDataStore.data.map { it[lastDebtRemKey] ?: "" }.first()
+
+    suspend fun setLastDebtRemDate(date: String) {
+        context.chatDataStore.edit { it[lastDebtRemKey] = date }
+    }
 }

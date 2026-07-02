@@ -731,7 +731,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v116", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v117", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -2142,6 +2142,7 @@ private fun DebtReminderCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
+            DebtBucket("🟢 1\u20139 kun", debtors.filter { it.daysOverdue in 1..9 }, Color(0xFF2E7D32), Color(0xFFE8F5E9))
             DebtBucket("🔵 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
             DebtBucket("🟡 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
             DebtBucket("🟠 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))

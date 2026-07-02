@@ -106,9 +106,12 @@ class ClientHistoryViewModel @Inject constructor(
 
     private fun findPriceAtDate(prices: List<PriceHistoryEntity>?, atDate: String): Double? {
         if (prices.isNullOrEmpty()) return null
+        // MUHIM: faqat SANA (10 belgi) solishtiriladi — DebtMath/calculateDebt bilan BIR XIL.
+        // Shu kuni narx o'zgartirilsa, o'sha kunning yozuvlariga ham yangi narx qo'llanadi
+        // (ilgari vaqt ham solishtirilib, timeline 4.3 / qarz 4.0 bo'lib farq chiqardi).
         var best: PriceHistoryEntity? = null
         for (p in prices.sortedBy { it.date }) {
-            if (p.date <= atDate) best = p else break
+            if (p.date.take(10) <= atDate.take(10)) best = p else break
         }
         if (best != null) return best.price
         return prices.minByOrNull { it.date }?.price  // retroaktiv
