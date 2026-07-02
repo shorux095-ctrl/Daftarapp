@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.clienthistory
 
+import uz.daftar.app.core.util.yukRangi
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -315,15 +316,8 @@ private fun TimelineRow(
     val type = TxType.fromCode(tx.type)
     val isPayment = type == TxType.P
     val isManualDebt = type == TxType.Q
-    val typeColor = when (tx.type.lowercase()) {
-        "a" -> Color(0xFF1976D2)
-        "b" -> Color(0xFFF9A825)
-        "c" -> Color(0xFF2E9E4F)
-        "d" -> Color(0xFF00838F)
-        "k" -> Color(0xFFC2185B)
-        "p" -> Color(0xFF1AA35A)
-        else -> DebtRed
-    }
+    // YAGONA rang standarti (yukRangi): A=ko'k, B=sariq, C=yashil, P=QIZIL, D=teal, K=pushti, Q=kulrang
+    val typeColor = yukRangi(tx.type)
     val desc = when {
         isPayment -> "P(pul): ${tx.amount.formatMoney()}"
         isManualDebt -> "Q(qarz): ${tx.amount.formatMoney()}"
@@ -477,14 +471,7 @@ private fun JamiCargoCol(letter: String, qty: Double, money: Double, color: Colo
     }
 }
 
-private fun cargoColor(code: String) = when (code.lowercase()) {
-    "a" -> Color(0xFF1976D2)
-    "b" -> Color(0xFFF9A825)
-    "c" -> Color(0xFF2E9E4F)
-    "d" -> Color(0xFF00838F)
-    "k" -> Color(0xFFC2185B)
-    else -> Color(0xFF1976D2)
-}
+private fun cargoColor(code: String) = yukRangi(code)
 
 @Composable
 private fun NavBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {

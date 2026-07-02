@@ -422,7 +422,7 @@ class TodayViewModel @Inject constructor(
                         }
                         "u" -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.User(id, t, ts) else null }
                         "debt" -> {
-                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 1 } }.getOrNull()
+                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
                             if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
                         }
                         else -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.Info(id, t, ts) else null }
@@ -501,7 +501,7 @@ class TodayViewModel @Inject constructor(
 
     /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 1 } }.getOrNull() ?: return
+        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull() ?: return
         // Kuniga 1 marta, soat 10:00 dan keyin (birinchi ochilishda) chiqadi
         val today = LocalDate.now().toString()
         val hour = java.time.LocalTime.now().hour
@@ -1603,7 +1603,7 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val list = getOverdue(userId).filter { it.daysOverdue >= 1 }
+                val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
                 if (list.isEmpty()) {
                     appendChat(ChatItem.Info(nextChatId(), "✅ 10 kundan oshgan qarz yo'q."))
                 } else {

@@ -1,4 +1,5 @@
 package uz.daftar.app.ui.screen.clients
+import uz.daftar.app.core.util.yukRangi
 
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.outlined.Refresh
@@ -291,7 +292,7 @@ private fun ClientCard(c: ClientSummary, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .background(avatarColor(c.name), CircleShape),
+                    .background(c.topType?.let { yukRangi(it) } ?: avatarColor(c.name), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

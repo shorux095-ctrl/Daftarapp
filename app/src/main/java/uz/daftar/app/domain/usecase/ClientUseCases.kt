@@ -59,7 +59,12 @@ class GetAllClientsUseCase @Inject constructor(
                         }
                     }
                 }
-                ClientSummary(cn, debt.roundToLong(), lastYuk, lastPay)
+                ClientSummary(
+                    cn, debt.roundToLong(), lastYuk, lastPay,
+                    topType = txs.filter { it.type.lowercase() in setOf("a", "b", "c", "d", "k") }
+                        .groupBy { it.type.lowercase() }
+                        .maxByOrNull { (_, l) -> l.sumOf { it.amount } }?.key
+                )
             }.sortedByDescending { it.debt }
         }
 
@@ -81,5 +86,6 @@ data class ClientSummary(
     val name: String,
     val debt: Long,
     val lastYukDate: String?,
-    val lastPaymentDate: String?
+    val lastPaymentDate: String?,
+    val topType: String? = null   // asosiy (eng ko'p) yuk turi kodi — rang uchun
 )
