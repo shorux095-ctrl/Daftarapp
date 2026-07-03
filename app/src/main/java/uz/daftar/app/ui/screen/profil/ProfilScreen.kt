@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.profil
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
