@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.tahrir
 
+import uz.daftar.app.core.util.yukRangi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,10 +39,7 @@ private val cC = Color(0xFF1565C0)
 private val cDK = Color(0xFF7B1FA2)
 private val cP = Color(0xFFD32F2F)
 private val cQ = Color(0xFF616161)
-private fun colorFor(t: TxType) = when (t) {
-    TxType.A -> cA; TxType.B -> cB; TxType.C -> cC
-    TxType.D, TxType.K -> cDK; TxType.P -> cP; TxType.Q -> cQ
-}
+private fun colorFor(t: TxType) = yukRangi(t)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +52,7 @@ fun TahrirScreen(
     val rows by vm.rows.collectAsStateWithLifecycle()
     val date by vm.date.collectAsStateWithLifecycle()
     val nameFilter by vm.nameFilter.collectAsStateWithLifecycle()
+    val allNames by vm.allNames.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -135,6 +134,35 @@ fun TahrirScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    // ✨ YORDAM: yozayotganda mavjud ismlardan tanlash
+                    run {
+                        val q = nameFilter.trim().lowercase()
+                        val hints = if (q.isBlank()) emptyList()
+                            else allNames.filter { it.contains(q) && it != q }.take(5)
+                        if (hints.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFF1F3F6),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.padding(vertical = 2.dp)) {
+                                    for (h in hints) {
+                                        TextButton(
+                                            onClick = { vm.setNameFilter(h) },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                "👤 " + h.replaceFirstChar { it.uppercase() },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = Color(0xFF374151)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     // Umumiy qidiruv: ism kiritilsa, butun tarixni ochish (barcha sanalar)
                     if (nameFilter.isNotBlank()) {
                         Spacer(Modifier.height(6.dp))

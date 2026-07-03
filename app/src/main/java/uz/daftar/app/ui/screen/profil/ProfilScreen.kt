@@ -1,5 +1,8 @@
 package uz.daftar.app.ui.screen.profil
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -164,7 +167,7 @@ fun ProfilScreen(
                 val fresh = lastSync > 0L && (System.currentTimeMillis() - lastSync) < 2 * 60 * 60 * 1000L
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(Modifier.padding(12.dp)) {
                         Text(
@@ -198,29 +201,50 @@ fun ProfilScreen(
                 checked = autoBackupOn,
                 onCheckedChange = { on -> if (on) autoBackupLauncher.launch("daftar_avto_backup.db") else vm.disableAutoBackup() }
             )
-            // Google Drive zaxira (bulut, 40 kunlik tarix)
-            SettingsItem(
-                icon = Icons.Outlined.Backup,
-                title = if (driveEmail != null) "☁️ Google Drive ✓" else "☁️ Google Drive zaxira",
-                subtitle = when {
-                    driveBusy -> "Saqlanmoqda…"
-                    driveEmail != null -> "$driveEmail — chiqishda avto, 40 kun saqlanadi"
-                    else -> "Google bilan kiring — bulutga avto-zaxira"
-                },
-                onClick = {
-                    if (driveEmail == null) driveSignInLauncher.launch(vm.signInClientIntent())
-                    else vm.backupNowDrive()
+            // Google Drive — TELEGRAMDEK yig'ma: bosganda ichida ochiladi
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    var gOpen by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (driveEmail == null) driveSignInLauncher.launch(vm.signInClientIntent())
+                            else gOpen = !gOpen
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (driveEmail != null) "☁️ Google Drive ✓" else "☁️ Google Drive zaxira",
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                when {
+                                    driveBusy -> "Saqlanmoqda…"
+                                    driveEmail != null && !gOpen -> "$driveEmail · sozlash uchun bosing"
+                                    driveEmail != null -> "$driveEmail — chiqishda avto, 40 kun saqlanadi"
+                                    else -> "Google bilan kiring — bulutga avto-zaxira"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (driveEmail != null) Text(if (gOpen) "▲" else "▼", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (gOpen && driveEmail != null) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { vm.backupNowDrive() },
+                            enabled = !driveBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (driveBusy) "Saqlanmoqda…" else "💾 Hozir Drive'ga zaxiralash") }
+                        TextButton(
+                            onClick = { showDriveSignOut = true }
+                        ) { Text("Google hisobidan chiqish", color = MaterialTheme.colorScheme.error) }
+                    }
                 }
-            )
-            if (driveEmail != null) {
-                OutlinedButton(
-                    onClick = { vm.backupNowDrive() },
-                    enabled = !driveBusy,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) { Text(if (driveBusy) "Saqlanmoqda…" else "💾 Hozir Drive'ga zaxiralash") }
-                TextButton(
-                    onClick = { showDriveSignOut = true }
-                ) { Text("Google hisobidan chiqish", color = MaterialTheme.colorScheme.error) }
             }
             if (showDriveSignOut) {
                 AlertDialog(
@@ -242,7 +266,7 @@ fun ProfilScreen(
             // Telegram zaxira — botingizga bazani (.db) yuboradi
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(Modifier.padding(14.dp)) {
                     var tgOpen by remember { mutableStateOf(false) }
@@ -344,12 +368,12 @@ private fun SettingsItem(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
@@ -358,8 +382,12 @@ private fun SettingsItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(16.dp))
+            Box(
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -378,16 +406,20 @@ private fun ToggleItem(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(16.dp))
+            Box(
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

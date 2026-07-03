@@ -46,6 +46,16 @@ class TahrirViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    // Ism yozganda YORDAM (autocomplete) uchun barcha mijoz nomlari
+    private val _allNames = MutableStateFlow<List<String>>(emptyList())
+    val allNames: StateFlow<List<String>> = _allNames.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _allNames.value = runCatching { txDao.getAllClientNames(userId) }.getOrDefault(emptyList())
+        }
+    }
+
     /** Tanlangan sana + ism filtri bo'yicha o'sha kunning yozuvlari (T narx bilan) */
     val rows: StateFlow<List<TahrirRowData>> =
         combine(_date, _nameFilter) { d, nf -> Pair(d, nf) }
