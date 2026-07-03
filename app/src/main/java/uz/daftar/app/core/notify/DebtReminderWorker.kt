@@ -22,19 +22,31 @@ const val REMINDER_CHANNEL_ID = "debt_reminder"
 class DebtReminderWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val getOverdue: GetOverdueDebtorsUseCase
+    private val getOverdue: GetOverdueDebtorsUseCase,
+    private val chatStore: uz.daftar.app.core.chat.ChatStore
 ) : CoroutineWorker(appContext, params) {
 
+    /** HAR KUNI 10:00 — BILDIRISHNOMA YO'Q. Bosh ekran chatiga qarz-eslatma KARTASI qo'shiladi
+     *  (ilova YOPIQ bo'lsa ham ishlaydi). Keyin ilova ochilganda karta jonli DB dan qayta quriladi. */
     override suspend fun doWork(): Result {
+        val today = java.time.LocalDate.now().toString()
+        val last = runCatching { chatStore.getLastDebtRemDate() }.getOrDefault("")
+        if (last == today) return Result.success()   // bugun allaqachon qo'shilgan
         val list = try {
             getOverdue(1L)
         } catch (e: Exception) {
             return Result.success()
         }
-        // 7+ kun muddati o'tganlar
         val overdue = list.filter { it.daysOverdue >= 10 }
         if (overdue.isNotEmpty()) {
-            postReminder(applicationContext, overdue.size, overdue.maxOf { it.daysOverdue })
+            runCatching {
+                val json = chatStore.load()
+                val arr = if (json.isBlank()) org.json.JSONArray()
+                else runCatching { org.json.JSONArray(json) }.getOrDefault(org.json.JSONArray())
+                arr.put(org.json.JSONObject().put("k", "debt").put("ts", System.currentTimeMillis()))
+                chatStore.save(arr.toString())
+                chatStore.setLastDebtRemDate(today)
+            }
         }
         return Result.success()
     }

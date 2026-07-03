@@ -52,7 +52,7 @@ class DaftarApplication : Application(), Configuration.Provider {
         // Ilova o'z loglarini (xato/warning) faylga yozadi — "🐞 Xato loglari" menyusida ko'rinadi.
         startLogCapture()
         // Avtomatik bildirishnoma O'CHIRILDI — hisobotlar endi ilova ochilganda chatga chiqadi.
-        scheduleDailyReminder()  // HAR KUNI 10:00 — qarz eslatma bildirishnomasi (10+ kunlik qarzdorlar)
+        scheduleDailyReminder()  // HAR KUNI 10:00 — bosh ekranga qarz eslatma KARTASI (bildirishnomasiz, yopiq bo'lsa ham)
         scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
         scheduleDriveSync()      // har 30 daqiqa — Drive'ga fon sinxron (internet bo'lganda; yo'q bo'lsa kutadi)
         // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)

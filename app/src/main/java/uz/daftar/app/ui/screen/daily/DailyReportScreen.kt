@@ -1,4 +1,5 @@
 package uz.daftar.app.ui.screen.daily
+import uz.daftar.app.core.util.yukRangi
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -167,7 +168,7 @@ private fun DayRow(num: Int, ln: DayClientLine) {
     val detail = buildAnnotatedString {
         ln.cargo.forEachIndexed { i, c ->
             if (i > 0) append("    ")
-            withStyle(SpanStyle(color = InkDark, fontWeight = FontWeight.SemiBold)) {
+            withStyle(SpanStyle(color = yukRangi(c.type), fontWeight = FontWeight.SemiBold)) {
                 append("${c.type}:${c.qty.formatQty()}")
             }
             if (c.price != null) {
@@ -176,13 +177,13 @@ private fun DayRow(num: Int, ln: DayClientLine) {
         }
         if (ln.payment > 0) {
             if (length > 0) append("    ")
-            withStyle(SpanStyle(color = GreenB, fontWeight = FontWeight.Bold)) {
+            withStyle(SpanStyle(color = yukRangi("p"), fontWeight = FontWeight.Bold)) {
                 append("P:${ln.payment.formatMoney()}")
             }
         }
         if (ln.manualDebt > 0) {
             if (length > 0) append("    ")
-            withStyle(SpanStyle(color = RedQ, fontWeight = FontWeight.Bold)) {
+            withStyle(SpanStyle(color = yukRangi("q"), fontWeight = FontWeight.Bold)) {
                 append("Q:${ln.manualDebt.formatMoney()}")
             }
         }

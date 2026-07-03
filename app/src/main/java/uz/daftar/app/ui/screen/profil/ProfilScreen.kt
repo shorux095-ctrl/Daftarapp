@@ -155,6 +155,34 @@ fun ProfilScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
             )
 
+            // ☁️ Drive avto-sinxron holati — TEPADA (qachon saqlangani shu yerda ko'rinadi)
+            run {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val lastSync = remember {
+                    ctx.getSharedPreferences("drive_sync", android.content.Context.MODE_PRIVATE).getLong("last_sync", 0L)
+                }
+                val fresh = lastSync > 0L && (System.currentTimeMillis() - lastSync) < 2 * 60 * 60 * 1000L
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            if (fresh) "🟢 Drive avto-sinxron: ISHLAYAPTI" else "🔴 Drive avto-sinxron: kutilmoqda",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            if (lastSync > 0L)
+                                "Oxirgi saqlash: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(lastSync)) + " · har 30 daqiqada"
+                            else
+                                "Hali sinxron bo'lmagan — internet bo'lganda avtomatik boshlanadi.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             // Zaxira (DB backup / fayldan tiklash)
             SettingsItem(
                 icon = Icons.Outlined.Backup,
@@ -217,10 +245,25 @@ fun ProfilScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text(
-                        if (tgConfigured) "\uD83D\uDCE8 Telegram zaxira \u2713" else "\uD83D\uDCE8 Telegram zaxira",
-                        fontWeight = FontWeight.Bold
-                    )
+                    var tgOpen by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { tgOpen = !tgOpen },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (tgConfigured) "\uD83D\uDCE8 Telegram zaxira \u2713" else "\uD83D\uDCE8 Telegram zaxira",
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (!tgOpen && tgConfigured) Text(
+                                "ID: $tgChat · sozlash uchun bosing",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(if (tgOpen) "▲" else "▼", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (tgOpen) {
                     Text(
                         "Bot token + chat_id kiriting \u2014 baza har kuni Telegramga yuboriladi. Telefon yo'qolsa ham ma'lumot saqlanadi.",
                         style = MaterialTheme.typography.bodySmall,
@@ -249,6 +292,7 @@ fun ProfilScreen(
                     if (tgConfigured) {
                         TextButton(onClick = { showTgClear = true }) { Text("O'chirish", color = MaterialTheme.colorScheme.error) }
                     }
+                    }   // tgOpen yig'ma blok tugadi
                     if (showTgClear) {
                         AlertDialog(
                             onDismissRequest = { showTgClear = false },

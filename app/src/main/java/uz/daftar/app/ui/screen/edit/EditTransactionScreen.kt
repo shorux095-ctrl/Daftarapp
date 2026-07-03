@@ -63,18 +63,36 @@ fun EditTransactionScreen(
                 )
                 state.original != null -> {
                     val orig = state.original!!
-                    // Mijoz
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Mijoz:", style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                orig.clientName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
-                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold
-                            )
+                    // Mijoz — YOZIB O'ZGARTIRSA BO'LADI (yordam: mavjud ismlardan tanlash)
+                    OutlinedTextField(
+                        value = state.clientName,
+                        onValueChange = vm::setClientName,
+                        label = { Text("Mijoz (ism)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    val q = state.clientName.trim().lowercase()
+                    val hints = if (q.isBlank()) emptyList()
+                        else state.allNames.filter { it.contains(q) && it != q }.take(5)
+                    if (hints.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                for (h in hints) {
+                                    TextButton(
+                                        onClick = { vm.setClientName(h) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            "👤 " + h.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -151,6 +169,28 @@ fun EditTransactionScreen(
                         Icon(Icons.Outlined.Save, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("Saqlash")
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // 🗑 SHU BITTA yozuvni o'chirish (takroriy yozuvlarni olib tashlash uchun)
+                    var showDel by remember { mutableStateOf(false) }
+                    OutlinedButton(
+                        onClick = { showDel = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("🗑 Yozuvni o'chirish") }
+                    if (showDel) {
+                        AlertDialog(
+                            onDismissRequest = { showDel = false },
+                            title = { Text("Yozuv o'chirilsinmi?") },
+                            text = { Text("Shu bitta yozuv butunlay o'chiriladi. Qarz avtomatik qayta hisoblanadi.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showDel = false
+                                    vm.delete { onBack() }
+                                }) { Text("Ha, o'chirish", color = MaterialTheme.colorScheme.error) }
+                            },
+                            dismissButton = { TextButton(onClick = { showDel = false }) { Text("Bekor") } }
+                        )
                     }
                     Spacer(Modifier.height(24.dp))
                 }

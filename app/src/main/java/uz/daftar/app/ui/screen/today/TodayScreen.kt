@@ -731,7 +731,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v118", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v120", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -742,8 +742,21 @@ private fun ChatTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash")
+            // ☁️ Drive sinxron nuqtachasi: YASHIL=ishlayapti, QIZIL=hali sinxron emas
+            // (🔄 tugma olib tashlandi — hisobot har yozuvda o'zi avtomatik yangilanadi)
+            run {
+                val dctx = androidx.compose.ui.platform.LocalContext.current
+                val lastSync = remember {
+                    dctx.getSharedPreferences("drive_sync", android.content.Context.MODE_PRIVATE).getLong("last_sync", 0L)
+                }
+                val fresh = lastSync > 0L && (System.currentTimeMillis() - lastSync) < 2 * 60 * 60 * 1000L
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(if (fresh) Color(0xFF2E7D32) else Color(0xFFD32F2F))
+                )
+                Spacer(Modifier.width(6.dp))
             }
             // 📅 Sana — istalgan kun yozuvlarini ko'rsatadi (Bugun o'rniga)
             TextButton(onClick = onOpenCalendar, contentPadding = PaddingValues(horizontal = 10.dp)) {

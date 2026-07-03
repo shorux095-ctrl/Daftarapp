@@ -23,6 +23,8 @@ data class EditState(
     val original: TransactionEntity? = null,
     val type: TxType = TxType.A,
     val amount: String = "",
+    val clientName: String = "",
+    val allNames: List<String> = emptyList(),
     val date: LocalDate = LocalDate.now(),
     val nNarx: String = "",
     val tNarx: String = "",
@@ -68,12 +70,15 @@ class EditTransactionViewModel @Inject constructor(
                     val p = runCatching { priceDao.getPriceAt(userId, tx.clientName, tx.type, tx.date) }.getOrNull()
                     if (p != null) nNarx = fmtNum(p)
                 }
+                val names = runCatching { txDao.getAllClientNames(userId) }.getOrDefault(emptyList())
                 _state.update {
                     it.copy(
                         isLoading = false,
                         original = tx,
                         type = type,
                         amount = fmtNum(tx.amount),
+                        clientName = tx.clientName,
+                        allNames = names,
                         date = day,
                         nNarx = nNarx,
                         tNarx = tx.tOverride?.let { v -> fmtNum(v) } ?: "",
@@ -87,6 +92,16 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     fun setType(t: TxType) = _state.update { it.copy(type = t) }
+    fun setClientName(s: String) = _state.update { it.copy(clientName = s) }
+
+    /** Yozuvni butunlay o'chiradi (takroriy yozuvni olib tashlash uchun). */
+    fun delete(onDone: () -> Unit) {
+        viewModelScope.launch {
+            runCatching { txDao.deleteById(txId) }
+            onDone()
+        }
+    }
+
     fun setAmount(s: String) = _state.update { it.copy(amount = s) }
     fun setDate(d: LocalDate) = _state.update { it.copy(date = d) }
     fun setNNarx(s: String) = _state.update { it.copy(nNarx = s) }
@@ -110,7 +125,7 @@ class EditTransactionViewModel @Inject constructor(
                 editUC(
                     id = orig.id,
                     userId = orig.userId,
-                    clientName = orig.clientName,
+                    clientName = s.clientName.trim().ifBlank { orig.clientName },
                     type = s.type,
                     amount = amt,
                     date = newDate,
