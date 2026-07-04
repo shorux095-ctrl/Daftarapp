@@ -52,7 +52,7 @@ import uz.daftar.app.data.db.entity.YukRasxodNarxEntity
         EslatmaEntity::class,
         SkladEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class DaftarDatabase : RoomDatabase() {

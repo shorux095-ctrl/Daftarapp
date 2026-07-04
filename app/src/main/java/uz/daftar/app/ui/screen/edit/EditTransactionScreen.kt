@@ -125,6 +125,15 @@ fun EditTransactionScreen(
                         singleLine = true,
                         isError = state.error != null
                     )
+                    Spacer(Modifier.height(10.dp))
+                    // 📝 IZOH — har yozuvga eslatma (ixtiyoriy)
+                    OutlinedTextField(
+                        value = state.note,
+                        onValueChange = vm::setNote,
+                        label = { Text("📝 Izoh (ixtiyoriy)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
 
                     // Faqat yuk uchun: N narx, T narx, T1
                     if (state.isCargo) {

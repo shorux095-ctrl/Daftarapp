@@ -25,6 +25,7 @@ data class EditState(
     val amount: String = "",
     val clientName: String = "",
     val allNames: List<String> = emptyList(),
+    val note: String = "",
     val date: LocalDate = LocalDate.now(),
     val nNarx: String = "",
     val tNarx: String = "",
@@ -79,6 +80,7 @@ class EditTransactionViewModel @Inject constructor(
                         amount = fmtNum(tx.amount),
                         clientName = tx.clientName,
                         allNames = names,
+                        note = tx.note ?: "",
                         date = day,
                         nNarx = nNarx,
                         tNarx = tx.tOverride?.let { v -> fmtNum(v) } ?: "",
@@ -93,6 +95,7 @@ class EditTransactionViewModel @Inject constructor(
 
     fun setType(t: TxType) = _state.update { it.copy(type = t) }
     fun setClientName(s: String) = _state.update { it.copy(clientName = s) }
+    fun setNote(s: String) = _state.update { it.copy(note = s) }
 
     /** Yozuvni butunlay o'chiradi (takroriy yozuvni olib tashlash uchun). */
     fun delete(onDone: () -> Unit) {
@@ -126,6 +129,7 @@ class EditTransactionViewModel @Inject constructor(
                     id = orig.id,
                     userId = orig.userId,
                     clientName = s.clientName.trim().ifBlank { orig.clientName },
+                    note = s.note.trim().ifBlank { null },
                     type = s.type,
                     amount = amt,
                     date = newDate,

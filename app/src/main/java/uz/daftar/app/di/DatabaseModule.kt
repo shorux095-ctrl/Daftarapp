@@ -12,6 +12,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import javax.inject.Singleton
 
+/** v3 -> v4: transactions jadvaliga `note` (izoh) ustuni qo'shiladi — mavjud ma'lumot saqlanadi */
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `note` TEXT")
+    }
+}
+
 /** v2 -> v3: eslatma va sklad jadvallarini qo'shadi (mavjud ma'lumot saqlanadi) */
 private val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -71,7 +78,7 @@ object DatabaseModule {
             DaftarDatabase::class.java,
             DaftarDatabase.NAME
         )
-            .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 

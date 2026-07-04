@@ -358,6 +358,9 @@ private fun TimelineRow(
             if (time.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
                 Text("🕐 $time", fontSize = 12.sp, color = Color(0xFF9AA0A6))
+                tx.note?.takeIf { it.isNotBlank() }?.let {
+                    Text("📝 $it", fontSize = 12.sp, color = Color(0xFF6B7280))
+                }
             }
         }
         Spacer(Modifier.width(8.dp))

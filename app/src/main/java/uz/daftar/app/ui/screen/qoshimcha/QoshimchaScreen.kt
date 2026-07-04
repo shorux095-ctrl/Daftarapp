@@ -58,13 +58,13 @@ fun QoshimchaScreen(
             Tile("🔍", "Qidiruv", "Hamma yozuvda qidirish", Color(0xFFD5F2EE), onSearch)
 
             Spacer(Modifier.height(22.dp))
-            Text("Tez orada", fontSize = 13.sp, color = Color(0xFF888888))
+            Text("Tayyor bo'ldi ✅", fontSize = 13.sp, color = Color(0xFF2E7D32))
             Spacer(Modifier.height(10.dp))
-            SoonTile("📤", "Hisob ulashish (PDF)", "Mijoz hisobini PDF qilib yuborish")
+            DoneTile("📤", "Hisob ulashish (PDF)", "Mijoz tarixida 📄 tugma — PDF yuboriladi")
             Spacer(Modifier.height(10.dp))
-            SoonTile("📝", "Yozuvga izoh", "Har yozuvga eslatma qo'shish")
+            DoneTile("📝", "Yozuvga izoh", "Yozuvni bosing → Tahrirlash → Izoh maydoni")
             Spacer(Modifier.height(10.dp))
-            SoonTile("🔄", "Avto kunlik hisobot", "Har kuni kechagi hisobot chatda")
+            DoneTile("🔄", "Avto kunlik hisobot", "Har kuni kechagi hisobot chatda o'zi keladi")
             Spacer(Modifier.height(20.dp))
         }
     }
@@ -109,6 +109,28 @@ private fun SoonTile(emoji: String, title: String, subtitle: String) {
         }
         Surface(color = Color(0xFFE0E0E0), shape = RoundedCornerShape(8.dp)) {
             Text("tez orada", fontSize = 10.sp, color = Color(0xFF666666),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+        }
+    }
+}
+
+@Composable
+private fun DoneTile(emoji: String, title: String, subtitle: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFFE8F5E9)),
+            contentAlignment = Alignment.Center
+        ) { Text(emoji, fontSize = 24.sp) }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF1F2937))
+            Text(subtitle, fontSize = 12.sp, color = Color(0xFF6B7280))
+        }
+        Surface(color = Color(0xFFD9F2DF), shape = RoundedCornerShape(8.dp)) {
+            Text("✅ tayyor", fontSize = 10.sp, color = Color(0xFF2E7D32),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
         }
     }
