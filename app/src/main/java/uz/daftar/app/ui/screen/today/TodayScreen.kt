@@ -176,6 +176,8 @@ fun TodayScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
     val listState = rememberLazyListState()
+    // 📱 2-telefon (ko'ruvchi) rejimi tekshiruvi uchun kontekst
+    val appCtx = androidx.compose.ui.platform.LocalContext.current
     val inputFr = remember { FocusRequester() }
     val calScope = rememberCoroutineScope()
     val csvContext = LocalContext.current
@@ -427,8 +429,15 @@ fun TodayScreen(
                                 .combinedClickable(
                                     onClick = {
                                         bottomMenuOpen = false
-                                        showInput = !showInput
-                                        if (!showInput) { keyboardController?.hide(); focusManager.clearFocus() }
+                                        // 📱 Ko'ruvchi telefonda yozish YO'Q — asosiy telefon ma'lumoti buzilmasin
+                                        val vwr = appCtx.getSharedPreferences("device_mode", android.content.Context.MODE_PRIVATE)
+                                            .getBoolean("viewer", false)
+                                        if (vwr) {
+                                            android.widget.Toast.makeText(appCtx, "📱 2-telefon rejimi: faqat ko'rish. Yozish — asosiy telefonda", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            showInput = !showInput
+                                            if (!showInput) { keyboardController?.hide(); focusManager.clearFocus() }
+                                        }
                                     },
                                     onLongClick = {
                                         bottomMenuOpen = false
@@ -731,7 +740,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v123", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v124", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {

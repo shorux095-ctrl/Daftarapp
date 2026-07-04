@@ -194,6 +194,23 @@ fun ProfilScreen(
                 subtitle = "Bazani zaxiralash yoki fayldan tiklash",
                 onClick = onManager
             )
+            // 📱 2-TELEFON REJIMI — parallel ishlatish XAVFSIZ bo'lishi uchun
+            run {
+                val vctx = androidx.compose.ui.platform.LocalContext.current
+                val vprefs = remember { vctx.getSharedPreferences("device_mode", android.content.Context.MODE_PRIVATE) }
+                var viewer by remember { mutableStateOf(vprefs.getBoolean("viewer", false)) }
+                ToggleItem(
+                    icon = Icons.Outlined.Backup,
+                    title = "📱 2-telefon rejimi (faqat ko'rish)",
+                    subtitle = if (viewer) "YOQILGAN — bu telefon yozmaydi va Drive'ga yubormaydi (faqat o'qiydi)"
+                        else "Ikkinchi telefonda YOQING — asosiy telefon ma'lumoti buzilmaydi",
+                    checked = viewer,
+                    onCheckedChange = { on ->
+                        viewer = on
+                        vprefs.edit().putBoolean("viewer", on).apply()
+                    }
+                )
+            }
             // Avto-zaxira (fayl)
             ToggleItem(
                 icon = Icons.Outlined.Backup,

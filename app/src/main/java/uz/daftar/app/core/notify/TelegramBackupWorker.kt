@@ -18,6 +18,10 @@ class TelegramBackupWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         if (!telegram.isConfigured()) return Result.success()
+        // 📱 2-telefon (ko'ruvchi) rejimi: Telegramga ham yubormaydi (asosiy telefon yuboradi)
+        val viewer = applicationContext.getSharedPreferences("device_mode", Context.MODE_PRIVATE)
+            .getBoolean("viewer", false)
+        if (viewer) return Result.success()
         return try {
             telegram.sendBackup()
             Result.success()
