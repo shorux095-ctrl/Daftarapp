@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.daftar.app.data.repository.TransactionRepository
 import uz.daftar.app.domain.model.Transaction
+import uz.daftar.app.domain.usecase.DeleteToKarzinaUseCase
 import uz.daftar.app.domain.model.TxType
 import java.time.LocalDate
 import javax.inject.Inject
@@ -32,7 +33,8 @@ class TahrirViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val txDao: uz.daftar.app.data.db.dao.TransactionDao,
     private val yukDao: uz.daftar.app.data.db.dao.YukNarxDao,
-    private val lockManager: uz.daftar.app.core.security.LockManager
+    private val lockManager: uz.daftar.app.core.security.LockManager,
+    private val deleteToKarzina: DeleteToKarzinaUseCase
 ) : ViewModel() {
 
     private val userId = 1L
@@ -121,8 +123,8 @@ class TahrirViewModel @Inject constructor(
     /** Bitta yozuvni o'chirish */
     fun delete(id: Long) {
         viewModelScope.launch {
-            repo.deleteByIds(listOf(id))
-            _message.value = "🗑 O'chirildi"
+            deleteToKarzina(userId, id)   // 🗑 karzinaga (7 kun tiklanadi)
+            _message.value = "🗑 Karzinaga ko'chirildi (7 kun tiklanadi)"
         }
     }
 
@@ -142,8 +144,8 @@ class TahrirViewModel @Inject constructor(
             }
             val ids = rows.value.map { it.tx.id }
             if (ids.isEmpty()) { _message.value = "O'chirish uchun yozuv yo'q"; return@launch }
-            repo.deleteByIds(ids)
-            _message.value = "🗑 ${ids.size} ta yozuv o'chirildi"
+            ids.forEach { deleteToKarzina(userId, it) }   // 🗑 hammasi karzinaga
+            _message.value = "🗑 ${ids.size} ta yozuv karzinaga ko'chirildi"
             onDone()
         }
     }

@@ -15,6 +15,7 @@ import uz.daftar.app.data.db.entity.PriceHistoryEntity
 import uz.daftar.app.data.db.entity.TransactionEntity
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.EditTransactionUseCase
+import uz.daftar.app.domain.usecase.DeleteToKarzinaUseCase
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -41,7 +42,8 @@ class EditTransactionViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val txDao: TransactionDao,
     private val priceDao: PriceHistoryDao,
-    private val editUC: EditTransactionUseCase
+    private val editUC: EditTransactionUseCase,
+    private val deleteToKarzina: DeleteToKarzinaUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -97,10 +99,10 @@ class EditTransactionViewModel @Inject constructor(
     fun setClientName(s: String) = _state.update { it.copy(clientName = s) }
     fun setNote(s: String) = _state.update { it.copy(note = s) }
 
-    /** Yozuvni butunlay o'chiradi (takroriy yozuvni olib tashlash uchun). */
+    /** Yozuvni KARZINAGA ko'chiradi (7 kun ichida tiklash mumkin). */
     fun delete(onDone: () -> Unit) {
         viewModelScope.launch {
-            runCatching { txDao.deleteById(txId) }
+            runCatching { deleteToKarzina(userId, txId) }
             onDone()
         }
     }
@@ -111,7 +113,12 @@ class EditTransactionViewModel @Inject constructor(
     fun setTNarx(s: String) = _state.update { it.copy(tNarx = s) }
     fun setIsT1(b: Boolean) = _state.update { it.copy(isT1 = b) }
 
-    fun save() {
+    fun save() = saveInternal(asNew = false)
+
+    /** ➕ Joriy formani YANGI yozuv sifatida QO'SHADI — asl yozuv o'zgarmaydi (pul/yuk qo'shish uchun) */
+    fun saveAsNew() = saveInternal(asNew = true)
+
+    private fun saveInternal(asNew: Boolean) {
         val s = state.value
         val orig = s.original ?: return
         val amt = s.amount.replace(",", ".").toDoubleOrNull()
@@ -126,7 +133,7 @@ class EditTransactionViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 editUC(
-                    id = orig.id,
+                    id = if (asNew) 0L else orig.id,
                     userId = orig.userId,
                     clientName = s.clientName.trim().ifBlank { orig.clientName },
                     note = s.note.trim().ifBlank { null },

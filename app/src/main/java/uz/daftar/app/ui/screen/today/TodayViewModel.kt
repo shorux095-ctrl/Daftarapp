@@ -2166,7 +2166,8 @@ class TodayViewModel @Inject constructor(
                     if (cmd.type != null) matching = matching.filter { it.type == cmd.type }
                     if (cmd.amount != null) matching = matching.filter { it.amount == cmd.amount }
                     if (matching.isNotEmpty()) {
-                        repo.deleteByIds(matching.map { it.id })
+                        // 🗑 KARZINAGA (7 kun tiklanadi) — to'g'ridan-to'g'ri o'chirmaymiz
+                        matching.forEach { runCatching { delToKarzina(userId, it.id) } }
                         count += matching.size
                     }
                 }

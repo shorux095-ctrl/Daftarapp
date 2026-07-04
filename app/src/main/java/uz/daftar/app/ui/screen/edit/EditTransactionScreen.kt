@@ -99,6 +99,11 @@ fun EditTransactionScreen(
 
                     // Tur
                     Text("Tur", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "⚠️ Tur o'zgartirilsa — SHU yozuv o'zgaradi. Pul/yuk QO'SHISH uchun pastdagi ➕ tugmani bosing",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(Modifier.height(4.dp))
                     FlowRowChips(state.type) { vm.setType(it) }
                     Spacer(Modifier.height(16.dp))
@@ -180,6 +185,14 @@ fun EditTransactionScreen(
                         Text("Saqlash")
                     }
                     Spacer(Modifier.height(10.dp))
+                    // ➕ YANGI YOZUV: asl yozuv qoladi, forma yangi yozuv sifatida qo'shiladi
+                    // (masalan: B:3 turibdi → Tur=To'lov, summa yozib ➕ bossangiz — B:3 QOLADI + P qo'shiladi)
+                    OutlinedButton(
+                        onClick = vm::saveAsNew,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = state.amount.isNotBlank()
+                    ) { Text("➕ Yangi yozuv sifatida qo'shish") }
+                    Spacer(Modifier.height(10.dp))
                     // 🗑 SHU BITTA yozuvni o'chirish (takroriy yozuvlarni olib tashlash uchun)
                     var showDel by remember { mutableStateOf(false) }
                     OutlinedButton(
@@ -191,7 +204,7 @@ fun EditTransactionScreen(
                         AlertDialog(
                             onDismissRequest = { showDel = false },
                             title = { Text("Yozuv o'chirilsinmi?") },
-                            text = { Text("Shu bitta yozuv butunlay o'chiriladi. Qarz avtomatik qayta hisoblanadi.") },
+                            text = { Text("Yozuv KARZINAGA ko'chadi (Qo'shimcha → Karzina, 7 kun ichida tiklash mumkin). Qarz avtomatik qayta hisoblanadi.") },
                             confirmButton = {
                                 TextButton(onClick = {
                                     showDel = false
