@@ -1005,7 +1005,15 @@ class TodayViewModel @Inject constructor(
         // X-o'chirish komandasi tekshirish ("x" yoki "12.03 x" + ismlar)
         if (isDeleteCommandText(text)) {
             _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = true, previews = emptyList(), dateReport = null, textReport = null) }
-            updateSuggestions("")
+            // X-o'chirishda HAM ism yordami chiqsin: oxirgi qatordan x/sana so'zlarini tashlab, ism qismini olamiz
+            val lastLn = text.substringAfterLast('\n').trim()
+            val parts = lastLn.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val dRe = Regex("""^\d{1,2}[.,]\d{1,2}([.,]\d{2,4})?$""")
+            val delW = setOf("x", "ochir", "o'chir", "ochirish")
+            var i = 0
+            while (i < parts.size && (dRe.matches(parts[i]) || parts[i].lowercase() in delW)) i++
+            val nameWords = parts.drop(i).takeWhile { w -> w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' } }
+            updateSuggestions(nameWords.joinToString(" "))
             return
         }
         // t1set / t1aset / t1bset / t1cset — mavjud yozuvlarni T1 ga o'tkazish
@@ -2058,9 +2066,11 @@ class TodayViewModel @Inject constructor(
             val pr = entry.clientPrices.entries.joinToString(", ") { "${it.key.code.uppercase()}=${it.value.formatQty()}" }
             lines.add(SavedLine("c", "Narx: $pr", "Narx yangilandi"))
         }
+        // SANA: yozuvning HAQIQIY sanasini ko'rsatamiz (bugun bo'lmasa ham) — chalkashlik bo'lmasin
+        val effDate = entry.date ?: LocalDate.now()
         return SavedInfo(
             nameCap,
-            LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")),
+            effDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")),
             java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
             lines, debt
         )

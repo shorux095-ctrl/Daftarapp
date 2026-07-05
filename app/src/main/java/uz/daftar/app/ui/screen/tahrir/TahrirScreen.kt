@@ -53,6 +53,7 @@ fun TahrirScreen(
     val date by vm.date.collectAsStateWithLifecycle()
     val nameFilter by vm.nameFilter.collectAsStateWithLifecycle()
     val allNames by vm.allNames.collectAsStateWithLifecycle()
+    val allClient by vm.allClient.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -86,6 +87,20 @@ fun TahrirScreen(
             // ── Sana tanlash ──
             Surface(tonalElevation = 2.dp) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                  if (allClient.isNotBlank()) {
+                    // 📂 BUTUN TARIX rejimi — Tahrir uslubida (tahrir/o'chirish/T-T1 ishlaydi)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("📂 " + allClient.replaceFirstChar { it.uppercase() },
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Butun tarix · ${rows.size} yozuv", fontSize = 12.sp, color = Color(0xFF6B7280))
+                        }
+                        OutlinedButton(
+                            onClick = { vm.closeAllClient() },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) { Text("✖ Yopish", fontSize = 13.sp) }
+                    }
+                  } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { vm.prevDay() }) { Text("◀", fontSize = 20.sp) }
                         Text(
@@ -167,7 +182,7 @@ fun TahrirScreen(
                     if (nameFilter.isNotBlank()) {
                         Spacer(Modifier.height(6.dp))
                         Surface(
-                            onClick = { onOpenClient(nameFilter.trim()) },
+                            onClick = { vm.openAllClient(nameFilter.trim()) },
                             shape = RoundedCornerShape(10.dp),
                             color = Color(0xFFE8F5EC),
                             modifier = Modifier.fillMaxWidth()
@@ -177,7 +192,7 @@ fun TahrirScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "📂 \"${nameFilter.trim()}\" — butun tarixini ochish",
+                                    "📂 \"${nameFilter.trim()}\" — butun tarixini Tahrirlashda ochish",
                                     color = Color(0xFF1AA35A), fontWeight = FontWeight.SemiBold,
                                     fontSize = 14.sp, modifier = Modifier.weight(1f)
                                 )
@@ -185,6 +200,7 @@ fun TahrirScreen(
                             }
                         }
                     }
+                  }
                 }
             }
 
@@ -320,6 +336,14 @@ private fun ClientGroupCard(
                     Spacer(Modifier.width(10.dp))
                     Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Monospace, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    // 🕐 Yozuv sanasi va vaqti (butun tarix rejimida sana muhim)
+                    val tm = tx.date.let { d ->
+                        if (d.length >= 16) d.substring(8, 10) + "." + d.substring(5, 7) + " " + d.substring(11, 16) else ""
+                    }
+                    if (tm.isNotBlank()) {
+                        Text("🕐 $tm", fontSize = 11.sp, color = Color(0xFF9AA0A6))
+                        Spacer(Modifier.width(4.dp))
+                    }
                     IconButton(onClick = { onEdit(tx.id) }, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = cC)
                     }

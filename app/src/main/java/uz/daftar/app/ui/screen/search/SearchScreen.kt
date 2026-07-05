@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import uz.daftar.app.core.util.formatMoney
+import uz.daftar.app.core.util.yukRangi
 import uz.daftar.app.data.db.entity.TransactionEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -65,6 +67,8 @@ fun SearchScreen(
     vm: SearchViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val allNames by vm.allNames.collectAsStateWithLifecycle()
+    val balances by vm.balances.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -112,7 +116,8 @@ fun SearchScreen(
                 SearchMode.CLIENT -> ClientSearchInputs(
                     query = state.query,
                     onQueryChange = vm::setQuery,
-                    onSearch = vm::performSearch
+                    onSearch = vm::performSearch,
+                    allNames = allNames
                 )
                 SearchMode.DATE_SINGLE -> DateSingleInputs(
                     date = state.dateFrom,
@@ -154,7 +159,7 @@ fun SearchScreen(
                             count = items.itemCount,
                             key = items.itemKey { it.id }
                         ) { index ->
-                            items[index]?.let { tx -> ResultRow(tx) }
+                            items[index]?.let { tx -> ResultRow(tx, balances[tx.id]) }
                         }
                         if (appending) {
                             item {
@@ -175,7 +180,8 @@ fun SearchScreen(
 private fun ClientSearchInputs(
     query: String,
     onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit
+    onSearch: () -> Unit,
+    allNames: List<String> = emptyList()
 ) {
     val voiceQuery = rememberVoiceInput { onQueryChange(it) }
     OutlinedTextField(
@@ -192,6 +198,24 @@ private fun ClientSearchInputs(
             }
         }
     )
+    // ✨ YORDAM: yozayotganda mavjud ismlardan tanlash
+    run {
+        val q = query.trim().lowercase()
+        val hints = if (q.isBlank()) emptyList()
+            else allNames.filter { it.contains(q) && it != q }.take(6)
+        if (hints.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Surface(shape = RoundedCornerShape(10.dp), color = androidx.compose.ui.graphics.Color(0xFFF1F3F6), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(vertical = 2.dp)) {
+                    for (h in hints) {
+                        TextButton(onClick = { onQueryChange(h); onSearch() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("👤 " + h.replaceFirstChar { it.uppercase() }, modifier = Modifier.fillMaxWidth(), color = androidx.compose.ui.graphics.Color(0xFF374151))
+                        }
+                    }
+                }
+            }
+        }
+    }
     Spacer(Modifier.height(12.dp))
     Button(
         onClick = onSearch,
@@ -276,8 +300,9 @@ private fun DatePickerField(label: String, date: LocalDate, onChange: (LocalDate
 }
 
 @Composable
-private fun ResultRow(tx: TransactionEntity) {
+private fun ResultRow(tx: TransactionEntity, balanceAfter: Long?) {
     val typeLabel = tx.type.uppercase()
+    val tColor = yukRangi(tx.type)   // A=ko'k, B=sariq, C=yashil, P=qizil...
     Card(
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -302,8 +327,18 @@ private fun ResultRow(tx: TransactionEntity) {
                 Text(
                     text = "$typeLabel: ${tx.amount.formatMoney()}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = tColor,
+                    fontWeight = FontWeight.Bold
                 )
+                // 💰 Shu yozuvdan keyingi QOLDIQ qarz (bitta mijoz qidirilganda)
+                balanceAfter?.let {
+                    Text(
+                        text = "Qoldiq: ${it.formatMoney()} so'm",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (it > 0) androidx.compose.ui.graphics.Color(0xFFD32F2F)
+                            else androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                    )
+                }
             }
             Text(
                 text = formatDate(tx.date),

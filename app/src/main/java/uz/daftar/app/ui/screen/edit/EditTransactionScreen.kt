@@ -100,12 +100,20 @@ fun EditTransactionScreen(
                     // Tur
                     Text("Tur", style = MaterialTheme.typography.labelLarge)
                     Text(
-                        "⚠️ Tur o'zgartirilsa — SHU yozuv o'zgaradi. Pul/yuk QO'SHISH uchun pastdagi ➕ tugmani bosing",
+                        "⚠️ Tur o'zgartirib Saqlansa — SHU yozuv o'zgaradi. Yangi yuk/pul/qarz QO'SHISH uchun ➕ tugma.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(4.dp))
                     FlowRowChips(state.type) { vm.setType(it) }
+                    Spacer(Modifier.height(10.dp))
+                    // ➕ Yangi qo'shish — tur tanlab, pastda summa yozib, shu tugma bilan YANGI yozuv qo'shiladi (asl yozuv qoladi)
+                    Button(
+                        onClick = vm::saveAsNew,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = state.amount.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                    ) { Text("➕ Yangi qo'shish (yuk / pul / qarz)", fontWeight = FontWeight.SemiBold) }
                     Spacer(Modifier.height(16.dp))
 
                     // Sana
@@ -184,14 +192,6 @@ fun EditTransactionScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Saqlash")
                     }
-                    Spacer(Modifier.height(10.dp))
-                    // ➕ YANGI YOZUV: asl yozuv qoladi, forma yangi yozuv sifatida qo'shiladi
-                    // (masalan: B:3 turibdi → Tur=To'lov, summa yozib ➕ bossangiz — B:3 QOLADI + P qo'shiladi)
-                    OutlinedButton(
-                        onClick = vm::saveAsNew,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state.amount.isNotBlank()
-                    ) { Text("➕ Yangi yozuv sifatida qo'shish") }
                     Spacer(Modifier.height(10.dp))
                     // 🗑 SHU BITTA yozuvni o'chirish (takroriy yozuvlarni olib tashlash uchun)
                     var showDel by remember { mutableStateOf(false) }

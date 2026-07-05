@@ -1,5 +1,6 @@
 package uz.daftar.app.ui.screen.toliq
 
+import uz.daftar.app.core.util.yukRangi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,14 +56,7 @@ private val RED = Color(0xFFE53935)
 private val INK = Color(0xFF1A1A1A)
 private val GRAY = Color(0xFF6B7280)
 
-private fun cargoColor(t: TxType): Color = when (t) {
-    TxType.A -> Color(0xFFEF7C3B)
-    TxType.B -> Color(0xFFE0A800)
-    TxType.C -> Color(0xFF1E9E57)
-    TxType.D -> Color(0xFF2D7FF0)
-    TxType.K -> Color(0xFF8E5BE0)
-    else -> GRAY
-}
+private fun cargoColor(t: TxType): Color = yukRangi(t)
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -103,6 +98,8 @@ fun ToliqHisobotScreen(
                 Toggle("\uD83D\uDCC6 Shu oy", state.mode == 1, Modifier.weight(1f)) { vm.setMode(1) }
                 Toggle("\uD83D\uDDD3\uFE0F Yil", state.mode == 2, Modifier.weight(1f)) { vm.setMode(2) }
             }
+            // 💰 Sof foyda — ALOHIDA tugma (12 oy sof foyda + jami)
+            Toggle("\uD83D\uDCB0 Sof foyda (12 oy)", state.mode == 3, Modifier.fillMaxWidth()) { vm.setMode(3) }
 
             if (state.isLoading) {
                 Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
@@ -118,6 +115,38 @@ fun ToliqHisobotScreen(
                     Text(r.rangeLabel, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = INK,
                         textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                     NavArrow("▶") { vm.step(1) }
+                }
+
+                // ── SOF FOYDA rejimi (mode 3): har oy + jami ──
+                if (state.mode == 3) {
+                    val yearTotal = state.monthlyProfits.sumOf { it.profit }
+                    TintCard(Color(0xFFF1FBF3)) {
+                        Text("\uD83D\uDCB0 Har oy sof foyda", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = INK)
+                        Spacer(Modifier.height(10.dp))
+                        state.monthlyProfits.forEach { mp ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(mp.label, fontSize = 14.sp, color = INK, modifier = Modifier.weight(1f))
+                                Text(
+                                    "${mp.profit.formatMoney()} so'm",
+                                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                    color = if (mp.profit >= 0) Color(0xFF2E7D32) else RED
+                                )
+                            }
+                            HorizontalDivider(color = Color(0xFFEDEDED))
+                        }
+                    }
+                    // JAMI (yillik sof foyda = oylar yig'indisi)
+                    Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFFD9F2DF), modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("\u2705 JAMI (yil)", fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                                color = Color(0xFF1B5E20), modifier = Modifier.weight(1f))
+                            Text("${yearTotal.formatMoney()} so'm", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1B5E20))
+                        }
+                    }
+                    return@Column
                 }
 
                 // ── 1) SOTILGAN YUKLAR ──

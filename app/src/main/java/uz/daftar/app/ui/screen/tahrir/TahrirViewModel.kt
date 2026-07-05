@@ -45,6 +45,10 @@ class TahrirViewModel @Inject constructor(
     private val _nameFilter = MutableStateFlow("")
     val nameFilter: StateFlow<String> = _nameFilter.asStateFlow()
 
+    // Bo'sh emas = SHU mijozning BUTUN tarixi (barcha sanalar) Tahrir uslubida ochiladi
+    private val _allClient = MutableStateFlow("")
+    val allClient: StateFlow<String> = _allClient.asStateFlow()
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
@@ -60,13 +64,18 @@ class TahrirViewModel @Inject constructor(
 
     /** Tanlangan sana + ism filtri bo'yicha o'sha kunning yozuvlari (T narx bilan) */
     val rows: StateFlow<List<TahrirRowData>> =
-        combine(_date, _nameFilter) { d, nf -> Pair(d, nf) }
-            .flatMapLatest { (d, nf) ->
-                repo.observeBetween(userId, d, d.plusDays(1)).map { list ->
-                    val f = nf.trim()
-                    val filtered = (if (f.isEmpty()) list
-                        else list.filter { it.clientName.contains(f, ignoreCase = true) })
-                        .sortedBy { it.date }
+        combine(_date, _nameFilter, _allClient) { d, nf, ac -> Triple(d, nf, ac) }
+            .flatMapLatest { (d, nf, ac) ->
+                // all-client rejimi: barcha sanalar; aks holda faqat tanlangan kun
+                val src = if (ac.isNotEmpty())
+                    repo.observeBetween(userId, LocalDate.of(2000, 1, 1), LocalDate.of(2100, 1, 1))
+                else repo.observeBetween(userId, d, d.plusDays(1))
+                src.map { list ->
+                    val filtered = (when {
+                        ac.isNotEmpty() -> list.filter { it.clientName.equals(ac.trim(), ignoreCase = true) }
+                        nf.trim().isEmpty() -> list
+                        else -> list.filter { it.clientName.contains(nf.trim(), ignoreCase = true) }
+                    }).sortedBy { it.date }
                     // Global T / T1 narx tarixi (turlar bo'yicha, sanaga saralangan)
                     val tHist = yukDao.getAllGlobalGroup(userId, "t")
                         .groupBy { it.type.lowercase() }
@@ -107,6 +116,9 @@ class TahrirViewModel @Inject constructor(
     fun nextDay() { _date.value = _date.value.plusDays(1) }
     fun today() { _date.value = LocalDate.now() }
     fun setNameFilter(s: String) { _nameFilter.value = s }
+    /** SHU mijozning butun tarixini Tahrir uslubida ochish (barcha sanalar) */
+    fun openAllClient(name: String) { _allClient.value = name.trim() }
+    fun closeAllClient() { _allClient.value = "" }
     fun clearMessage() { _message.value = null }
 
     /** Bitta yozuvni T yoki T1 tarifga qo'yish (har birini alohida) */

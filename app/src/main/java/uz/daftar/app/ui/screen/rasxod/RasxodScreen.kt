@@ -153,18 +153,23 @@ fun RasxodScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 when (state.period) {
-                                    RasxodPeriod.DAY -> "Kunlik xarajat"
-                                    RasxodPeriod.MONTH -> "Oylik xarajat"
-                                    RasxodPeriod.YEAR -> "Yillik xarajat"
+                                    RasxodPeriod.DAY -> "Kunlik umumiy xarajat"
+                                    RasxodPeriod.MONTH -> "Oylik umumiy xarajat"
+                                    RasxodPeriod.YEAR -> "Yillik umumiy xarajat"
                                 },
                                 fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f)
                             )
                             Spacer(Modifier.height(2.dp))
+                            // UMUMIY = qo'lda xarajat + yuk rasxodi
                             Text(
-                                "${state.total.formatMoney()} so'm",
+                                "${(state.total + state.yukTotal).formatMoney()} so'm",
                                 fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White
                             )
-                            Text("${state.items.size} ta yozuv", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f))
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "💵 Qo'lda: ${state.total.formatMoney()}  ·  🚚 Yuk: ${state.yukTotal.formatMoney()}",
+                                fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f)
+                            )
                         }
                     }
                 }

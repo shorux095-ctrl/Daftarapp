@@ -42,12 +42,55 @@ data class SearchState(
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val txDao: TransactionDao
+    private val txDao: TransactionDao,
+    private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao
 ) : ViewModel() {
 
     private val userId: Long = 1L
     private val _state = MutableStateFlow(SearchState())
     val state: StateFlow<SearchState> = _state.asStateFlow()
+
+    // ✨ Ism yozishda YORDAM (autocomplete) uchun barcha mijoz nomlari
+    private val _allNames = MutableStateFlow<List<String>>(emptyList())
+    val allNames: StateFlow<List<String>> = _allNames.asStateFlow()
+
+    // 💰 Har yozuvdan KEYINGI qoldiq qarz (tx.id -> qoldi) — bitta mijoz qidirilganda
+    private val _balances = MutableStateFlow<Map<Long, Long>>(emptyMap())
+    val balances: StateFlow<Map<Long, Long>> = _balances.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _allNames.value = runCatching { txDao.getAllClientNames(userId) }.getOrDefault(emptyList())
+        }
+    }
+
+    /** Bitta mijoz aniqlansa — har yozuvdan keyingi qoldiqni hisoblaydi (tarixdagi kabi). */
+    private suspend fun computeBalances(name: String) {
+        val txs = runCatching { txDao.getByClient(userId, name.lowercase()) }.getOrDefault(emptyList())
+            .sortedBy { it.date }
+        if (txs.isEmpty()) { _balances.value = emptyMap(); return }
+        val pricesByType = runCatching { priceDao.getAllForClient(userId, name.lowercase()) }
+            .getOrDefault(emptyList())
+            .groupBy { it.priceType }
+            .mapValues { (_, l) -> l.sortedBy { it.date } }
+        fun priceAt(type: String, at: String): Double? {
+            val prices = pricesByType[type] ?: return null
+            var best: Double? = null
+            for (p in prices) { if (p.date.take(10) <= at.take(10)) best = p.price else break }
+            return best ?: prices.firstOrNull()?.price
+        }
+        var running = 0.0
+        val map = mutableMapOf<Long, Long>()
+        for (tx in txs) {
+            when (tx.type.lowercase()) {
+                "p" -> running -= tx.amount
+                "q" -> running += tx.amount
+                else -> { val p = priceAt(tx.type, tx.date); if (p != null) running += tx.amount * p }
+            }
+            map[tx.id] = Math.round(running)
+        }
+        _balances.value = map
+    }
 
     private val params = MutableStateFlow<SearchParams?>(null)
 
@@ -91,6 +134,19 @@ class SearchViewModel @Inject constructor(
         if (s.mode == SearchMode.CLIENT && s.query.trim().isEmpty()) return
         _state.update { it.copy(searched = true) }
         params.value = SearchParams(s.mode, s.query, s.dateFrom, s.dateTo)
+        // 💰 Bitta mijoz topilsa — qoldiq qarzlarni ham hisoblaymiz
+        if (s.mode == SearchMode.CLIENT) {
+            viewModelScope.launch {
+                val q = s.query.trim().lowercase()
+                val matches = _allNames.value.filter { it.contains(q) }
+                val name = when {
+                    _allNames.value.contains(q) -> q
+                    matches.size == 1 -> matches[0]
+                    else -> null
+                }
+                if (name != null) computeBalances(name) else _balances.value = emptyMap()
+            }
+        } else _balances.value = emptyMap()
     }
 
     private fun dayStart(d: LocalDate): String = d.atStartOfDay().format(ISO)

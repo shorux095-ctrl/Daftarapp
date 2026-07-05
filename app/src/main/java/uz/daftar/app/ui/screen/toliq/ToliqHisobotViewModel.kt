@@ -17,9 +17,10 @@ import javax.inject.Inject
 
 data class ToliqState(
     val isLoading: Boolean = true,
-    val mode: Int = 0,                 // 0 = Bugun, 1 = Shu oy, 2 = Yil
+    val mode: Int = 0,                 // 0 = Bugun, 1 = Shu oy, 2 = Yil, 3 = Sof foyda (12 oy)
     val selectedDate: LocalDate = LocalDate.now(),
     val report: PeriodReport? = null,
+    val monthlyProfits: List<uz.daftar.app.domain.usecase.MonthPoint> = emptyList(),
     val error: String? = null
 )
 
@@ -43,12 +44,12 @@ class ToliqHisobotViewModel @Inject constructor(
         load()
     }
 
-    /** Oldingi/keyingi davr: Bugun→kun, Shu oy→oy, Yil→yil */
+    /** Oldingi/keyingi davr: Bugun→kun, Shu oy→oy, Yil/Sof foyda→yil */
     fun step(delta: Int) {
         val cur = _state.value.selectedDate
         val next = when (_state.value.mode) {
             0 -> cur.plusDays(delta.toLong())
-            2 -> cur.plusYears(delta.toLong())
+            2, 3 -> cur.plusYears(delta.toLong())
             else -> cur.plusMonths(delta.toLong())
         }
         _state.update { it.copy(selectedDate = next) }
@@ -60,15 +61,33 @@ class ToliqHisobotViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             try {
                 val d = _state.value.selectedDate
-                val r = when (_state.value.mode) {
-                    0 -> getDaily(userId, d)
-                    2 -> getYearly(userId, d.year)
-                    else -> getMonthly(userId, d.year, d.monthValue)
+                if (_state.value.mode == 3) {
+                    // 12 oy sof foyda (tanlangan yil) + yillik jami
+                    val yr = getYearly(userId, d.year)
+                    val months = (1..12).map { m ->
+                        val mr = runCatching { getMonthly(userId, d.year, m) }.getOrNull()
+                        uz.daftar.app.domain.usecase.MonthPoint(
+                            label = MONTHS_UZ[m - 1], year = d.year, month = m,
+                            revenue = mr?.revenue ?: 0L, profit = mr?.profit ?: 0L, payments = mr?.payments ?: 0L
+                        )
+                    }
+                    _state.update { it.copy(isLoading = false, report = yr, monthlyProfits = months, error = null) }
+                } else {
+                    val r = when (_state.value.mode) {
+                        0 -> getDaily(userId, d)
+                        2 -> getYearly(userId, d.year)
+                        else -> getMonthly(userId, d.year, d.monthValue)
+                    }
+                    _state.update { it.copy(isLoading = false, report = r, monthlyProfits = emptyList(), error = null) }
                 }
-                _state.update { it.copy(isLoading = false, report = r, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
         }
+    }
+
+    private companion object {
+        val MONTHS_UZ = listOf("Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+            "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr")
     }
 }

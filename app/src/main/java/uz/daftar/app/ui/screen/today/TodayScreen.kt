@@ -740,7 +740,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v125", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v129", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1871,17 +1871,28 @@ private fun JamiSummary(report: uz.daftar.app.domain.usecase.DateReport) {
             }
             Spacer(Modifier.height(10.dp))
             val pay = report.totalPayments
-            val farq = report.totalRevenue - pay
+            val cGreen = androidx.compose.ui.graphics.Color(0xFF2E7D32)
+            // 📦 Jami yuk puli (yashil) + 💵 Pul olindi (qizil) — Farq YO'Q
             Row(modifier = Modifier.fillMaxWidth()) {
                 Box(
-                    modifier = Modifier.weight(1f).background(cP.copy(alpha = 0.10f), RoundedCornerShape(10.dp)).padding(vertical = 8.dp),
+                    modifier = Modifier.weight(1f).background(cGreen.copy(alpha = 0.10f), RoundedCornerShape(10.dp)).padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
-                ) { Text("💵 Pul: ${pay.formatMoney()}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = cP) }
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📦 Jami yuk", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+                        Text(report.totalRevenue.formatMoney(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = cGreen)
+                    }
+                }
                 Spacer(Modifier.width(8.dp))
                 Box(
-                    modifier = Modifier.weight(1f).background(androidx.compose.ui.graphics.Color(0xFF374151).copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 8.dp),
+                    modifier = Modifier.weight(1f).background(cP.copy(alpha = 0.10f), RoundedCornerShape(10.dp)).padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
-                ) { Text("Farq: ${if (farq >= 0) "+" else ""}${farq.formatMoney()}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF374151)) }
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("💵 Pul olindi", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+                        Text(pay.formatMoney(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = cP)
+                    }
+                }
             }
         }
     }
@@ -1932,9 +1943,6 @@ private fun DateReportCard(
                 )
                 return@Column
             }
-
-            // JAMI xulosa (yuk turlari: soni + puli, pul, farq)
-            JamiSummary(report)
 
             // Raqamlangan mijoz qatorlari — har biri alohida kartochka + rangli nuqta
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -2003,8 +2011,10 @@ private fun DateReportCard(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-            // Eski "— JAMI —" bloki OLIB TASHLANDI: JAMI xulosa endi kartaning TEPASIDA (JamiSummary)
+            Spacer(Modifier.height(12.dp))
+            // JAMI xulosa endi PASTDA (mijoz qatorlaridan keyin)
+            JamiSummary(report)
+            // Eski "— JAMI —" bloki OLIB TASHLANDI
         }
     }
 }
@@ -2108,7 +2118,7 @@ private fun SavedCard(info: SavedInfo) {
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(line.main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = lc)
-                            Text(line.sub, fontSize = 11.sp, color = gray)
+                            Text(line.sub, fontSize = 11.sp, color = if (line.sub == "Narx yo'q") androidx.compose.ui.graphics.Color(0xFFD32F2F) else gray)
                         }
                     }
                 }
