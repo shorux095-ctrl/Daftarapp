@@ -2,6 +2,7 @@ package uz.daftar.app.ui.screen.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
