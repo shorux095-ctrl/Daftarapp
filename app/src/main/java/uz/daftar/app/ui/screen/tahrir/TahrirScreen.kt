@@ -336,10 +336,8 @@ private fun ClientGroupCard(
                     Spacer(Modifier.width(10.dp))
                     Text(entry, color = colorFor(tx.type), fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Monospace, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    // 🕐 Yozuv sanasi va vaqti (butun tarix rejimida sana muhim)
-                    val tm = tx.date.let { d ->
-                        if (d.length >= 16) d.substring(8, 10) + "." + d.substring(5, 7) + " " + d.substring(11, 16) else ""
-                    }
+                    // 🕐 Yozuv sanasi va vaqti (butun tarix rejimida sana muhim) — LocalDateTime
+                    val tm = tx.date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm"))
                     if (tm.isNotBlank()) {
                         Text("🕐 $tm", fontSize = 11.sp, color = Color(0xFF9AA0A6))
                         Spacer(Modifier.width(4.dp))
