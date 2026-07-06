@@ -200,7 +200,7 @@ fun YukReportScreen(
                             contentPadding = PaddingValues(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            item { CardsRow(report, dayCount, coverDenom) }
+                            item { HeroFarqCard(report, state.yearly) }
                             item { StatsCard(report) }
                             item { TableCard(report, onCellClick = { l, m -> vm.openDay(l, m) }) }
                             item { JamiCard(report) }
@@ -283,6 +283,65 @@ fun YukReportScreen(
 }
 
 /* ═════════════ PUL (T/N/P) ═════════════ */
+
+/**
+ * v145: Mockup uslubidagi katta TEAL karta.
+ * Katta raqam = FARQ: + bo'lsa YASHIL, − bo'lsa QIZIL (oylikda ham, yillikda ham).
+ * Pastda: T narx / N narx / Pul jami.
+ */
+@Composable
+private fun HeroFarqCard(report: YukReport, yearly: Boolean) {
+    val pos = report.jamiFarq >= 0
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF2F7D6D))
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Text(
+            if (yearly) "YILLIK FARQ" else "OYLIK FARQ",
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 12.sp, fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                farqStr(report.jamiFarq),
+                color = if (pos) Color(0xFF9CFFC7) else Color(0xFFFFB4AB),
+                fontSize = 36.sp, fontWeight = FontWeight.ExtraBold,
+                maxLines = 1, softWrap = false
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "so'm",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 5.dp)
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth()) {
+            HeroMini("T narx", report.jamiT, Modifier.weight(1f))
+            HeroMini("N narx", report.jamiN, Modifier.weight(1f))
+            HeroMini("Pul", report.jamiP, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun HeroMini(label: String, value: Long, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            value.formatMoney(),
+            color = Color.White,
+            fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            maxLines = 1, softWrap = false
+        )
+    }
+}
 
 @Composable
 private fun CardsRow(report: YukReport, dayCount: Int, coverDenom: Int) {

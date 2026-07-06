@@ -288,7 +288,7 @@ class TodayViewModel @Inject constructor(
             // Avval widjet yozuvlarini chatga qo'shamiz, keyin kartalarni yangilaymiz
             val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
             for (line in pend) {
-                appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
+                appendChat(widgetSavedItem(line))
             }
             if (pend.isNotEmpty()) persistChat()
             refreshHistoryCards()
@@ -300,9 +300,37 @@ class TodayViewModel @Inject constructor(
         val pend = runCatching { chatStore.drainPending() }.getOrDefault(emptyList())
         if (pend.isEmpty()) return
         for (line in pend) {
-            appendChat(ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n" + line))
+            appendChat(widgetSavedItem(line))
         }
         persistChat()
+    }
+
+    /** v145: widjet yozuvi ham ilovadagi kabi CHIROYLI KARTA bo'ladi, vaqt yonida "widjet" yozuvi bilan. */
+    private suspend fun widgetSavedItem(line: String): ChatItem {
+        val entry = (runCatching { DaftarParser.parse(line) }.getOrNull() as? ParseResult.Success)?.entry
+        if (entry == null || !entry.isValid)
+            return ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n$line")
+        val cn = entry.clientName.lowercase()
+        val prices = runCatching { getUnitPrices(userId, cn) }.getOrDefault(emptyMap())
+        val debt = runCatching { calcDebt(userId, cn) }.getOrDefault(0L)
+        val lines = entry.items.map { (t, amt) ->
+            when (t) {
+                TxType.P -> SavedLine("p", "P: ${amt.formatMoney()}", "Pul kirimi")
+                TxType.Q -> SavedLine("q", "Q: ${amt.formatMoney()}", "Qo'lda qarz")
+                else -> {
+                    val p = prices[t]
+                    if (p != null) SavedLine(t.code, "${t.code.uppercase()}: ${amt.formatQty()} × ${p.formatQty()} = ${(amt * p).formatMoney()} so'm", "Yuk")
+                    else SavedLine(t.code, "${t.code.uppercase()}: ${amt.formatQty()}", "Narx yo'q")
+                }
+            }
+        }
+        val info = SavedInfo(
+            entry.clientName.replaceFirstChar { it.uppercase() },
+            (entry.date ?: java.time.LocalDate.now()).format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")),
+            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " · 📲 widjet",
+            lines, debt
+        )
+        return ChatItem.Saved(nextChatId(), info)
     }
 
     private fun refreshHistoryCards() {
@@ -2065,7 +2093,7 @@ class TodayViewModel @Inject constructor(
         if (s.isEditUndo) {
             val low = raw.lowercase()
             appendChat(ChatItem.User(nextChatId(), raw))
-            _state.update { it.copy(isSending = true, input = "", isEditUndo = false, errorMessage = null, suggestions = emptyList()) }
+            _state.update { it.copy(isSending = true, input = "", isEditUndo = false, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
             viewModelScope.launch {
                 val msg = try {
                     if (low == "undo" || low == "bekor") {
@@ -2094,7 +2122,7 @@ class TodayViewModel @Inject constructor(
                     for (entry in s.parsed) {
                         appendChat(ChatItem.Saved(nextChatId(), buildSavedInfoFromEntry(entry)))
                     }
-                    _state.update { it.copy(isSending = false, input = "", parsed = emptyList(), isDeleteCommand = false, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), pinnedView = false, isViewCommand = false) }
+                    _state.update { it.copy(isSending = false, input = "", parsed = emptyList(), isDeleteCommand = false, errorMessage = null, suggestions = emptyList(), quickFills = emptyList(), dateReport = null, textReport = null, previews = emptyList(), pinnedView = false, isViewCommand = false) }
                 } catch (e: Exception) {
                     appendChat(ChatItem.Info(nextChatId(), "❌ Xato: ${e.message}"))
                     _state.update { it.copy(isSending = false) }
@@ -2105,19 +2133,19 @@ class TodayViewModel @Inject constructor(
         // 4) Ko'rinish natijalari (jonli yuklangan) — chatga qo'shamiz (stack bo'ladi)
         if (s.dateReport != null) {
             appendChat(ChatItem.User(nextChatId(), raw), ChatItem.DateRep(nextChatId(), s.dateReport))
-            _state.update { it.copy(input = "", dateReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            _state.update { it.copy(input = "", dateReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
             return
         }
         if (s.textReport != null) {
             appendChat(ChatItem.User(nextChatId(), raw), ChatItem.TextRep(nextChatId(), s.textReport))
-            _state.update { it.copy(input = "", textReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            _state.update { it.copy(input = "", textReport = null, isViewCommand = false, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
             return
         }
         if (s.previews.isNotEmpty()) {
             val items = mutableListOf<ChatItem>(ChatItem.User(nextChatId(), raw))
             s.previews.forEach { items.add(ChatItem.History(nextChatId(), it)) }
             appendChat(*items.toTypedArray())
-            _state.update { it.copy(input = "", previews = emptyList(), isViewCommand = false, errorMessage = null, suggestions = emptyList()) }
+            _state.update { it.copy(input = "", previews = emptyList(), isViewCommand = false, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
             return
         }
     }
