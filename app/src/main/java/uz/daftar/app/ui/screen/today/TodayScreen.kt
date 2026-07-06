@@ -742,7 +742,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v136", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v137", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1149,8 +1149,8 @@ private fun InputBar(
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Tez kiritish tugmalari — yozuvga kirilganda (fokusda) ko'rinadi
-            if (inputFocused) {
+            // Tez kiritish tugmalari — v137: FAQAT ☰ (yuk yordam) tugmasi bosilganda ochiladi, ✕ bosilsa yopiladi
+            if (menuOpen) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1209,8 +1209,8 @@ private fun InputBar(
                 }
             }
 
-            // 💡 Tez to'ldirish — mijozning OXIRGI yuk / puli (bosilsa qatorga qo'shiladi)
-            if (quickFills.isNotEmpty()) {
+            // 💡 Tez to'ldirish — mijozning OXIRGI yuk / puli (v137: yuk yordam paneli ochiq bo'lganda)
+            if (menuOpen && quickFills.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

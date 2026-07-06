@@ -64,15 +64,17 @@ fun EditTransactionScreen(
                 state.original != null -> {
                     val orig = state.original!!
                     // Mijoz — YOZIB O'ZGARTIRSA BO'LADI (yordam: mavjud ismlardan tanlash)
+                    // v137: takliflar FAQAT foydalanuvchi ismni O'ZGARTIRGANDA chiqadi (kirishda chiqmaydi)
+                    var nameEdited by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = state.clientName,
-                        onValueChange = vm::setClientName,
+                        onValueChange = { nameEdited = true; vm.setClientName(it) },
                         label = { Text("Mijoz (ism)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     val q = state.clientName.trim().lowercase()
-                    val hints = if (q.isBlank()) emptyList()
+                    val hints = if (!nameEdited || q.isBlank()) emptyList()
                         else state.allNames.filter { it.contains(q) && it != q }.take(5)
                     if (hints.isNotEmpty()) {
                         Card(
