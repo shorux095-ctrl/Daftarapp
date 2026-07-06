@@ -353,11 +353,19 @@ class TodayViewModel @Inject constructor(
                 }
                 is ChatItem.DebtRep -> { o.put("k", "debt") }
                 is ChatItem.Saved -> {
-                    o.put("k", "i")
-                    val t = StringBuilder("✅ Saqlandi\n📅 ${c.info.dateLabel}   🕒 ${c.info.timeLabel}\n${c.info.name}\n")
-                    c.info.lines.forEach { t.append("  ${it.main}\n") }
-                    t.append("💳 Qarz: ${c.info.debt.formatMoney()} so'm")
-                    o.put("t", t.toString())
+                    // v140: karta MA'LUMOT sifatida saqlanadi — qayta ochilganda ham chiroyli karta chiqadi
+                    o.put("k", "s")
+                    o.put("name", c.info.name)
+                    o.put("dl", c.info.dateLabel)
+                    o.put("tl", c.info.timeLabel)
+                    o.put("debt", c.info.debt)
+                    val la = org.json.JSONArray()
+                    c.info.lines.forEach { ln ->
+                        val lo = org.json.JSONObject()
+                        lo.put("t", ln.type); lo.put("m", ln.main); lo.put("s", ln.sub)
+                        la.put(lo)
+                    }
+                    o.put("lines", la)
                 }
             }
             arr.put(o)
@@ -422,6 +430,19 @@ class TodayViewModel @Inject constructor(
                             } else null
                         }
                         "u" -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.User(id, t, ts) else null }
+                        "s" -> {
+                            // v140: Saqlandi kartasi to'liq tiklanadi
+                            val name = o.optString("name")
+                            if (name.isBlank()) null else {
+                                val la = o.optJSONArray("lines")
+                                val lines = mutableListOf<SavedLine>()
+                                if (la != null) for (j in 0 until la.length()) {
+                                    val lo = la.optJSONObject(j) ?: continue
+                                    lines.add(SavedLine(lo.optString("t", "c"), lo.optString("m"), lo.optString("s")))
+                                }
+                                ChatItem.Saved(id, SavedInfo(name, o.optString("dl"), o.optString("tl"), lines, o.optLong("debt", 0L)), ts)
+                            }
+                        }
                         "debt" -> {
                             val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
                             if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
@@ -655,6 +676,15 @@ class TodayViewModel @Inject constructor(
     fun requestCloseDebt(name: String, debt: Long) {
         if (debt <= 0) return
         _state.update { it.copy(confirmCloseDebt = name to debt) }
+    }
+
+    /** v140: hisobotda ism bosilsa — mijoz tarixi kartasi chatga qo'shiladi */
+    fun openClientHistory(name: String) {
+        viewModelScope.launch {
+            val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
+            if (cp != null) appendChat(ChatItem.History(nextChatId(), cp))
+            else appendChat(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — yozuv topilmadi"))
+        }
     }
 
     fun cancelCloseDebt() { _state.update { it.copy(confirmCloseDebt = null) } }

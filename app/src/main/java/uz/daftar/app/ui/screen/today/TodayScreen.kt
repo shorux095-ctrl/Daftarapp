@@ -568,7 +568,8 @@ fun TodayScreen(
                                     is ChatItem.Info -> ChatBotBubble(item.text)
                                     is ChatItem.DateRep -> DateReportCard(
                                         report = item.report,
-                                        onClose = { vm.removeChat(item.id) }
+                                        onClose = { vm.removeChat(item.id) },
+                                        onClientClick = { vm.openClientHistory(it) }
                                     )
                                     is ChatItem.TextRep -> TextReportCard(
                                         report = item.report,
@@ -742,7 +743,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v138", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v140", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1149,8 +1150,8 @@ private fun InputBar(
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Tez kiritish tugmalari — v137: FAQAT ☰ (yuk yordam) tugmasi bosilganda ochiladi, ✕ bosilsa yopiladi
-            if (menuOpen) {
+            // Tez kiritish tugmalari — v139: yozuvga kirilganda o'zi ko'rinadi
+            if (inputFocused) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1209,8 +1210,8 @@ private fun InputBar(
                 }
             }
 
-            // 💡 Tez to'ldirish — mijozning OXIRGI yuk / puli (v137: yuk yordam paneli ochiq bo'lganda)
-            if (menuOpen && quickFills.isNotEmpty()) {
+            // 💡 Tez to'ldirish — mijozning OXIRGI yuk / puli (v139: ism yozilganda O'ZI chiqadi)
+            if (quickFills.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1287,17 +1288,7 @@ private fun InputBar(
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Pastki menyu toggle (Telegram'day — bosganda ochiladi/yashirinadi)
-                IconButton(
-                    onClick = onToggleMenu,
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Text(
-                        if (menuOpen) "✕" else "☰",
-                        fontSize = 30.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                // v139: ☰ toggle tugmasi olib tashlandi — yordam chiplari o'zi chiqadi
                 val voiceIn = rememberVoiceInput { spoken -> onVoice(spoken) }
                 OutlinedTextField(
                     value = tfv,
@@ -1926,6 +1917,7 @@ private fun JamiSummary(report: uz.daftar.app.domain.usecase.DateReport) {
 private fun DateReportCard(
     report: uz.daftar.app.domain.usecase.DateReport,
     onClose: () -> Unit = {},
+    onClientClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dateStr = report.title.ifEmpty { report.date.format(DateTimeFormatter.ofPattern("dd.MM")) }
@@ -1979,7 +1971,9 @@ private fun DateReportCard(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 3.dp),
+                            .padding(vertical = 3.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onClientClick(line.clientName) },
                         shape = RoundedCornerShape(10.dp),
                         color = androidx.compose.ui.graphics.Color(0xFFF7F7F9),
                         tonalElevation = 1.dp
@@ -2105,6 +2099,8 @@ private fun SavedCard(info: SavedInfo) {
                 Text("Saqlandi", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ink)
                 Spacer(Modifier.height(4.dp))
                 Text("\uD83D\uDCC5 ${info.dateLabel}", fontSize = 12.sp, color = gray)
+                Spacer(Modifier.height(2.dp))
+                Text("\uD83D\uDD52 ${info.timeLabel}", fontSize = 12.sp, color = gray)
                 Spacer(Modifier.height(10.dp))
                 // 🎬 Lottie: yashil doira + ✓ chizilish animatsiyasi (yuklanmasa — eski statik belgi)
                 val lottieComp by com.airbnb.lottie.compose.rememberLottieComposition(
