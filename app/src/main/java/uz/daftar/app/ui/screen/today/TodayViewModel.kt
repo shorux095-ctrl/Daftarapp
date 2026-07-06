@@ -966,7 +966,12 @@ class TodayViewModel @Inject constructor(
                 !Regex("""^\d{1,2}\.\d{1,2}.*""").matches(tk[1]) && tk[1] !in setOf("bugun", "kecha")) {
                 val name = tk.drop(1).joinToString(" ")
                 _state.update { it.copy(parsed = emptyList(), errorMessage = null, isDeleteCommand = false, isViewCommand = false, previews = emptyList(), dateReport = null, textReport = null, deleteClientName = name) }
-                updateSuggestions("")
+                // v138: "ochir NAME" da ham ism yordami chiqsin
+                suggestJob?.cancel()
+                suggestJob = viewModelScope.launch {
+                    val list = repo.suggestClients(userId, name)
+                    _state.update { it.copy(suggestions = list, quickFills = emptyList()) }
+                }
                 return
             }
         }
@@ -1814,6 +1819,13 @@ class TodayViewModel @Inject constructor(
             datePrefix = dm.groupValues[1] + " "
             lastLine = dm.groupValues[2]
         }
+        // v138: o'chirish so'zi bo'lsa ("x dv" / "ochir dv") — so'z saqlanadi, faqat ism almashadi
+        var delPrefix = ""
+        val dw = Regex("""^(x|ochir|o'chir|ochirish)\s+(.*)$""", RegexOption.IGNORE_CASE).matchEntire(lastLine)
+        if (dw != null) {
+            delPrefix = dw.groupValues[1] + " "
+            lastLine = dw.groupValues[2]
+        }
         // Yozilgan ism qismini topamiz (ko'p so'zli ismlar uchun ham): "olim shash" -> butun shu qism almashadi
         val lname = name.lowercase()
         var typed = ""
@@ -1825,7 +1837,7 @@ class TodayViewModel @Inject constructor(
         val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
                    else lastLine.removePrefix(typed).trimStart()
         val tail = if (rest.isBlank()) "$name " else "$name $rest"
-        onInputChange(prefix + datePrefix + tail)
+        onInputChange(prefix + datePrefix + delPrefix + tail)
     }
 
     /**
