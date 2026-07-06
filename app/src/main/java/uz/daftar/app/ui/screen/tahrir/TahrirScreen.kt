@@ -62,6 +62,7 @@ fun TahrirScreen(
     var confirmId by remember { mutableStateOf<Long?>(null) }
     var delPin by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }  // 🔍 ism qidiruv yig'iq (kerak bo'lsa ochiladi)
 
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
 
@@ -114,6 +115,7 @@ fun TahrirScreen(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         IconButton(onClick = { vm.nextDay() }) { Text("▶", fontSize = 20.sp) }
+                        IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) vm.setNameFilter("") }) { Text(if (searchOpen) "✖" else "🔍", fontSize = 17.sp) }
                     }
                     // Bugun / Kecha + (o'ngda) qisqa "Hammasini o'chirish"
                     Row(
@@ -136,6 +138,7 @@ fun TahrirScreen(
                             ) { Text("🗑 Hammasi", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                         }
                     }
+                    if (searchOpen) {
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = nameFilter,
@@ -199,6 +202,7 @@ fun TahrirScreen(
                                 Text("→", color = Color(0xFF1AA35A), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             }
                         }
+                    }
                     }
                   }
                 }

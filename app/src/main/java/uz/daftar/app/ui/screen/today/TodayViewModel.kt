@@ -1014,7 +1014,17 @@ class TodayViewModel @Inject constructor(
             var i = 0
             while (i < parts.size && (dRe.matches(parts[i]) || parts[i].lowercase() in delW)) i++
             val nameWords = parts.drop(i).takeWhile { w -> w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' } }
-            updateSuggestions(nameWords.joinToString(" "))
+            // To'g'ridan-to'g'ri to'ldiramiz: aniq mos ism ham ko'rinadi (tasdiq sifatida)
+            val dq = nameWords.joinToString(" ").trim()
+            suggestJob?.cancel()
+            if (dq.isBlank()) {
+                _state.update { it.copy(suggestions = emptyList(), quickFills = emptyList()) }
+            } else {
+                suggestJob = viewModelScope.launch {
+                    val list = repo.suggestClients(userId, dq)
+                    _state.update { it.copy(suggestions = list, quickFills = emptyList()) }
+                }
+            }
             return
         }
         // t1set / t1aset / t1bset / t1cset — mavjud yozuvlarni T1 ga o'tkazish
