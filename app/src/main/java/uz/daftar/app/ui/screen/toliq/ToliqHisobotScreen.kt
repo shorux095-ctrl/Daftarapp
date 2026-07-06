@@ -222,9 +222,44 @@ fun ToliqHisobotScreen(
                     }
                 }
 
+                // ── 🏆 TOP (eng ko'p qarzdor / yuk olgan / sotilgan tur) ──
+                state.stats?.let { st ->
+                    Spacer(Modifier.height(12.dp))
+                    TintCard(Color(0xFFFFF9E6)) {
+                        Text("\uD83C\uDFC6 TOP", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = INK)
+                        Spacer(Modifier.height(12.dp))
+                        var any = false
+                        st.topDebtor?.let {
+                            TopRow("\uD83E\uDD47", "Eng ko'p qarzdor", it, "${st.topDebtorSum.formatMoney()} so'm", RED); any = true
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        st.topClient?.let {
+                            TopRow("\uD83D\uDCE6", "Eng ko'p yuk olgan", it, "${st.topClientQty.formatQty()} dona", Color(0xFF2E7D32)); any = true
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        st.topType?.let {
+                            TopRow("\uD83D\uDD25", "Eng ko'p sotilgan tur", it.uppercase(), "${st.topTypeQty.formatQty()} dona", PURPLE); any = true
+                        }
+                        if (!any) Text("Bu davrda ma'lumot yo'q", fontSize = 13.sp, color = Color(0xFF9AA0A6))
+                    }
+                }
+
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun TopRow(emoji: String, label: String, name: String, value: String, valueColor: Color) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(emoji, fontSize = 20.sp)
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 12.sp, color = Color(0xFF9AA0A6))
+            Text(name.replaceFirstChar { it.uppercase() }, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = INK)
+        }
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = valueColor)
     }
 }
 

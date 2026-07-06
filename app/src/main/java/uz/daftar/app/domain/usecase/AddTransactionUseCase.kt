@@ -5,6 +5,8 @@ import uz.daftar.app.data.db.dao.ClientPriceDao
 import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.dao.TransactionDao
 import uz.daftar.app.data.db.dao.YukNarxDao
+import uz.daftar.app.data.db.DaftarDatabase
+import androidx.room.withTransaction
 import uz.daftar.app.data.db.entity.ClientPriceEntity
 import uz.daftar.app.data.db.entity.PriceHistoryEntity
 import uz.daftar.app.data.db.entity.TransactionEntity
@@ -28,7 +30,8 @@ class AddTransactionUseCase @Inject constructor(
     private val txDao: TransactionDao,
     private val priceHistoryDao: PriceHistoryDao,
     private val clientPriceDao: ClientPriceDao,
-    private val yukNarxDao: YukNarxDao
+    private val yukNarxDao: YukNarxDao,
+    private val db: DaftarDatabase
 ) {
     /** Saqlash natijasi: nechta yozuv, nechta narx */
     data class Result(
@@ -38,9 +41,26 @@ class AddTransactionUseCase @Inject constructor(
         val tOneTimeCount: Int
     )
 
+    /**
+     * Bir nechta yozuvni ATOMIK saqlaydi (@Transaction / withTransaction).
+     * Telefon o'chsa yoki xato bo'lsa — YARIM saqlanmaydi: yo HAMMASI, yo HECH BIRI.
+     * Shu tufayli baza hech qachon buzilmaydi.
+     */
+    suspend fun invokeAll(userId: Long, entries: List<ParsedEntry>): List<Result> =
+        db.withTransaction {
+            entries.map { invoke(userId, it) }
+        }
+
     suspend operator fun invoke(userId: Long, entry: ParsedEntry): Result {
-        val now = entry.date?.atTime(LocalDateTime.now(ZONE).toLocalTime())
-            ?: LocalDateTime.now(ZONE)
+        // SANA MUAMMOSI TUZATILDI: aniq sana kiritilsa (03.07) — o'sha kunning SOAT 12:00 (tush)
+        // vaqti bilan saqlanadi. Shunda tun/timezone siljishi sanani keyingi kunga o'tkazib yubormaydi.
+        // Sana kiritilmasa — hozirgi to'liq vaqt (bugungi yozuv).
+        val today = java.time.LocalDate.now(ZONE)
+        val now = when {
+            entry.date == null -> LocalDateTime.now(ZONE)
+            entry.date == today -> LocalDateTime.now(ZONE)   // bugun — real vaqt
+            else -> entry.date.atTime(12, 0)                 // o'tgan/kelasi kun — tush payti (barqaror)
+        }
         val dateStr = now.format(ISO)
         val cn = entry.clientName.lowercase()
 

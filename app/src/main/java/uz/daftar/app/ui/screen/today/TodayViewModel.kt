@@ -74,6 +74,7 @@ data class TodayUiState(
 
     /** Autocomplete takliflar (mijoz ismi) */
     val suggestions: List<String> = emptyList(),
+    val quickFills: List<String> = emptyList(),   // mijozning oxirgi yuk/puli — tez to'ldirish
 
     /** Tanlangan yozuvlar (multi-delete uchun) */
     val selected: Set<Long> = emptySet(),
@@ -1751,14 +1752,44 @@ class TodayViewModel @Inject constructor(
     private fun updateSuggestions(prefix: String) {
         suggestJob?.cancel()
         if (prefix.isBlank()) {
-            _state.update { it.copy(suggestions = emptyList()) }
+            _state.update { it.copy(suggestions = emptyList(), quickFills = emptyList()) }
             return
         }
         suggestJob = viewModelScope.launch {
             val list = repo.suggestClients(userId, prefix)
-            // Faqat aniq prefiks mos kelmasligini ham qo'shamiz (foydalanuvchi ko'p variantni ko'rishi uchun)
-            _state.update { it.copy(suggestions = list.filter { n -> n != prefix.lowercase() }) }
+            val names = list.filter { n -> n != prefix.lowercase() }
+            // 💡 Tez to'ldirish: aniq mijoz aniqlansa — oxirgi yuk + pulini taklif qilamiz
+            val exact = prefix.trim().lowercase()
+            val matchName = when {
+                list.any { it.equals(exact, ignoreCase = true) } -> exact
+                list.size == 1 -> list[0]
+                else -> null
+            }
+            val fills = if (matchName != null) computeQuickFills(matchName) else emptyList()
+            _state.update { it.copy(suggestions = names, quickFills = fills) }
         }
+    }
+
+    /** Mijozning OXIRGI yuk (A/B/C/D/K) va OXIRGI to'lovini "a20","p500" ko'rinishida qaytaradi */
+    private suspend fun computeQuickFills(clientName: String): List<String> {
+        val txs = runCatching { repo.getByClient(userId, clientName.lowercase()) }
+            .getOrDefault(emptyList())
+            .sortedByDescending { it.date }
+        val fills = mutableListOf<String>()
+        val cargo = setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+        txs.firstOrNull { it.type in cargo }?.let { fills.add(it.type.code + fmtAmt(it.amount)) }
+        txs.firstOrNull { it.type == TxType.P }?.let { fills.add("p" + fmtAmt(it.amount)) }
+        return fills
+    }
+
+    private fun fmtAmt(a: Double): String =
+        if (a == Math.floor(a) && !a.isInfinite()) a.toLong().toString() else a.toString()
+
+    /** Tez to'ldirish chipi: joriy qatorga qo'shadi (masalan "muborak" → "muborak a20") */
+    fun applyQuickFill(fill: String) {
+        val cur = state.value.input.trimEnd()
+        val newInput = if (cur.isEmpty()) fill else "$cur $fill"
+        onInputChange(newInput)
     }
 
     /** Avtotaklif chip bosildi — input'da birinchi so'zni almashtiramiz */
@@ -1908,7 +1939,7 @@ class TodayViewModel @Inject constructor(
                         ChatItem.User(nextChatId(), raw),
                         ChatItem.Info(nextChatId(), "✅ Global ${gp.group.uppercase()} narx yangilandi\n$label")
                     )
-                    _state.update { it.copy(isSending = false, input = "", globalPrice = null, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), isViewCommand = false) }
+                    _state.update { it.copy(isSending = false, input = "", globalPrice = null, errorMessage = null, suggestions = emptyList(), quickFills = emptyList(), dateReport = null, textReport = null, previews = emptyList(), isViewCommand = false) }
                 } catch (e: Exception) {
                     appendChat(ChatItem.Info(nextChatId(), "❌ Xato: ${e.message}"))
                     _state.update { it.copy(isSending = false) }
@@ -1936,7 +1967,7 @@ class TodayViewModel @Inject constructor(
                     }
                     lines.append("Jami: $total yozuv")
                     appendChat(ChatItem.Info(nextChatId(), lines.toString().trimEnd()))
-                    _state.update { it.copy(isSending = false, input = "", t1set = null, errorMessage = null, suggestions = emptyList()) }
+                    _state.update { it.copy(isSending = false, input = "", t1set = null, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
                 } catch (e: Exception) {
                     appendChat(ChatItem.Info(nextChatId(), "❌ Xato: ${e.message}"))
                     _state.update { it.copy(isSending = false) }
@@ -1948,7 +1979,7 @@ class TodayViewModel @Inject constructor(
         val aiq = s.aiQuery
         if (aiq != null) {
             appendChat(ChatItem.User(nextChatId(), raw))
-            _state.update { it.copy(isSending = true, input = "", aiQuery = null, errorMessage = null, suggestions = emptyList()) }
+            _state.update { it.copy(isSending = true, input = "", aiQuery = null, errorMessage = null, suggestions = emptyList(), quickFills = emptyList()) }
             viewModelScope.launch {
                 val answer = handleAi(aiq)
                 appendChat(ChatItem.Info(nextChatId(), answer))
@@ -1984,8 +2015,9 @@ class TodayViewModel @Inject constructor(
                 _state.update { it.copy(isSending = true) }
                 try {
                     appendChat(ChatItem.User(nextChatId(), raw))
+                    // ATOMIK saqlash (@Transaction): hamma yozuv BIRGA — telefon o'chsa yarim qolmaydi
+                    addTx.invokeAll(userId, s.parsed)
                     for (entry in s.parsed) {
-                        addTx(userId, entry)
                         appendChat(ChatItem.Saved(nextChatId(), buildSavedInfoFromEntry(entry)))
                     }
                     _state.update { it.copy(isSending = false, input = "", parsed = emptyList(), isDeleteCommand = false, errorMessage = null, suggestions = emptyList(), dateReport = null, textReport = null, previews = emptyList(), pinnedView = false, isViewCommand = false) }

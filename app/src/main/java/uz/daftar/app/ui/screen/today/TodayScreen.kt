@@ -503,6 +503,8 @@ fun TodayScreen(
                         onChange = vm::onInputChange,
                         suggestions = state.suggestions,
                         onSuggestionClick = vm::applySuggestion,
+                        quickFills = state.quickFills,
+                        onQuickFillClick = vm::applyQuickFill,
                         onVoice = vm::onVoiceInput,
                         onSend = {
                             bottomMenuOpen = false
@@ -740,7 +742,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v131", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v134", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1119,6 +1121,8 @@ private fun InputBar(
     onChange: (String) -> Unit,
     suggestions: List<String>,
     onSuggestionClick: (String) -> Unit,
+    quickFills: List<String>,
+    onQuickFillClick: (String) -> Unit,
     onVoice: (String) -> Unit,
     onSend: () -> Unit,
     canSend: Boolean,
@@ -1200,6 +1204,25 @@ private fun InputBar(
                             leadingIcon = {
                                 Icon(Icons.Outlined.AccountCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
+                        )
+                    }
+                }
+            }
+
+            // 💡 Tez to'ldirish — mijozning OXIRGI yuk / puli (bosilsa qatorga qo'shiladi)
+            if (quickFills.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    quickFills.forEach { fill ->
+                        AssistChip(
+                            onClick = { onQuickFillClick(fill) },
+                            label = { Text(fill.uppercase()) },
+                            leadingIcon = { Text(if (fill.startsWith("p")) "💵" else "📦") }
                         )
                     }
                 }
@@ -2083,11 +2106,23 @@ private fun SavedCard(info: SavedInfo) {
                 Spacer(Modifier.height(4.dp))
                 Text("\uD83D\uDCC5 ${info.dateLabel}", fontSize = 12.sp, color = gray)
                 Spacer(Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier.size(46.dp).clip(CircleShape).background(green),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("\u2713", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                // 🎬 Lottie: yashil doira + ✓ chizilish animatsiyasi (yuklanmasa — eski statik belgi)
+                val lottieComp by com.airbnb.lottie.compose.rememberLottieComposition(
+                    com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(uz.daftar.app.R.raw.success_check)
+                )
+                if (lottieComp != null) {
+                    com.airbnb.lottie.compose.LottieAnimation(
+                        composition = lottieComp,
+                        iterations = 1,
+                        modifier = Modifier.size(58.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.size(46.dp).clip(CircleShape).background(green),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("\u2713", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                    }
                 }
             }
             // O'ng: tafsilotlar

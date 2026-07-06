@@ -32,6 +32,15 @@ interface TransactionDao {
     """)
     fun pagingByRange(userId: Long, start: String, end: String): PagingSource<Int, TransactionEntity>
 
+    /** 🏆 Statistika: berilgan davrda eng ko'p yuk (A/B/C/D/K) olgan mijoz */
+    @Query("""
+        SELECT client_name AS clientName, SUM(amount) AS total
+        FROM transactions
+        WHERE user_id = :userId AND LOWER(type) IN ('a','b','c','d','k') AND date BETWEEN :start AND :end
+        GROUP BY client_name ORDER BY total DESC LIMIT 1
+    """)
+    suspend fun topCargoClient(userId: Long, start: String, end: String): ClientTotal?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(tx: TransactionEntity): Long
 
@@ -155,3 +164,6 @@ interface TransactionDao {
     @Query("SELECT type AS type, amount AS amount, date AS date FROM transactions WHERE user_id = :userId AND type IN ('a','b','c','d','k')")
     fun observeCargoTxLite(userId: Long): Flow<List<CargoTxLite>>
 }
+
+/** 🏆 Statistika natijasi: mijoz + jami miqdor */
+data class ClientTotal(val clientName: String, val total: Double)
