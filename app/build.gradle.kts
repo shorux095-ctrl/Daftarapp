@@ -126,6 +126,9 @@ dependencies {
     // WorkManager + Hilt integration
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
+
+    // Lottie — premium animatsiyalar (Saqlandi ✅ va h.k.)
+    implementation("com.airbnb.android:lottie-compose:6.7.1")
     ksp(libs.androidx.hilt.work.compiler)
 
     // LeakCanary O'CHIRILDI — heap dump ilovani muzlatib OQ EKRAN qilardi.
