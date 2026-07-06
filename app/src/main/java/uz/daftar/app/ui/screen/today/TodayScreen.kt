@@ -743,7 +743,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v140", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v144", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -2160,15 +2160,26 @@ private fun SavedCard(info: SavedInfo) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (info.debt > 0) "\uD83D\uDCB3" else "\u2705", fontSize = 16.sp)
+                        Text(if (info.debt > 0) "\uD83D\uDCB3" else if (info.debt < 0) "\uD83D\uDCB0" else "\u2705", fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(
-                                if (info.debt > 0) "Qarz: ${info.debt.formatMoney()} so'm" else "Qarz yo'q",
+                                when {
+                                    info.debt > 0 -> "Qarz: ${info.debt.formatMoney()} so'm"
+                                    info.debt < 0 -> "Ortiqcha: ${(-info.debt).formatMoney()} so'm"
+                                    else -> "Qarz yo'q"
+                                },
                                 fontSize = 14.sp, fontWeight = FontWeight.Bold,
                                 color = if (info.debt > 0) red else green
                             )
-                            Text(if (info.debt > 0) "Qarz mavjud" else "To'liq to'langan", fontSize = 11.sp, color = gray)
+                            Text(
+                                when {
+                                    info.debt > 0 -> "Qarz mavjud"
+                                    info.debt < 0 -> "Oldindan to'lov (haqi bor)"
+                                    else -> "To'liq to'langan"
+                                },
+                                fontSize = 11.sp, color = gray
+                            )
                         }
                     }
                 }

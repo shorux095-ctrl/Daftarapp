@@ -109,13 +109,66 @@ fun EditTransactionScreen(
                     Spacer(Modifier.height(4.dp))
                     FlowRowChips(state.type) { vm.setType(it) }
                     Spacer(Modifier.height(10.dp))
-                    // ➕ Yangi qo'shish — tur tanlab, pastda summa yozib, shu tugma bilan YANGI yozuv qo'shiladi (asl yozuv qoladi)
+                    // ➕ Yangi qo'shish — v144: DIALOG ochiladi (tur tanlab, miqdor yozib, Saqlash) — asl yozuvga tegmaydi
+                    var showAddDialog by remember { mutableStateOf(false) }
                     Button(
-                        onClick = vm::saveAsNew,
+                        onClick = { showAddDialog = true },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = state.amount.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF2E7D32))
                     ) { Text("➕ Yangi qo'shish (yuk / pul / qarz)", fontWeight = FontWeight.SemiBold) }
+
+                    if (showAddDialog) {
+                        var newType by remember { mutableStateOf(TxType.A) }
+                        var newAmount by remember { mutableStateOf("") }
+                        var newNote by remember { mutableStateOf("") }
+                        val newIsCargo = newType in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+                        AlertDialog(
+                            onDismissRequest = { showAddDialog = false },
+                            title = { Text("➕ Yangi qo'shish") },
+                            text = {
+                                Column {
+                                    Text("Tur tanlang:", style = MaterialTheme.typography.labelLarge)
+                                    Spacer(Modifier.height(6.dp))
+                                    FlowRowChips(newType) { newType = it }
+                                    Spacer(Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = newAmount,
+                                        onValueChange = { newAmount = it },
+                                        label = { Text(if (newIsCargo) "Yuk miqdori" else "Summa (pul)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = newNote,
+                                        onValueChange = { newNote = it },
+                                        label = { Text("📝 Izoh (ixtiyoriy)") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Asl yozuv o'zgarmaydi — ${state.clientName.trim().replaceFirstChar { c -> c.uppercase() }} ga YANGI yozuv qo'shiladi (${state.date.format(fmt)})",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    enabled = (newAmount.replace(",", ".").toDoubleOrNull() ?: 0.0) > 0.0,
+                                    onClick = {
+                                        vm.addNew(newType, newAmount, newNote)
+                                        showAddDialog = false
+                                    }
+                                ) { Text("Saqlash") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showAddDialog = false }) { Text("Bekor") }
+                            }
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
 
                     // Sana

@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +48,7 @@ import kotlinx.coroutines.withContext
 import uz.daftar.app.core.parser.DaftarParser
 import uz.daftar.app.core.parser.ParseResult
 import uz.daftar.app.core.theme.DaftarTheme
+import uz.daftar.app.core.voice.rememberVoiceInput
 import uz.daftar.app.data.repository.TransactionRepository
 import uz.daftar.app.domain.usecase.AddTransactionUseCase
 import javax.inject.Inject
@@ -53,6 +57,7 @@ import javax.inject.Inject
  * Tezkor qo'shish — bosh ekran widgetidan ochiladi.
  * To'liq ilovaga kirmasdan, kichik oynada yozib saqlash imkonini beradi.
  * Chatdagi bilan BIR XIL parser + saqlash mantig'ini ishlatadi.
+ * v142: 🎤 ovozli kiritish + saqlashdan oldin HA/YO'Q tasdiq (adashmaslik uchun).
  */
 @AndroidEntryPoint
 class QuickAddActivity : ComponentActivity() {
@@ -69,6 +74,9 @@ class QuickAddActivity : ComponentActivity() {
                 var tfv by remember { mutableStateOf(TextFieldValue("")) }
                 var saving by remember { mutableStateOf(false) }
                 var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+                // v142: ovozdan kelgan matn — saqlashdan OLDIN tasdiq so'raladi
+                var voiceConfirm by remember { mutableStateOf<String?>(null) }
+                val voice = rememberVoiceInput { spoken -> voiceConfirm = spoken.trim() }
 
                 // Oxirgi qatordagi ism bo'yicha takliflar (chatdagi bilan bir xil)
                 LaunchedEffect(tfv.text) {
@@ -79,6 +87,20 @@ class QuickAddActivity : ComponentActivity() {
                         runCatching { repo.suggestClients(userId, word) }.getOrDefault(emptyList())
                             .filter { it != word.lowercase() }.take(6)
                     else emptyList()
+                }
+
+                fun doSave(text: String) {
+                    if (text.isBlank() || saving) return
+                    saving = true
+                    lifecycleScope.launch {
+                        val n = withContext(Dispatchers.IO) { saveText(text) }
+                        android.widget.Toast.makeText(
+                            this@QuickAddActivity,
+                            if (n > 0) "✅ $n yozuv saqlandi" else "❌ Tushunarsiz format",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        if (n > 0) finish() else { saving = false; voiceConfirm = null }
+                    }
                 }
 
                 Box(
@@ -94,66 +116,116 @@ class QuickAddActivity : ComponentActivity() {
                             .padding(20.dp)
                             .clickable(enabled = false) {}
                     ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("⚡ Tezkor qo'shish", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Spacer(Modifier.height(12.dp))
-                            OutlinedTextField(
-                                value = tfv,
-                                onValueChange = { tfv = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 2
-                            )
-                            if (suggestions.isNotEmpty()) {
-                                Spacer(Modifier.height(6.dp))
-                                Row(
-                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        val vc = voiceConfirm
+                        if (vc != null) {
+                            // ───── 🎤 OVOZ TASDIG'I: Ha / Yo'q ─────
+                            Column(Modifier.padding(16.dp)) {
+                                Text("🎤 Eshitildi — saqlaymi?", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Spacer(Modifier.height(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFF2F4F8),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    suggestions.forEach { name ->
-                                        SuggestionChip(
-                                            onClick = {
-                                                val cur = tfv.text
-                                                val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
-                                                val lastLine = cur.substringAfterLast('\n').trimStart()
-                                                // Yozilgan ism qismini topamiz (ko'p so'zli ismlar ham)
-                                                val lname = name.lowercase()
-                                                var typed = ""
-                                                for (w in lastLine.split(" ")) {
-                                                    if (w.isBlank()) break
-                                                    val cand = if (typed.isEmpty()) w else "$typed $w"
-                                                    if (lname.startsWith(cand.lowercase())) typed = cand else break
-                                                }
-                                                val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
-                                                           else lastLine.removePrefix(typed).trimStart()
-                                                val tail = if (rest.isBlank()) "$name " else "$name $rest"
-                                                val newText = prefix + tail
-                                                tfv = TextFieldValue(newText, selection = TextRange(newText.length))
-                                            },
-                                            label = { Text(name.replaceFirstChar { it.uppercase() }) }
-                                        )
-                                    }
+                                    Text(
+                                        "\u201C$vc\u201D",
+                                        modifier = Modifier.padding(12.dp),
+                                        fontSize = 17.sp, fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                // Qatorlar tekshiruvi: ✅ tushunarli / ❓ tushunarsiz
+                                val checks = vc.lines().filter { it.isNotBlank() }
+                                    .map { it.trim() to (DaftarParser.parse(it.trim()) is ParseResult.Success) }
+                                val okCount = checks.count { it.second }
+                                checks.forEach { (ln, ok) ->
+                                    Text(
+                                        (if (ok) "✅ " else "❓ ") + ln,
+                                        fontSize = 14.sp,
+                                        color = if (ok) Color(0xFF1AA35A) else Color(0xFFD32F2F)
+                                    )
+                                }
+                                if (okCount == 0) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Format tushunarsiz (masalan: \"dvorik a10\"). Yo'q — tahrirlash.",
+                                        fontSize = 12.sp, color = Color(0xFFD32F2F)
+                                    )
+                                }
+                                Spacer(Modifier.height(14.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    TextButton(onClick = {
+                                        // YO'Q: matn maydonga tushadi — qo'lda tuzatib olish mumkin
+                                        tfv = TextFieldValue(vc, selection = TextRange(vc.length))
+                                        voiceConfirm = null
+                                    }) { Text("❌ Yo'q, tahrirlash") }
+                                    Spacer(Modifier.width(8.dp))
+                                    Button(
+                                        enabled = okCount > 0 && !saving,
+                                        onClick = { doSave(vc) }
+                                    ) { Text("✅ Ha, saqlash") }
                                 }
                             }
-                            Spacer(Modifier.height(12.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton(onClick = { finish() }) { Text("Bekor") }
-                                Spacer(Modifier.width(8.dp))
-                                Button(
-                                    enabled = !saving,
-                                    onClick = {
-                                        if (tfv.text.isBlank()) return@Button
-                                        saving = true
-                                        lifecycleScope.launch {
-                                            val n = withContext(Dispatchers.IO) { saveText(tfv.text) }
-                                            android.widget.Toast.makeText(
-                                                this@QuickAddActivity,
-                                                if (n > 0) "✅ $n yozuv saqlandi" else "❌ Tushunarsiz format",
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
-                                            if (n > 0) finish() else saving = false
+                        } else {
+                            // ───── ODDIY REJIM: yozish + 🎤 ─────
+                            Column(Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "⚡ Tezkor qo'shish",
+                                        fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(onClick = { voice("uz-UZ") }) {
+                                        Text("🎤", fontSize = 22.sp)
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = tfv,
+                                    onValueChange = { tfv = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 2
+                                )
+                                if (suggestions.isNotEmpty()) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        suggestions.forEach { name ->
+                                            SuggestionChip(
+                                                onClick = {
+                                                    val cur = tfv.text
+                                                    val prefix = if (cur.contains('\n')) cur.substringBeforeLast('\n') + "\n" else ""
+                                                    val lastLine = cur.substringAfterLast('\n').trimStart()
+                                                    // Yozilgan ism qismini topamiz (ko'p so'zli ismlar ham)
+                                                    val lname = name.lowercase()
+                                                    var typed = ""
+                                                    for (w in lastLine.split(" ")) {
+                                                        if (w.isBlank()) break
+                                                        val cand = if (typed.isEmpty()) w else "$typed $w"
+                                                        if (lname.startsWith(cand.lowercase())) typed = cand else break
+                                                    }
+                                                    val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
+                                                               else lastLine.removePrefix(typed).trimStart()
+                                                    val tail = if (rest.isBlank()) "$name " else "$name $rest"
+                                                    val newText = prefix + tail
+                                                    tfv = TextFieldValue(newText, selection = TextRange(newText.length))
+                                                },
+                                                label = { Text(name.replaceFirstChar { it.uppercase() }) }
+                                            )
                                         }
                                     }
-                                ) { Text("Saqlash") }
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    TextButton(onClick = { finish() }) { Text("Bekor") }
+                                    Spacer(Modifier.width(8.dp))
+                                    Button(
+                                        enabled = !saving,
+                                        onClick = { doSave(tfv.text) }
+                                    ) { Text("Saqlash") }
+                                }
                             }
                         }
                     }

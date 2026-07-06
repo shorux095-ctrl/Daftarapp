@@ -118,6 +118,37 @@ class EditTransactionViewModel @Inject constructor(
     /** ➕ Joriy formani YANGI yozuv sifatida QO'SHADI — asl yozuv o'zgarmaydi (pul/yuk qo'shish uchun) */
     fun saveAsNew() = saveInternal(asNew = true)
 
+    /** v144: ➕ dialogdan — TANLANGAN tur va miqdor bilan YANGI yozuv qo'shadi. Asl yozuvga TEGMAYDI. */
+    fun addNew(type: TxType, amountStr: String, note: String = "") {
+        val s = state.value
+        val orig = s.original ?: return
+        val amt = amountStr.replace(",", ".").toDoubleOrNull()
+        if (amt == null || amt <= 0) {
+            _state.update { it.copy(error = "Noto'g'ri miqdor") }
+            return
+        }
+        val timePart = if (orig.date.length > 10) orig.date.substring(10) else " 12:00:00"
+        val newDate = s.date.toString() + timePart
+        viewModelScope.launch {
+            try {
+                editUC(
+                    id = 0L,
+                    userId = orig.userId,
+                    clientName = s.clientName.trim().ifBlank { orig.clientName },
+                    note = note.trim().ifBlank { null },
+                    type = type,
+                    amount = amt,
+                    date = newDate,
+                    tOverride = null,
+                    costTier = null
+                )
+                _state.update { it.copy(isSaved = true, error = null) }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     private fun saveInternal(asNew: Boolean) {
         val s = state.value
         val orig = s.original ?: return

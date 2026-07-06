@@ -1314,6 +1314,23 @@ class TodayViewModel @Inject constructor(
                 errorMessage = if (parsedList.isEmpty() && !isNameOnly) firstError?.error?.message else null
             )
         }
+        // v141: "Ali a" kabi ism oxiri yuk-harfiga o'xshasa ham — AYNAN shu nomli mijoz bo'lsa TARIX
+        if (parsedList.isEmpty() && !isNameOnly && !text.contains('\n')) {
+            val cand = text.trim()
+            val okChars = cand.length >= 2 && cand.any { it.isLetter() } &&
+                cand.all { it.isLetterOrDigit() || it == ' ' || it == '\'' || it == '-' }
+            if (okChars) {
+                previewJob?.cancel()
+                previewJob = viewModelScope.launch {
+                    val cp = runCatching { buildClientPreview(cand, null) }.getOrNull()
+                    if (cp != null && cp.name.equals(cand, ignoreCase = true) &&
+                        _state.value.input.trim().equals(cand, ignoreCase = true)
+                    ) {
+                        _state.update { it.copy(isViewCommand = true, errorMessage = null, previews = listOf(cp)) }
+                    }
+                }
+            }
+        }
         // Autocomplete — OXIRGI qatordagi birinchi so'z (har bir qatorda ishlaydi)
         val lastLine0 = text.substringAfterLast('\n').trimStart()
         // Sana (15.06) yoki o'chirish so'zi (x/ochir) bo'lsa — ulardan keyingi so'z ISM
@@ -1322,10 +1339,15 @@ class TodayViewModel @Inject constructor(
         val delWords = setOf("x", "ochir", "o'chir", "ochirish")
         var wi = 0
         while (wi < partsLL.size && (dateRe.matches(partsLL[wi]) || partsLL[wi].lowercase() in delWords)) wi++
-        val nameWord = if (wi < partsLL.size) partsLL[wi] else ""
-        val onlyName = nameWord.isNotBlank() &&
-            nameWord.first().isLetter() &&
-            nameWord.all { it.isLetter() || it == '\'' || it == '-' }
+        // v141: ism BIR NECHTA so'zdan iborat bo'lishi mumkin ("dom oshtoncha") — harfli so'zlar ketma-ket olinadi
+        val nameWords = mutableListOf<String>()
+        var wj = wi
+        while (wj < partsLL.size) {
+            val w = partsLL[wj]
+            if (w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' }) { nameWords.add(w); wj++ } else break
+        }
+        val nameWord = nameWords.joinToString(" ")
+        val onlyName = nameWord.isNotBlank()
         updateSuggestions(if (onlyName) nameWord else "")
 
         // Jonli tarix preview — ism yozilsa (parsing yozuv topa olmasa)

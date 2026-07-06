@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uz.daftar.app.domain.usecase.GetYukReportUseCase
+import uz.daftar.app.domain.usecase.GetDateReportUseCase
+import uz.daftar.app.domain.usecase.DateReport
 import uz.daftar.app.domain.usecase.YukReport
 import java.time.LocalDate
 import java.time.YearMonth
@@ -24,12 +26,17 @@ data class YukReportState(
     val month: YearMonth = YearMonth.now(),
     val year: Int = LocalDate.now().year,
     val report: YukReport? = null,
-    val countReport: uz.daftar.app.domain.usecase.YukCountReport? = null
+    val countReport: uz.daftar.app.domain.usecase.YukCountReport? = null,
+    // v143: jadval katagi bosilganda — o'sha KUN tafsiloti (T/N/P filtri bilan)
+    val dayDetail: DateReport? = null,
+    val dayDetailTitle: String = "",
+    val dayDetailLoading: Boolean = false
 )
 
 @HiltViewModel
 class YukReportViewModel @Inject constructor(
-    private val getReport: GetYukReportUseCase
+    private val getReport: GetYukReportUseCase,
+    private val getDateReport: GetDateReportUseCase
 ) : ViewModel() {
 
     private val userId: Long = 1L
@@ -120,5 +127,41 @@ class YukReportViewModel @Inject constructor(
         if (!_state.value.yearly) return
         _state.update { it.copy(yearly = false) }
         load()
+    }
+
+    /**
+     * v143: jadval katagi bosildi.
+     * mode: 't' = tannarx hisobot, 'n' = narx (sotish) hisobot, 'p' = faqat pullar, 'a' = to'liq (sana bosilganda)
+     */
+    fun openDay(label: String, mode: Char) {
+        val s = _state.value
+        if (s.yearly) return  // yillikda qator = oy, kun emas
+        val m = Regex("""^(\d{1,2})\.(\d{1,2})$""").matchEntire(label.trim()) ?: return
+        val date = runCatching {
+            LocalDate.of(s.month.year, m.groupValues[2].toInt(), m.groupValues[1].toInt())
+        }.getOrNull() ?: return
+        val title = when (mode) {
+            'p' -> "💵 $label — Pullar"
+            'n' -> "💰 $label — Narx (sotish)"
+            't' -> "📦 $label — Tannarx"
+            else -> "📅 $label — To'liq hisobot"
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(dayDetailLoading = true, dayDetailTitle = title, dayDetail = null) }
+            val r = runCatching {
+                withContext(Dispatchers.Default) {
+                    when (mode) {
+                        'p' -> getDateReport(userId, date, setOf("p"), false)
+                        'n' -> getDateReport(userId, date, null, true)
+                        else -> getDateReport(userId, date, null, false)
+                    }
+                }
+            }.getOrNull()
+            _state.update { it.copy(dayDetail = r, dayDetailLoading = false) }
+        }
+    }
+
+    fun closeDay() {
+        _state.update { it.copy(dayDetail = null, dayDetailLoading = false) }
     }
 }

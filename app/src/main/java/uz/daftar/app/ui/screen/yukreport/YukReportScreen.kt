@@ -20,6 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -197,13 +202,83 @@ fun YukReportScreen(
                         ) {
                             item { CardsRow(report, dayCount, coverDenom) }
                             item { StatsCard(report) }
-                            item { TableCard(report) }
+                            item { TableCard(report, onCellClick = { l, m -> vm.openDay(l, m) }) }
                             item { JamiCard(report) }
                         }
                     }
                 }
             }
         }
+    }
+
+    // ── v143: kun tafsiloti dialogi (jadvalda Sana / T / N / P bosilganda) ──
+    if (state.dayDetailLoading || state.dayDetail != null) {
+        AlertDialog(
+            onDismissRequest = vm::closeDay,
+            confirmButton = {
+                TextButton(onClick = vm::closeDay) { Text("Yopish") }
+            },
+            title = { Text(state.dayDetailTitle, fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                val dr = state.dayDetail
+                when {
+                    dr == null -> Box(
+                        Modifier.fillMaxWidth().height(90.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+
+                    dr.clientLines.isEmpty() -> Text("Bu kunda mos yozuv yo'q")
+
+                    else -> {
+                        fun fmtD(v: Double): String =
+                            if (v == Math.floor(v) && !v.isInfinite()) v.toLong().toString() else v.toString()
+                        Column(
+                            Modifier
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            dr.clientLines.forEachIndexed { idx, cl ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text(
+                                        "${idx + 1}. ${cl.clientName.replaceFirstChar { it.uppercase() }}",
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                                    )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        cl.entries.forEach { e ->
+                                            val line = when {
+                                                e.type.code.equals("p", true) ->
+                                                    "💵 ${e.amount.toLong().formatMoney()}"
+                                                e.type.code.equals("q", true) ->
+                                                    "💳 Q: ${e.amount.toLong().formatMoney()}"
+                                                e.price != null ->
+                                                    "${e.type.code.uppercase()}: ${fmtD(e.amount)} × ${fmtD(e.price)} = ${(e.amount * e.price).toLong().formatMoney()}"
+                                                else ->
+                                                    "${e.type.code.uppercase()}: ${fmtD(e.amount)}"
+                                            }
+                                            Text(line, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                                        }
+                                    }
+                                }
+                                if (idx < dr.clientLines.size - 1)
+                                    HorizontalDivider(Modifier.padding(vertical = 6.dp), color = LineGray)
+                            }
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = LineGray)
+                            if (dr.totalPayments > 0)
+                                Text(
+                                    "💵 Jami pul: ${dr.totalPayments.toLong().formatMoney()} so'm",
+                                    fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PRing
+                                )
+                            if (dr.totalRevenue > 0)
+                                Text(
+                                    "📦 Jami yuk: ${dr.totalRevenue.toLong().formatMoney()} so'm",
+                                    fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NRing
+                                )
+                        }
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -358,7 +433,7 @@ private fun StatsCard(report: YukReport) {
 }
 
 @Composable
-private fun TableCard(report: YukReport) {
+private fun TableCard(report: YukReport, onCellClick: ((String, Char) -> Unit)? = null) {
     val maxT = (report.rows.maxOfOrNull { it.tTotal } ?: 0L).coerceAtLeast(1L)
     val maxN = (report.rows.maxOfOrNull { it.nTotal } ?: 0L).coerceAtLeast(1L)
     val maxP = (report.rows.maxOfOrNull { it.pTotal } ?: 0L).coerceAtLeast(1L)
@@ -385,12 +460,14 @@ private fun TableCard(report: YukReport) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    row.label, modifier = Modifier.weight(1.0f),
+                    row.label,
+                    modifier = Modifier.weight(1.0f)
+                        .then(if (onCellClick != null) Modifier.clickable { onCellClick(row.label, 'a') } else Modifier),
                     fontSize = 11.sp, fontFamily = FontFamily.Monospace
                 )
-                BarCell(row.tTotal, maxT, TRing, 1.4f)
-                BarCell(row.nTotal, maxN, NRing, 1.4f)
-                BarCell(row.pTotal, maxP, PRing, 1.4f)
+                BarCell(row.tTotal, maxT, TRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 't') } })
+                BarCell(row.nTotal, maxN, NRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'n') } })
+                BarCell(row.pTotal, maxP, PRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'p') } })
                 Text(
                     farqStr(row.farq), modifier = Modifier.weight(1.05f),
                     fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
@@ -403,10 +480,11 @@ private fun TableCard(report: YukReport) {
 }
 
 @Composable
-private fun RowScope.BarCell(value: Long, max: Long, color: Color, weight: Float) {
+private fun RowScope.BarCell(value: Long, max: Long, color: Color, weight: Float, onClick: (() -> Unit)? = null) {
     val frac = (value.toFloat() / max.toFloat()).coerceIn(0f, 1f)
     Row(
-        modifier = Modifier.weight(weight).padding(end = 6.dp),
+        modifier = Modifier.weight(weight).padding(end = 6.dp)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
