@@ -24,6 +24,14 @@ class ChatStore @Inject constructor(
     suspend fun load(): String =
         context.chatDataStore.data.map { it[chatKey] ?: "" }.first()
 
+    /** v149: XAVFSIZ REJIM — ilova ochilishda 2 marta ketma-ket qulagan bo'lsa true (bir marta o'qiladi va o'chadi). */
+    fun consumeSafeMode(): Boolean {
+        val p = context.getSharedPreferences("crash_guard", Context.MODE_PRIVATE)
+        val on = p.getBoolean("safe_mode", false)
+        if (on) p.edit().putBoolean("safe_mode", false).putInt("startup_crashes", 0).apply()
+        return on
+    }
+
     suspend fun save(json: String) {
         context.chatDataStore.edit { it[chatKey] = json }
     }

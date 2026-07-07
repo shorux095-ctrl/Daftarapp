@@ -15,7 +15,8 @@ import javax.inject.Inject
 data class QarzdorlarState(
     val debtors: List<OverdueDebtor> = emptyList(),
     val totalDebt: Long = 0,
-    val loading: Boolean = true
+    val loading: Boolean = true,
+    val rating: Boolean = true  // v148: 🏆 reyting (katta qarz yuqorida) / 📅 kun bo'yicha
 )
 
 @HiltViewModel
@@ -27,20 +28,32 @@ class QarzdorlarViewModel @Inject constructor(
     private val _state = MutableStateFlow(QarzdorlarState())
     val state: StateFlow<QarzdorlarState> = _state.asStateFlow()
 
+    private var raw: List<OverdueDebtor> = emptyList()
+
     init { load() }
 
     fun load() {
         viewModelScope.launch {
-            val list = runCatching { getOverdue(userId) }.getOrDefault(emptyList())
-            // Kam kun yuqorida, ko'p kun pastda (10-14 kun tepada, 60 kun pastda)
-            val sorted = list.sortedBy { it.daysOverdue }
-            _state.update {
-                QarzdorlarState(
-                    debtors = sorted,
-                    totalDebt = sorted.sumOf { d -> d.debt },
-                    loading = false
-                )
-            }
+            raw = runCatching { getOverdue(userId) }.getOrDefault(emptyList())
+            applySort()
+        }
+    }
+
+    /** v148: 🏆 Reyting — eng katta qarz yuqorida; 📅 Kun — yangi qarzlar yuqorida */
+    fun setRating(r: Boolean) {
+        _state.update { it.copy(rating = r) }
+        applySort()
+    }
+
+    private fun applySort() {
+        val s = _state.value
+        val sorted = if (s.rating) raw.sortedByDescending { it.debt } else raw.sortedBy { it.daysOverdue }
+        _state.update {
+            it.copy(
+                debtors = sorted,
+                totalDebt = raw.sumOf { d -> d.debt },
+                loading = false
+            )
         }
     }
 }

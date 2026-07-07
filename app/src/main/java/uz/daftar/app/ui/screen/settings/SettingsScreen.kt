@@ -232,6 +232,26 @@ fun SettingsScreen(
                     scope.launch {
                         logText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             val sb = StringBuilder()
+                            // v148: PROFESSIONAL diagnostika sarlavhasi — qurilma, versiya, baza hajmi
+                            runCatching {
+                                val pi = context.packageManager.getPackageInfo(context.packageName, 0)
+                                sb.append("=== 🛠 DIAGNOSTIKA ===\n")
+                                sb.append("Ilova versiyasi: ${pi.versionName}\n")
+                                sb.append("Android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})\n")
+                                sb.append("Qurilma: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\n")
+                                val db = context.databaseList().firstOrNull { it.endsWith(".db") }
+                                    ?.let { context.getDatabasePath(it) }
+                                if (db?.exists() == true)
+                                    sb.append("Baza: ${db.name} — ${String.format("%.2f", db.length() / 1048576.0)} MB\n")
+                                val bdir = java.io.File(context.filesDir, "backups")
+                                if (bdir.exists())
+                                    sb.append("Lokal zaxiralar: ${bdir.listFiles()?.size ?: 0} ta\n")
+                                val lastBk = context.getSharedPreferences("local_backup", android.content.Context.MODE_PRIVATE)
+                                    .getLong("last_backup", 0L)
+                                if (lastBk > 0)
+                                    sb.append("Oxirgi avto-zaxira: ${java.text.SimpleDateFormat("dd.MM HH:mm", java.util.Locale.US).format(java.util.Date(lastBk))}\n")
+                                sb.append("Hozirgi vaqt: ${java.util.Date()}\n\n")
+                            }
                             runCatching {
                                 val f = java.io.File(context.filesDir, "last_crash.txt")
                                 if (f.exists()) sb.append("=== OXIRGI CRASH ===\n").append(f.readText()).append("\n\n")
@@ -276,13 +296,26 @@ fun SettingsScreen(
                         }
                     },
                     confirmButton = {
-                        TextButton(onClick = {
-                            runCatching {
-                                val clip = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                clip.setPrimaryClip(android.content.ClipData.newPlainText("log", logText))
-                                android.widget.Toast.makeText(context, "Nusxa olindi", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text("📋 Nusxa olish") }
+                        Row {
+                            // v148: 📤 Ulashish — logni Telegram/boshqa ilova orqali dasturchiga yuborish
+                            TextButton(onClick = {
+                                runCatching {
+                                    val i = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Daftar diagnostika")
+                                        putExtra(android.content.Intent.EXTRA_TEXT, logText.take(95000))
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(i, "Logni ulashish"))
+                                }
+                            }) { Text("📤 Ulashish") }
+                            TextButton(onClick = {
+                                runCatching {
+                                    val clip = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    clip.setPrimaryClip(android.content.ClipData.newPlainText("log", logText))
+                                    android.widget.Toast.makeText(context, "Nusxa olindi", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }) { Text("📋 Nusxa") }
+                        }
                     },
                     dismissButton = {
                         TextButton(onClick = {

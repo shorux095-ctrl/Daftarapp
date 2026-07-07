@@ -33,8 +33,11 @@ class DaftarApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Global xato tutuvchi — har qanday crash sababini faylga yozadi,
-        // keyingi ochilishda chatda ko'rsatamiz (dasturchiga yuborish uchun).
+        val appStart = System.currentTimeMillis()
+        // Global xato tutuvchi (v149 — professional):
+        // 1) Har qanday crash sababi faylga yoziladi (dasturchiga yuborish uchun)
+        // 2) FON oqimidagi xato ilovani YIQITMAYDI (faqat logga yoziladi)
+        // 3) Ochilishda ketma-ket 2 marta qulasa — keyingi safar XAVFSIZ REJIM (chat tarixi o'tkazib yuboriladi)
         runCatching {
             val prev = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { t, e ->
@@ -42,11 +45,38 @@ class DaftarApplication : Application(), Configuration.Provider {
                     val sw = java.io.StringWriter()
                     e.printStackTrace(java.io.PrintWriter(sw))
                     java.io.File(filesDir, "last_crash.txt").writeText(
-                        "${java.util.Date()}\n${e}\n\n$sw"
+                        "${java.util.Date()}\nOqim: ${t.name}\n${e}\n\n$sw"
                     )
                 }
-                prev?.uncaughtException(t, e)
+                if (t.name == "main") {
+                    // Ochilish paytidagi (birinchi 15s) crash — hisoblanadi
+                    runCatching {
+                        val p = getSharedPreferences("crash_guard", MODE_PRIVATE)
+                        if (System.currentTimeMillis() - appStart < 15_000) {
+                            val n = p.getInt("startup_crashes", 0) + 1
+                            p.edit().putInt("startup_crashes", n)
+                                .putBoolean("safe_mode", n >= 2)
+                                .apply()
+                        }
+                    }
+                    prev?.uncaughtException(t, e)
+                } else {
+                    // FON oqimi xatosi — ilova ISHLAYVERADI, sabab logda
+                    android.util.Log.e("DaftarGuard", "Fon oqimida tutildi (${t.name})", e)
+                }
             }
+        }
+        // Ilova 15 soniya omon qolsa — ochilish muvaffaqiyatli, hisoblagich nolga qaytadi
+        runCatching {
+            android.os.Handler(mainLooper).postDelayed({
+                getSharedPreferences("crash_guard", MODE_PRIVATE)
+                    .edit().putInt("startup_crashes", 0).apply()
+            }, 15_000)
+        }
+        // Juda katta eski log fayl qolgan bo'lsa — tozalash (xotira to'lib qulamasin)
+        runCatching {
+            val lf = java.io.File(filesDir, "app_log.txt")
+            if (lf.exists() && lf.length() > 5_000_000L) lf.delete()
         }
         createReminderChannel(this)
         // Ilova o'z loglarini (xato/warning) faylga yozadi — "🐞 Xato loglari" menyusida ko'rinadi.
@@ -55,6 +85,7 @@ class DaftarApplication : Application(), Configuration.Provider {
         scheduleDailyReminder()  // HAR KUNI 10:00 — bosh ekranga qarz eslatma KARTASI (bildirishnomasiz, yopiq bo'lsa ham)
         scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
         scheduleDriveSync()      // har 30 daqiqa — Drive'ga fon sinxron (internet bo'lganda; yo'q bo'lsa kutadi)
+        scheduleNightlyLocalBackup() // v148: HAR KECHASI 02:00 — lokal avto-zaxira
         // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)
         Thread { runCatching { backupManager.dailyLocalBackupIfNeeded() } }.apply { isDaemon = true }.start()
         // scheduleDailyAutoReport()
@@ -168,6 +199,27 @@ class DaftarApplication : Application(), Configuration.Provider {
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "daily_telegram_backup",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
+    /** v148: HAR KECHASI 02:00 — bazaning lokal avto-zaxirasi (internetsiz ham ishlaydi). */
+    private fun scheduleNightlyLocalBackup() {
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 2)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val delay = target.timeInMillis - now.timeInMillis
+        val request = PeriodicWorkRequestBuilder<uz.daftar.app.core.notify.LocalBackupWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "nightly_local_backup",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )

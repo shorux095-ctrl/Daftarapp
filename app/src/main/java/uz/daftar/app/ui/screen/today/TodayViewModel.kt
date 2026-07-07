@@ -486,6 +486,22 @@ class TodayViewModel @Inject constructor(
     /** Ilova ochilganda saqlangan chatni tiklaydi (qayta generatsiya yo'q). */
     private fun restoreChat() {
         viewModelScope.launch {
+            // v149: XAVFSIZ REJIM — ochilishda 2 marta qulagan bo'lsa, chat tarixi O'TKAZIB yuboriladi
+            // (buzilgan bitta karta ilovani butunlay qulflay olmasin). Baza (yozuvlar) BUT UN saqlangan.
+            val safeMode = runCatching { chatStore.consumeSafeMode() }.getOrDefault(false)
+            if (safeMode) {
+                appendChat(
+                    ChatItem.Info(
+                        nextChatId(),
+                        "⚠️ Xavfsiz rejim: ilova 2 marta ketma-ket qulagani uchun chat tarixi vaqtincha o'tkazib yuborildi.\n" +
+                        "Yozuvlaringiz (baza) to'liq saqlangan. Muammo sababi: Sozlamalar → 🐞 Xato loglari → 📤 Ulashish."
+                    )
+                )
+                _state.update { it.copy(restored = true) }
+                restored = true
+                runCatching { ensureDebtReminder() }
+                return@launch
+            }
             // Og'ir disk o'qish + JSON parse — fon thread'da (Main qotmasin, tez ochilsin)
             val list = withContext(Dispatchers.Default) {
                 val json = runCatching { chatStore.load() }.getOrDefault("")
@@ -1883,7 +1899,8 @@ class TodayViewModel @Inject constructor(
     /** Tez to'ldirish chipi: joriy qatorga qo'shadi (masalan "muborak" → "muborak a20") */
     fun applyQuickFill(fill: String) {
         val cur = state.value.input.trimEnd()
-        val newInput = if (cur.isEmpty()) fill else "$cur $fill"
+        // v146: chip'dan keyin 1 ta probel — keyingi yozuv zich yopishmasin
+        val newInput = if (cur.isEmpty()) "$fill " else "$cur $fill "
         onInputChange(newInput)
     }
 

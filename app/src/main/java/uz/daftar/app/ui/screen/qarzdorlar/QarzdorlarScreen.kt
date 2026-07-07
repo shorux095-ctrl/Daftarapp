@@ -67,8 +67,22 @@ fun QarzdorlarScreen(
                     modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFFFEEC2)).padding(horizontal = 14.dp, vertical = 8.dp)
                 ) { Text("${s.debtors.size} qarzdor", fontWeight = FontWeight.SemiBold, color = Color(0xFF8A6D00)) }
             }
+            // v148: 🏆 Reyting / 📅 Kun rejimi
+            Row(modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)) {
+                FilterChip(
+                    selected = s.rating,
+                    onClick = { vm.setRating(true) },
+                    label = { Text("🏆 Reyting") }
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = !s.rating,
+                    onClick = { vm.setRating(false) },
+                    label = { Text("📅 Kun bo'yicha") }
+                )
+            }
             Text(
-                "  Eng yangi qarzlar (oz kun) yuqorida",
+                if (s.rating) "  Eng katta qarz yuqorida" else "  Eng yangi qarzlar (oz kun) yuqorida",
                 fontSize = 11.sp, color = Color(0xFF9AA0A6),
                 modifier = Modifier.padding(start = 16.dp, bottom = 6.dp)
             )
@@ -80,7 +94,7 @@ fun QarzdorlarScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(s.debtors, key = { _, d -> d.client }) { i, d ->
-                        DebtorRow(i + 1, d) { onOpenClient(d.client) }
+                        DebtorRow(i + 1, d, s.rating) { onOpenClient(d.client) }
                         HorizontalDivider(color = Color(0x0F000000))
                     }
                     item { Spacer(Modifier.height(20.dp)) }
@@ -91,7 +105,7 @@ fun QarzdorlarScreen(
 }
 
 @Composable
-private fun DebtorRow(rank: Int, d: OverdueDebtor, onClick: () -> Unit) {
+private fun DebtorRow(rank: Int, d: OverdueDebtor, rating: Boolean, onClick: () -> Unit) {
     // Kun bo'yicha rang: oz kun = yashil, ko'p kun = qizil
     val dayColor = when {
         d.daysOverdue <= 14 -> Color(0xFF2E7D32)
@@ -109,12 +123,24 @@ private fun DebtorRow(rank: Int, d: OverdueDebtor, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Yuk turi rangi — yagona standart (yukRangi)
+        // v148: Reyting rejimida — o'rin (🥇🥈🥉 / #4...), Kun rejimida — yuk turi harfi
         val typeColor = yukRangi(d.topType)
-        Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(typeColor.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center
-        ) { Text(d.topType?.uppercase() ?: "$rank", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = typeColor) }
+        if (rating) {
+            val medal = when (rank) { 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> null }
+            Box(
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                    .background(if (medal != null) Color(0xFFFFF6DC) else Color(0xFFF0F2F5)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (medal != null) Text(medal, fontSize = 16.sp)
+                else Text("#$rank", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF5B6470))
+            }
+        } else {
+            Box(
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(typeColor.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) { Text(d.topType?.uppercase() ?: "$rank", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = typeColor) }
+        }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(d.client.replaceFirstChar { it.uppercase() }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1A1A1A))

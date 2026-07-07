@@ -83,6 +83,10 @@ private val NeutralBg = Color(0xFFF3F5F8)
 private val NeutralRing = Color(0xFF9AA4B2)
 private val HeaderBlue = Color(0xFF3366FF)
 private val LineGray = Color(0xFFE9ECF1)
+// v146: jadval sonlari ranglari — T yashil, N ko'k, P qizil
+private val TColV2 = Color(0xFF16A34A)
+private val NColV2 = Color(0xFF2563EB)
+private val PColV2 = Color(0xFFD32F2F)
 
 // Farq: musbat → YASHIL, manfiy → qizil
 private fun farqStr(v: Long): String = if (v > 0) "+${v.formatMoney()}" else v.formatMoney()
@@ -174,7 +178,7 @@ fun YukReportScreen(
                             contentPadding = PaddingValues(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            item { SoniCardsRow(cr, coverDenom) }
+                            item { SoniHeroCard(cr, state.yearly) }
                             item { SoniTableCard(cr) }
                             item { SoniJamiCard(cr) }
                         }
@@ -291,52 +295,62 @@ fun YukReportScreen(
  */
 @Composable
 private fun HeroFarqCard(report: YukReport, yearly: Boolean) {
+    // v146: OCHROQ, chiroyliroq — yumshoq mint gradient fon, farq yashil/qizil aniq ko'rinadi
     val pos = report.jamiFarq >= 0
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF2F7D6D))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFFEFFBF6), Color(0xFFD9F1E8))
+                )
+            )
+            .border(1.dp, Color(0xFF2F7D6D).copy(alpha = 0.30f), RoundedCornerShape(22.dp))
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        Text(
-            if (yearly) "YILLIK FARQ" else "OYLIK FARQ",
-            color = Color.White.copy(alpha = 0.85f),
-            fontSize = 12.sp, fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (pos) "📈" else "📉", fontSize = 16.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (yearly) "YILLIK FARQ" else "OYLIK FARQ",
+                color = Color(0xFF2F7D6D),
+                fontSize = 12.sp, fontWeight = FontWeight.Bold
+            )
+        }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 farqStr(report.jamiFarq),
-                color = if (pos) Color(0xFF9CFFC7) else Color(0xFFFFB4AB),
+                color = if (pos) TColV2 else PColV2,
                 fontSize = 36.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 1, softWrap = false
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 "so'm",
-                color = Color.White.copy(alpha = 0.8f),
+                color = Color(0xFF5B7A72),
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 5.dp)
             )
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth()) {
-            HeroMini("T narx", report.jamiT, Modifier.weight(1f))
-            HeroMini("N narx", report.jamiN, Modifier.weight(1f))
-            HeroMini("Pul", report.jamiP, Modifier.weight(1f))
+            HeroMini("T narx", report.jamiT, TColV2, Modifier.weight(1f))
+            HeroMini("N narx", report.jamiN, NColV2, Modifier.weight(1f))
+            HeroMini("Pul", report.jamiP, PColV2, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun HeroMini(label: String, value: Long, modifier: Modifier = Modifier) {
+private fun HeroMini(label: String, value: Long, color: Color, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+        Text(label, color = Color(0xFF5B7A72), fontSize = 11.sp)
         Spacer(Modifier.height(2.dp))
         Text(
             value.formatMoney(),
-            color = Color.White,
+            color = color,
             fontSize = 15.sp, fontWeight = FontWeight.Bold,
             maxLines = 1, softWrap = false
         )
@@ -493,10 +507,8 @@ private fun StatsCard(report: YukReport) {
 
 @Composable
 private fun TableCard(report: YukReport, onCellClick: ((String, Char) -> Unit)? = null) {
-    val maxT = (report.rows.maxOfOrNull { it.tTotal } ?: 0L).coerceAtLeast(1L)
-    val maxN = (report.rows.maxOfOrNull { it.nTotal } ?: 0L).coerceAtLeast(1L)
-    val maxP = (report.rows.maxOfOrNull { it.pTotal } ?: 0L).coerceAtLeast(1L)
-
+    // v146: rangli chiziqlar O'CHIRILDI — sonlar RANGLI va ustun O'RTASIDA
+    // T — yashil, N — ko'k, P — qizil
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -508,14 +520,14 @@ private fun TableCard(report: YukReport, onCellClick: ((String, Char) -> Unit)? 
             verticalAlignment = Alignment.CenterVertically
         ) {
             HCell("Sana", 1.0f, TextAlign.Start)
-            HCell("T", 1.4f, TextAlign.Start)
-            HCell("N", 1.4f, TextAlign.Start)
-            HCell("P", 1.4f, TextAlign.Start)
+            HCell("T", 1.4f, TextAlign.Center)
+            HCell("N", 1.4f, TextAlign.Center)
+            HCell("P", 1.4f, TextAlign.Center)
             HCell("Farq", 1.05f, TextAlign.End)
         }
         report.rows.forEachIndexed { i, row ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -524,9 +536,9 @@ private fun TableCard(report: YukReport, onCellClick: ((String, Char) -> Unit)? 
                         .then(if (onCellClick != null) Modifier.clickable { onCellClick(row.label, 'a') } else Modifier),
                     fontSize = 11.sp, fontFamily = FontFamily.Monospace
                 )
-                BarCell(row.tTotal, maxT, TRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 't') } })
-                BarCell(row.nTotal, maxN, NRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'n') } })
-                BarCell(row.pTotal, maxP, PRing, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'p') } })
+                NumCell(row.tTotal, TColV2, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 't') } })
+                NumCell(row.nTotal, NColV2, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'n') } })
+                NumCell(row.pTotal, PColV2, 1.4f, onClick = onCellClick?.let { cb -> { cb(row.label, 'p') } })
                 Text(
                     farqStr(row.farq), modifier = Modifier.weight(1.05f),
                     fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
@@ -536,6 +548,19 @@ private fun TableCard(report: YukReport, onCellClick: ((String, Char) -> Unit)? 
             if (i < report.rows.size - 1) HorizontalDivider(color = LineGray)
         }
     }
+}
+
+/** v146: chiziqsiz, RANGLI son — ustun o'rtasida */
+@Composable
+private fun RowScope.NumCell(value: Long, color: Color, weight: Float, onClick: (() -> Unit)? = null) {
+    Text(
+        value.formatMoney(),
+        modifier = Modifier.weight(weight)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 2.dp),
+        fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center, color = color, maxLines = 1, softWrap = false
+    )
 }
 
 @Composable
@@ -574,19 +599,20 @@ private fun RowScope.HCell(text: String, weight: Float, align: TextAlign) {
 
 @Composable
 private fun JamiCard(report: YukReport) {
+    // v146: JAMI ham teal uslubda, sonlar T-yashil N-ko'k P-qizil
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFEFF3FF))
-            .border(1.dp, HeaderBlue.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+            .background(Color(0xFFE9F7F2))
+            .border(1.dp, Color(0xFF2F7D6D).copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("JAMI", modifier = Modifier.width(54.dp), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        JamiCol(Modifier.weight(1f), "T", report.jamiT.formatMoney(), TBlue)
-        JamiCol(Modifier.weight(1f), "N", report.jamiN.formatMoney(), NGreen)
-        JamiCol(Modifier.weight(1f), "P", report.jamiP.formatMoney(), PPurple)
+        Text("JAMI", modifier = Modifier.width(54.dp), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF2F7D6D))
+        JamiCol(Modifier.weight(1f), "T", report.jamiT.formatMoney(), TColV2)
+        JamiCol(Modifier.weight(1f), "N", report.jamiN.formatMoney(), NColV2)
+        JamiCol(Modifier.weight(1f), "P", report.jamiP.formatMoney(), PColV2)
         JamiCol(Modifier.weight(1f), "Farq", farqStr(report.jamiFarq), farqColor(report.jamiFarq))
     }
 }
@@ -645,11 +671,64 @@ private fun SoniCard(
     }
 }
 
+/** v147: Soni rejimi ham mint-teal uslubda — katta jami dona + har tur o'z rangida */
+@Composable
+private fun SoniHeroCard(cr: YukCountReport, yearly: Boolean) {
+    val grand = TYPES.sumOf { cr.totals[it] ?: 0.0 }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFFEFFBF6), Color(0xFFD9F1E8))
+                )
+            )
+            .border(1.dp, Color(0xFF2F7D6D).copy(alpha = 0.30f), RoundedCornerShape(22.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("📦", fontSize = 16.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (yearly) "YILLIK YUK SONI" else "OYLIK YUK SONI",
+                color = Color(0xFF2F7D6D),
+                fontSize = 12.sp, fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                grand.formatQty(),
+                color = Color(0xFF2F7D6D),
+                fontSize = 36.sp, fontWeight = FontWeight.ExtraBold,
+                maxLines = 1, softWrap = false
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("dona", color = Color(0xFF5B7A72), fontSize = 14.sp, modifier = Modifier.padding(bottom = 5.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth()) {
+            TYPES.forEachIndexed { i, t ->
+                val (c, _, _) = typeColors(t)
+                val v = cr.totals[t] ?: 0.0
+                Column(Modifier.weight(1f)) {
+                    Text(LETTERS[i], color = Color(0xFF5B7A72), fontSize = 11.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        if (v > 0) v.formatQty() else "—",
+                        color = c, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, softWrap = false
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SoniTableCard(cr: YukCountReport) {
-    val maxes = TYPES.associateWith { t ->
-        (cr.rows.maxOfOrNull { it.counts[t] ?: 0.0 } ?: 0.0).coerceAtLeast(1.0)
-    }
+    // v147: chiziqlar o'chirildi — sonlar rangli va O'RTADA
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -661,11 +740,11 @@ private fun SoniTableCard(cr: YukCountReport) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             HCell("Sana", 1.1f, TextAlign.Start)
-            LETTERS.forEach { HCell(it, 1f, TextAlign.End) }
+            LETTERS.forEach { HCell(it, 1f, TextAlign.Center) }
         }
         cr.rows.forEachIndexed { i, row ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -675,7 +754,7 @@ private fun SoniTableCard(cr: YukCountReport) {
                 TYPES.forEach { t ->
                     val v = row.counts[t] ?: 0.0
                     val (c, _, _) = typeColors(t)
-                    SoniCell(v, maxes[t] ?: 1.0, c, 1f)
+                    SoniCell(v, c, 1f)
                 }
             }
             if (i < cr.rows.size - 1) HorizontalDivider(color = LineGray)
@@ -684,44 +763,30 @@ private fun SoniTableCard(cr: YukCountReport) {
 }
 
 @Composable
-private fun RowScope.SoniCell(value: Double, max: Double, color: Color, weight: Float) {
-    val frac = (value / max).coerceIn(0.0, 1.0).toFloat()
-    Column(
-        modifier = Modifier.weight(weight).padding(horizontal = 2.dp)
-    ) {
-        Text(
-            if (value > 0) value.formatQty() else "—",
-            modifier = Modifier.fillMaxWidth(),
-            fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End, maxLines = 1, softWrap = false
-        )
-        if (value > 0) {
-            Spacer(Modifier.height(3.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth().height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)).background(color.copy(alpha = 0.16f))
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(frac).height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)).background(color)
-                )
-            }
-        }
-    }
+private fun RowScope.SoniCell(value: Double, color: Color, weight: Float) {
+    Text(
+        if (value > 0) value.formatQty() else "—",
+        modifier = Modifier.weight(weight).padding(vertical = 2.dp),
+        fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        color = if (value > 0) color else Color(0xFFB9C0C9),
+        maxLines = 1, softWrap = false
+    )
 }
 
 @Composable
 private fun SoniJamiCard(cr: YukCountReport) {
+    // v147: mint uslub
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFEFF3FF))
-            .border(1.dp, HeaderBlue.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+            .background(Color(0xFFE9F7F2))
+            .border(1.dp, Color(0xFF2F7D6D).copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             .padding(horizontal = 10.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("∑", modifier = Modifier.width(30.dp), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("∑", modifier = Modifier.width(30.dp), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF2F7D6D))
         TYPES.forEachIndexed { i, t ->
             val (c, _, _) = typeColors(t)
             val v = cr.totals[t] ?: 0.0
