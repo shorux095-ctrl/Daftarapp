@@ -9,7 +9,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import uz.daftar.app.core.pdf.DebtPdf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,6 +36,7 @@ fun QarzdorlarScreen(
     vm: QarzdorlarViewModel = hiltViewModel()
 ) {
     val s by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -42,7 +47,42 @@ fun QarzdorlarScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
-                actions = { uz.daftar.app.ui.common.HomeButton() }
+                actions = {
+                    // v150: 📄 PDF — qarzdorlar ro'yxatini ilovasiz ham ochiladigan faylga chiqarish
+                    IconButton(onClick = {
+                        runCatching {
+                            val now = java.time.LocalDate.now()
+                            val body = buildList {
+                                s.debtors.forEachIndexed { i, d ->
+                                    add("${i + 1}. ${d.client.replaceFirstChar { c -> c.uppercase() }}")
+                                    add("   Qarz: ${d.debt.formatMoney()} so'm   (${d.daysOverdue} kun)")
+                                }
+                                if (s.debtors.isEmpty()) add("Qarzdor yo'q")
+                            }
+                            val file = DebtPdf.create(
+                                context = context,
+                                title = "QARZDORLAR RO'YXATI",
+                                headerLines = listOf(
+                                    "Sana: %02d.%02d.%04d".format(now.dayOfMonth, now.monthValue, now.year),
+                                    "Tartib: " + if (s.rating) "eng katta qarz yuqorida" else "yangi qarzlar yuqorida",
+                                    "Jami: ${s.debtors.size} qarzdor"
+                                ),
+                                bodyLines = body,
+                                footerLines = listOf("JAMI QARZ: ${s.totalDebt.formatMoney()} so'm")
+                            )
+                            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "application/pdf"
+                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(send, "Qarzdorlar PDF"))
+                        }.onFailure {
+                            android.widget.Toast.makeText(context, "PDF xato: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }) { Icon(Icons.Outlined.PictureAsPdf, contentDescription = "PDF") }
+                    uz.daftar.app.ui.common.HomeButton()
+                }
             )
         }
     ) { padding ->
