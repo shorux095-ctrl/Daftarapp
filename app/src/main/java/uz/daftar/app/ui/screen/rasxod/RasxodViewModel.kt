@@ -79,6 +79,12 @@ class RasxodViewModel @Inject constructor(
         load()
     }
 
+    /** v151: yillik jadvalda oy bosilsa — o'sha OY ochiladi */
+    fun openMonth(m: Int) {
+        _state.update { it.copy(period = RasxodPeriod.MONTH, anchor = LocalDate.of(it.anchor.year, m, 1)) }
+        load()
+    }
+
     private fun shift(d: LocalDate, p: RasxodPeriod, dir: Int): LocalDate = when (p) {
         RasxodPeriod.DAY -> d.plusDays(dir.toLong())
         RasxodPeriod.MONTH -> d.plusMonths(dir.toLong())

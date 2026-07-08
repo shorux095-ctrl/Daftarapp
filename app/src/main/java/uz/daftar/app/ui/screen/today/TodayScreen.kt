@@ -4,6 +4,7 @@ import uz.daftar.app.core.util.yukRangi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -743,7 +744,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v150", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v151", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -781,7 +782,9 @@ private fun ChatTopBar(
 
     // ── Ikonkali to'r menyu (pastdan chiqadi) ──
     if (menuOpen) {
-        ModalBottomSheet(onDismissRequest = { onMenuOpenChange(false) }) {
+        // v151: skipPartiallyExpanded — ikki bosqichli "qotib" ochilish o'rniga BIR silliq harakat
+        val menuSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(onDismissRequest = { onMenuOpenChange(false) }, sheetState = menuSheetState) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

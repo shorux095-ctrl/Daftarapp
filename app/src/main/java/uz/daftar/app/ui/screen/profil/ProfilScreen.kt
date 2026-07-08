@@ -373,6 +373,42 @@ fun ProfilScreen(
                 }
             )
 
+            // v151: 📥 Import — eski bot .db yoki .csv fayldan (Sozlamalardan shu yerga ko'chirildi)
+            val importMsg by vm.importMsg.collectAsStateWithLifecycle()
+            val ctxImp = androidx.compose.ui.platform.LocalContext.current
+            val scopeImp = androidx.compose.runtime.rememberCoroutineScope()
+            val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null) {
+                    scopeImp.launch {
+                        val res = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching {
+                                val tmp = java.io.File(ctxImp.cacheDir, "import_tmp.bin")
+                                ctxImp.contentResolver.openInputStream(uri)?.use { inp -> tmp.outputStream().use { o -> inp.copyTo(o) } }
+                                val header = ByteArray(16)
+                                tmp.inputStream().use { it.read(header) }
+                                if (String(header).startsWith("SQLite format 3")) tmp.absolutePath to true
+                                else tmp.readText() to false
+                            }.getOrNull()
+                        }
+                        if (res != null) { if (res.second) vm.importDb(res.first) else vm.importCsv(res.first) }
+                    }
+                }
+            }
+            androidx.compose.runtime.LaunchedEffect(importMsg) {
+                importMsg?.let {
+                    android.widget.Toast.makeText(ctxImp, it, android.widget.Toast.LENGTH_LONG).show()
+                    if (!it.startsWith("⏳")) vm.clearImportMsg()
+                }
+            }
+            SettingsItem(
+                icon = Icons.Outlined.Download,
+                title = "📥 Import",
+                subtitle = "Eski bot .db yoki .csv fayldan ma'lumot ko'chirish",
+                onClick = { importLauncher.launch("*/*") }
+            )
+
             Spacer(Modifier.height(16.dp))
         }
     }

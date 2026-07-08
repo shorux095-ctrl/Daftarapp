@@ -115,6 +115,10 @@ class SettingsViewModel @Inject constructor(
         .map { !it.isNullOrBlank() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** v151: joriy PIN qiymati — dialogda ESKI kodni tekshirish uchun */
+    val pinValue: kotlinx.coroutines.flow.StateFlow<String?> =
+        lockManager.pinCode.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     fun setLockEnabled(enabled: Boolean) {
         viewModelScope.launch {
             lockManager.setLockEnabled(enabled)

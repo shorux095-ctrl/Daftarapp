@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
@@ -177,9 +178,9 @@ fun RasxodScreen(
             }
 
             // Har oy xarajat (faqat Yil ko'rinishida)
-            if (state.period == RasxodPeriod.YEAR && state.monthlyBreakdown.any { it.total > 0 }) {
+            if (state.period == RasxodPeriod.YEAR) {
                 item {
-                    val maxM = state.monthlyBreakdown.maxOf { it.total }.coerceAtLeast(1)
+                    val maxM = (state.monthlyBreakdown.maxOfOrNull { it.total } ?: 0L).coerceAtLeast(1)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -187,12 +188,15 @@ fun RasxodScreen(
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text("📊 Har oy xarajat", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A1A1A))
+                            Text("Oy ustiga bosing — o'sha oy ochiladi", fontSize = 11.sp, color = Color(0xFF9AA0A6))
                             Spacer(Modifier.height(10.dp))
                             state.monthlyBreakdown.forEach { mr ->
                                 val frac = (mr.total.toFloat() / maxM).coerceIn(0f, 1f)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clickable { vm.openMonth(mr.month) }
+                                        .padding(vertical = 5.dp)
                                 ) {
                                     Text(MONTHS_RZ[mr.month - 1], fontSize = 13.sp, color = Color(0xFF555555), modifier = Modifier.width(42.dp))
                                     Box(modifier = Modifier.weight(1f).height(18.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFFECECEF))) {
@@ -345,7 +349,8 @@ fun RasxodScreen(
                 }
             }
 
-            item {
+            // v151: YILLIK rejimda ro'yxat ko'rsatilmaydi — 12 oylik jadval yetarli
+            if (state.period != RasxodPeriod.YEAR) item {
                 Text(
                     "Xarajatlar ro'yxati",
                     style = MaterialTheme.typography.titleMedium,
@@ -354,7 +359,9 @@ fun RasxodScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            if (state.items.isEmpty()) {
+            if (state.period == RasxodPeriod.YEAR) {
+                // yillikda ro'yxat yo'q
+            } else if (state.items.isEmpty()) {
                 item {
                     Text("📭 Hali xarajat yo'q", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

@@ -70,6 +70,7 @@ fun SettingsScreen(
 ) {
     val lockEnabled by vm.lockEnabled.collectAsStateWithLifecycle()
     val pinSet by vm.pinSet.collectAsStateWithLifecycle()
+    val pinValue by vm.pinValue.collectAsStateWithLifecycle()
     val importMsg by vm.importMsg.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
@@ -149,13 +150,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 1) Import (eski bot .db yoki .csv)
-            SettingsItem(
-                icon = Icons.Outlined.Download,
-                title = "📥 Import",
-                subtitle = "Eski bot .db yoki .csv fayldan ma'lumot ko'chirish",
-                onClick = { importLauncher.launch("*/*") }
-            )
+            // v151: 📥 Import — Profil (👤) ichiga ko'chirildi
             // Ko'rinish (mavzu)
             Text(
                 "🎨 Ko'rinish",
@@ -332,6 +327,7 @@ fun SettingsScreen(
             if (showPinDialog) {
                 PinDialog(
                     pinSet = pinSet,
+                    currentPin = pinValue,
                     onSave = { newPin -> vm.setPin(newPin); showPinDialog = false },
                     onRemove = { vm.setPin(null); showPinDialog = false },
                     onDismiss = { showPinDialog = false }
@@ -344,26 +340,83 @@ fun SettingsScreen(
 @Composable
 private fun PinDialog(
     pinSet: Boolean,
+    currentPin: String?,
     onSave: (String) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var pin by remember { mutableStateOf("") }
+    var oldPin by remember { mutableStateOf("") }
+    var forgot by remember { mutableStateOf(false) }
+    var confirmWord by remember { mutableStateOf("") }
+    val oldOk = !pinSet || oldPin.trim() == (currentPin ?: "")
+
+    if (forgot) {
+        // v151: 🆘 KODNI UNUTDIM — PIN o'chiriladi, yozuvlarga tegilmaydi
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("🆘 Kodni unutdim") },
+            text = {
+                Column {
+                    Text(
+                        "PIN kod O'CHIRILADI — yozuvlaringizga tegilmaydi, faqat qulf olinadi. " +
+                        "Keyin xohlasangiz yangi kod qo'yasiz.\nTasdiqlash uchun quyiga OCHIR deb yozing:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = confirmWord,
+                        onValueChange = { confirmWord = it },
+                        label = { Text("OCHIR deb yozing") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = confirmWord.trim().uppercase() in listOf("OCHIR", "O'CHIR"),
+                    onClick = onRemove
+                ) { Text("PIN o'chirilsin") }
+            },
+            dismissButton = { TextButton(onClick = { forgot = false }) { Text("Orqaga") } }
+        )
+        return
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (pinSet) "PIN kodni o'zgartirish" else "PIN kod o'rnatish") },
         text = {
             Column {
+                if (pinSet) {
+                    Text(
+                        "Avval JORIY kodni kiriting:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = oldPin,
+                        onValueChange = { if (it.length <= 6 && it.all { ch -> ch.isDigit() }) oldPin = it },
+                        label = { Text("Joriy PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        isError = oldPin.isNotEmpty() && !oldOk
+                    )
+                    TextButton(onClick = { forgot = true }) { Text("🆘 Kodni unutdim") }
+                    Spacer(Modifier.height(4.dp))
+                }
                 Text(
-                    "4-6 raqamli kod kiriting.",
+                    if (pinSet) "Yangi 4-6 raqamli kod:" else "4-6 raqamli kod kiriting.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (it.length <= 6 && it.all { ch -> ch.isDigit() }) pin = it },
-                    label = { Text("PIN") },
+                    label = { Text(if (pinSet) "Yangi PIN" else "PIN") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
@@ -372,13 +425,13 @@ private fun PinDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (pin.length >= 4) onSave(pin) },
-                enabled = pin.length >= 4
+                onClick = { if (pin.length >= 4 && oldOk) onSave(pin) },
+                enabled = pin.length >= 4 && oldOk
             ) { Text("Saqlash") }
         },
         dismissButton = {
             if (pinSet) {
-                TextButton(onClick = onRemove) { Text("O'chirish") }
+                TextButton(onClick = onRemove, enabled = oldOk) { Text("O'chirish") }
             } else {
                 TextButton(onClick = onDismiss) { Text("Bekor") }
             }
