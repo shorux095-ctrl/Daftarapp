@@ -16,6 +16,10 @@ import uz.daftar.app.data.db.entity.YukNarxEntity
 
 @Dao
 interface PriceHistoryDao {
+    /** v152: mijoz nomi o'zgarganda narx tarixi ham yangi nomga o'tadi */
+    @Query("UPDATE price_history SET client_name = :newName WHERE user_id = :userId AND LOWER(client_name) = LOWER(:oldName)")
+    suspend fun renameClient(userId: Long, oldName: String, newName: String): Int
+
     @Query("DELETE FROM price_history WHERE user_id = :userId")
     suspend fun clearAll(userId: Long)
 
@@ -54,6 +58,13 @@ interface PriceHistoryDao {
 
 @Dao
 interface ClientPriceDao {
+    /** v152: rename — yangi nomda yozuv bo'lsa u ustun (IGNORE), eski qoldiq o'chiriladi */
+    @Query("UPDATE OR IGNORE client_prices SET client_name = :newName WHERE user_id = :userId AND LOWER(client_name) = LOWER(:oldName)")
+    suspend fun renameClient(userId: Long, oldName: String, newName: String): Int
+
+    @Query("DELETE FROM client_prices WHERE user_id = :userId AND LOWER(client_name) = LOWER(:oldName)")
+    suspend fun deleteLeftover(userId: Long, oldName: String): Int
+
     @Query("DELETE FROM client_prices WHERE user_id = :userId")
     suspend fun clearAll(userId: Long)
 

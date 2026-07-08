@@ -24,7 +24,8 @@ import kotlin.math.roundToLong
  */
 class CalculateDebtUseCase @Inject constructor(
     private val txDao: TransactionDao,
-    private val priceDao: PriceHistoryDao
+    private val priceDao: PriceHistoryDao,
+    private val clientPriceDao: uz.daftar.app.data.db.dao.ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, clientName: String): Long {
         val cn = clientName.lowercase()
@@ -38,6 +39,13 @@ class CalculateDebtUseCase @Inject constructor(
         val pricesByType: Map<String, List<PriceHistoryEntity>> =
             allPrices.groupBy { it.priceType }
                 .mapValues { e -> e.value.sortedBy { it.date } }
+        // v152: price_history'da yo'q tur uchun client_prices fallback —
+        // endi Qarzdorlar bilan kunlik hisobot BIR XIL raqam ko'rsatadi
+        val cp = runCatching { clientPriceDao.get(userId, cn) }.getOrNull()
+        fun fallbackPrice(type: String): Double? = when (type) {
+            "a" -> cp?.aPrice; "b" -> cp?.bPrice; "c" -> cp?.cPrice
+            "d" -> cp?.dPrice; "k" -> cp?.kPrice; else -> null
+        }
 
         // 3) Har tranzaksiya uchun qarzga qo'shamiz/ayiramiz
         var debt = 0.0
@@ -49,6 +57,7 @@ class CalculateDebtUseCase @Inject constructor(
                     // QARZ = N narx (SOTUV narxi). tOverride (tannarx/T) QARZDA ISHLATILMAYDI!
                     // tannarx faqat foyda hisobida kerak, qarzda emas.
                     val price = findPriceFor(pricesByType[tx.type], tx.date)
+                        ?: fallbackPrice(tx.type)
                     if (price != null) {
                         debt += (tx.amount * price).roundToLong()
                     }

@@ -64,7 +64,10 @@ data class DeletedTransactionEntity(
     val amount: Double,
     val date: String,
     @ColumnInfo(name = "deleted_at") val deletedAt: String,
-    @ColumnInfo(defaultValue = "''") val note: String = ""
+    @ColumnInfo(defaultValue = "''") val note: String = "",
+    // v152: tiklashda T1 tarif va t? narx yo'qolmasin
+    @ColumnInfo(name = "t_override") val tOverride: Double? = null,
+    @ColumnInfo(name = "cost_tier") val costTier: String? = null
 )
 
 @Entity(tableName = "client_reminders", primaryKeys = ["user_id", "client_name"])

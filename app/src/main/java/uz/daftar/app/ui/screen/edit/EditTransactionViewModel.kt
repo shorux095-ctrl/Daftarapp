@@ -60,8 +60,8 @@ class EditTransactionViewModel @Inject constructor(
     private fun load() {
         viewModelScope.launch {
             try {
-                val all = txDao.getRange(userId, "0000-00-00 00:00:00", "9999-12-31 23:59:59")
-                val tx = all.firstOrNull { it.id == txId }
+                // v152: butun bazani emas, faqat kerakli yozuvni olamiz (katta bazada ham tez)
+                val tx = txDao.getById(txId)
                 if (tx == null) {
                     _state.update { it.copy(isLoading = false, error = "Yozuv topilmadi") }
                     return@launch
@@ -134,7 +134,7 @@ class EditTransactionViewModel @Inject constructor(
                 editUC(
                     id = 0L,
                     userId = orig.userId,
-                    clientName = s.clientName.trim().ifBlank { orig.clientName },
+                    clientName = uz.daftar.app.core.parser.DaftarParser.normalizeName(s.clientName).ifBlank { orig.clientName },
                     note = note.trim().ifBlank { null },
                     type = type,
                     amount = amt,
@@ -161,12 +161,14 @@ class EditTransactionViewModel @Inject constructor(
         val newDate = s.date.toString() + timePart
         val tOv = s.tNarx.replace(",", ".").toDoubleOrNull()
 
+        // v152: ism parserdagi kabi NORMALIZE qilinadi (bitta mijoz ikkiga bo'linmasin)
+        val cleanName = uz.daftar.app.core.parser.DaftarParser.normalizeName(s.clientName).ifBlank { orig.clientName }
         viewModelScope.launch {
             try {
                 editUC(
                     id = if (asNew) 0L else orig.id,
                     userId = orig.userId,
-                    clientName = s.clientName.trim().ifBlank { orig.clientName },
+                    clientName = cleanName,
                     note = s.note.trim().ifBlank { null },
                     type = s.type,
                     amount = amt,
@@ -180,7 +182,8 @@ class EditTransactionViewModel @Inject constructor(
                         priceDao.insert(
                             PriceHistoryEntity(
                                 userId = orig.userId,
-                                clientName = orig.clientName.lowercase(),
+                                // v152: narx YANGI (tahrirlangan) ismga yoziladi — eski xato: orig.clientName
+                                clientName = cleanName.lowercase(),
                                 priceType = s.type.code,
                                 price = n,
                                 date = newDate

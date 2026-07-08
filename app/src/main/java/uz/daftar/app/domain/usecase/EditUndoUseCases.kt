@@ -6,12 +6,21 @@ import javax.inject.Inject
 
 /** Oxirgi saqlangan yozuvni (bitta save guruhini) bekor qiladi. */
 class UndoLastUseCase @Inject constructor(
-    private val txDao: TransactionDao
+    private val txDao: TransactionDao,
+    private val toKarzina: DeleteToKarzinaUseCase
 ) {
-    /** @return bekor qilingan mijoz nomi yoki null (yozuv yo'q) */
+    /**
+     * v152: FAQAT oxirgi saqlash guruhini bekor qiladi (ID chegarasi bilan) —
+     * bir xil sanadagi (12:00:00) ESKI yozuvlarga tegmaydi.
+     * O'chirilganlar KARZINAGA tushadi — 7 kun ichida tiklash mumkin.
+     * @return bekor qilingan mijoz nomi yoki null (yozuv yo'q)
+     */
     suspend operator fun invoke(userId: Long): String? {
         val last = txDao.getLast(userId) ?: return null
-        txDao.deleteSave(userId, last.clientName, last.date)
+        val boundary = txDao.maxIdExcept(userId, last.clientName, last.date) ?: 0L
+        val group = txDao.getSaveGroupAfter(userId, last.clientName, last.date, boundary)
+        if (group.isEmpty()) return null
+        group.forEach { toKarzina(it) }
         return last.clientName
     }
 }
@@ -43,7 +52,9 @@ class EditByMatchUseCase @Inject constructor(
             type = newType,
             amount = newAmount,
             date = match.date,
-            tOverride = match.tOverride
+            tOverride = match.tOverride,
+            costTier = match.costTier,
+            note = match.note
         )
         return Result(true, "✅ ${clientName.replaceFirstChar { it.uppercase() }}: ${oldType.code.uppercase()}${oldAmount.toLong()} → ${newType.code.uppercase()}${newAmount.toLong()}")
     }

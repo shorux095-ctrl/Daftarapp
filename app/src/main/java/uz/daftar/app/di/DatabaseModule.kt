@@ -12,6 +12,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import javax.inject.Singleton
 
+/** v4 -> v5: karzina jadvaliga t_override va cost_tier — tiklashda tarif/narx yo'qolmasin */
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `deleted_transactions` ADD COLUMN `t_override` REAL")
+        db.execSQL("ALTER TABLE `deleted_transactions` ADD COLUMN `cost_tier` TEXT")
+    }
+}
+
 /** v3 -> v4: transactions jadvaliga `note` (izoh) ustuni qo'shiladi — mavjud ma'lumot saqlanadi */
 private val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -49,7 +57,7 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    private const val DB_VERSION = 3
+    private const val DB_VERSION = 5  // v152: haqiqiy versiya bilan tenglashtirildi (premigration zaxira to'g'ri ishlashi uchun)
 
     @Provides
     @Singleton
@@ -78,7 +86,7 @@ object DatabaseModule {
             DaftarDatabase::class.java,
             DaftarDatabase.NAME
         )
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 

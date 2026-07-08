@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import androidx.room.withTransaction
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -64,6 +65,7 @@ class QuickAddActivity : ComponentActivity() {
 
     @Inject lateinit var addTx: AddTransactionUseCase
     @Inject lateinit var repo: TransactionRepository
+    @Inject lateinit var db: uz.daftar.app.data.db.DaftarDatabase
     @Inject lateinit var chatStore: uz.daftar.app.core.chat.ChatStore
     private val userId: Long = 1L
 
@@ -235,12 +237,14 @@ class QuickAddActivity : ComponentActivity() {
     }
 
     private suspend fun saveText(text: String): Int {
+        // v152: ATOMIK — barcha qatorlar bitta tranzaksiyada (yarim saqlash bo'lmaydi)
         var count = 0
-        for (line in text.lines()) {
-            if (line.isBlank()) continue
-            val r = DaftarParser.parse(line)
-            if (r is ParseResult.Success) {
-                runCatching { addTx(userId, r.entry) }.onSuccess {
+        db.withTransaction {
+            for (line in text.lines()) {
+                if (line.isBlank()) continue
+                val r = DaftarParser.parse(line)
+                if (r is ParseResult.Success) {
+                    addTx(userId, r.entry)
                     count++
                     runCatching { chatStore.addPending(line.trim()) }
                 }

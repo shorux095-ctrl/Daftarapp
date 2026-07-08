@@ -43,10 +43,5 @@ class EditTransactionUseCase @Inject constructor(
  * Tranzaksiyani o'chirish — karzinaga ko'chiriladi (7 kun saqlanadi).
  * Bot.py'dagi "x" handleriga ekvivalent.
  */
-class DeleteTransactionUseCase @Inject constructor(
-    private val txDao: TransactionDao
-) {
-    suspend operator fun invoke(id: Long) {
-        txDao.deleteById(id)
-    }
-}
+// v152: DeleteTransactionUseCase OLIB TASHLANDI — karzinani chetlab o'tardi.
+// O'chirish uchun faqat DeleteToKarzinaUseCase ishlatilsin.

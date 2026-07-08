@@ -417,7 +417,8 @@ data class OverdueDebtor(
 
 class GetOverdueDebtorsUseCase @Inject constructor(
     private val txDao: TransactionDao,
-    private val priceDao: PriceHistoryDao
+    private val priceDao: PriceHistoryDao,
+    private val clientPriceDao: uz.daftar.app.data.db.dao.ClientPriceDao
 ) {
     // TEZLIK/KESH: ochilganda getOverdue 2-3 marta chaqiriladi (eslatma + karta + bosh ekran).
     // Qisqa kesh shu burst'ni birlashtiradi — ko'p tranzaksiyada ham qayta-qayta hisoblanmaydi.
@@ -436,6 +437,8 @@ class GetOverdueDebtorsUseCase @Inject constructor(
         // TEZLIK: har mijoz uchun alohida so'rov o'rniga — HAMMASI 2 ta so'rovda
         val allTxs = txDao.getRange(userId, "2000-01-01", today.plusDays(1).toString())
         val txByClient = allTxs.groupBy { it.clientName.lowercase() }   // getRange allaqachon date bo'yicha tartibli
+        val cpByClient = runCatching { clientPriceDao.getAllForUser(userId) }
+            .getOrDefault(emptyList()).associateBy { it.clientName.lowercase() }
         val pricesByClient = priceDao.getAllForUser(userId)
             .groupBy { it.clientName.lowercase() }
             .mapValues { (_, l) -> l.sortedBy { it.date }.groupBy { it.priceType } }
@@ -443,7 +446,23 @@ class GetOverdueDebtorsUseCase @Inject constructor(
         for ((cn, txs) in txByClient) {
             if (txs.isEmpty()) continue
             val name = txs.first().clientName
-            val pricesByType = pricesByClient[cn] ?: emptyMap()
+            val pricesByType0 = pricesByClient[cn] ?: emptyMap()
+            // v152: price_history bo'sh tur uchun client_prices fallback —
+            // Qarzdorlar endi kunlik hisobot bilan BIR XIL narx mantiqda ishlaydi
+            val cpRow = cpByClient[cn]
+            val pricesByType = if (cpRow == null) pricesByType0 else buildMap {
+                putAll(pricesByType0)
+                fun fb(t: String, v: Double?) {
+                    if (v != null && this[t].isNullOrEmpty()) {
+                        put(t, listOf(uz.daftar.app.data.db.entity.PriceHistoryEntity(
+                            userId = userId, clientName = cn, priceType = t,
+                            price = v, date = "0000-01-01 00:00:00"
+                        )))
+                    }
+                }
+                fb("a", cpRow.aPrice); fb("b", cpRow.bPrice); fb("c", cpRow.cPrice)
+                fb("d", cpRow.dPrice); fb("k", cpRow.kPrice)
+            }
             // Pure hisob — DebtMath (unit test bilan qoplangan)
             val cb = DebtMath.clientBalance(txs, pricesByType, today) ?: continue
             // Asosiy yuk turi (eng ko'p miqdordagi) — rang uchun

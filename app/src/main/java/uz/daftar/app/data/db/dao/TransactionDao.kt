@@ -56,8 +56,17 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE user_id = :userId ORDER BY id DESC LIMIT 1")
     suspend fun getLast(userId: Long): TransactionEntity?
 
+    @Deprecated("v152: XAVFLI — retro yozuvlar (12:00:00) bir sanada to'planadi, begona yozuv o'chishi mumkin. UndoLast endi ID bo'yicha karzina orqali ishlaydi.")
     @Query("DELETE FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND date = :date")
     suspend fun deleteSave(userId: Long, clientName: String, date: String): Int
+
+    /** v152: oxirgi saqlash guruhi chegarasi — boshqa (client/date) yozuvlarning eng katta id'si */
+    @Query("SELECT MAX(id) FROM transactions WHERE user_id = :userId AND NOT (LOWER(client_name) = LOWER(:clientName) AND date = :date)")
+    suspend fun maxIdExcept(userId: Long, clientName: String, date: String): Long?
+
+    /** v152: faqat oxirgi saqlashda kiritilgan yozuvlar (chegaradan keyingilari) */
+    @Query("SELECT * FROM transactions WHERE user_id = :userId AND LOWER(client_name) = LOWER(:clientName) AND date = :date AND id > :afterId")
+    suspend fun getSaveGroupAfter(userId: Long, clientName: String, date: String, afterId: Long): List<uz.daftar.app.data.db.entity.TransactionEntity>
 
     @Query("DELETE FROM transactions WHERE user_id = :userId AND date >= :start AND date < :end")
     suspend fun deleteByDateRange(userId: Long, start: String, end: String): Int

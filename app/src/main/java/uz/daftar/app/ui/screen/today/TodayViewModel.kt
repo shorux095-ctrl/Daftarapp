@@ -35,7 +35,6 @@ import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.AddTransactionUseCase
 import uz.daftar.app.domain.usecase.CalculateDebtUseCase
 import uz.daftar.app.domain.usecase.GetClientUnitPricesUseCase
-import uz.daftar.app.domain.usecase.DeleteTransactionUseCase
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -166,7 +165,6 @@ sealed interface ChatItem {
 class TodayViewModel @Inject constructor(
     private val repo: TransactionRepository,
     private val addTx: AddTransactionUseCase,
-    private val deleteTx: DeleteTransactionUseCase,
     private val delToKarzina: DeleteToKarzinaUseCase,
     private val calcDebt: CalculateDebtUseCase,
     private val templateStore: TemplateStore,

@@ -13,7 +13,9 @@ import javax.inject.Inject
  */
 class AddAliasUseCase @Inject constructor(
     private val aliasDao: AliasDao,
-    private val txDao: TransactionDao
+    private val txDao: TransactionDao,
+    private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, aliasName: String, canonName: String): Result {
         val alias = DaftarParser.normalizeName(aliasName)
@@ -26,6 +28,12 @@ class AddAliasUseCase @Inject constructor(
         aliasDao.upsert(AliasEntity(userId = userId, alias = alias, canon = canon))
         // Eski nom yozuvlarini yangi nomga ko'chirish
         val moved = txDao.renameClient(userId, alias, canon)
+        // v152: NARX jadvallari ham ko'chiriladi (aks holda qarz noto'g'ri kamayib ko'rinardi)
+        runCatching { priceDao.renameClient(userId, alias, canon) }
+        runCatching {
+            clientPriceDao.renameClient(userId, alias, canon)
+            clientPriceDao.deleteLeftover(userId, alias)
+        }
         return Result.Success(moved)
     }
 
@@ -39,13 +47,22 @@ class AddAliasUseCase @Inject constructor(
  * Mijoz nomini qayta nomlash (rename). Alias'dan farqi — alias jadval'ga yozmaydi.
  */
 class RenameClientUseCase @Inject constructor(
-    private val txDao: TransactionDao
+    private val txDao: TransactionDao,
+    private val priceDao: uz.daftar.app.data.db.dao.PriceHistoryDao,
+    private val clientPriceDao: ClientPriceDao
 ) {
     suspend operator fun invoke(userId: Long, oldName: String, newName: String): Int {
         val oldN = DaftarParser.normalizeName(oldName)
         val newN = DaftarParser.normalizeName(newName)
         if (oldN == newN || oldN.isBlank() || newN.isBlank()) return 0
-        return txDao.renameClient(userId, oldN, newN)
+        val moved = txDao.renameClient(userId, oldN, newN)
+        // v152: narx tarixi va mijoz narxlari ham yangi nomga o'tadi
+        runCatching { priceDao.renameClient(userId, oldN, newN) }
+        runCatching {
+            clientPriceDao.renameClient(userId, oldN, newN)
+            clientPriceDao.deleteLeftover(userId, oldN)
+        }
+        return moved
     }
 }
 

@@ -60,6 +60,10 @@ object DaftarParser {
             val yukResult = parseYukToken(pl, parts, i)
             if (yukResult != null) {
                 val (type, amount, advance) = yukResult
+                // v152: manfiy yoki nol miqdor QABUL QILINMAYDI ("ali a-5" qarzni teskari o'zgartirardi)
+                if (amount <= 0.0) {
+                    return ParseResult.Failure(ParseError.InvalidFormat("miqdor musbat bo'lishi kerak ($p)"))
+                }
                 items[type] = (items[type] ?: 0.0) + amount
                 if (type in setOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)) {
                     lastCargoType = type

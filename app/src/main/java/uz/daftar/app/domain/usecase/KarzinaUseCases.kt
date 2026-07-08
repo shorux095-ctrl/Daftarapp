@@ -33,7 +33,9 @@ class RestoreTransactionUseCase @Inject constructor(
                 type = deleted.type,
                 amount = deleted.amount,
                 date = deleted.date,
-                tOverride = null
+                tOverride = deleted.tOverride,
+                costTier = deleted.costTier,
+                note = deleted.note.ifBlank { null }
             )
         )
         // Karzinadan o'chirish
@@ -75,7 +77,9 @@ class DeleteToKarzinaUseCase @Inject constructor(
                 amount = tx.amount,
                 date = tx.date,
                 deletedAt = LocalDateTime.now(ZONE).format(ISO),
-                note = ""
+                note = tx.note ?: "",
+                tOverride = tx.tOverride,
+                costTier = tx.costTier
             )
         )
         // Asl jadvaldan o'chirish
