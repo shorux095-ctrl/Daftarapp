@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.Immutable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -216,8 +217,18 @@ class TodayViewModel @Inject constructor(
                     refreshHistoryCards()
                 }
         }
-        // Tezkor shablonlarni kuzatish
+        // v153: NARX o'zgarishini alohida kuzatamiz — "n c4.1" faqat price_history'ni o'zgartiradi,
+        // transactions o'zgarmaydi, shuning uchun oldingi kuzatuvchi hisobotni yangilamas edi (narx eski ko'rinardi).
         viewModelScope.launch {
+            priceDao.observePriceCount(userId)
+                .drop(1)   // dastlabki qiymat — yangilanish emas
+                .collectLatest {
+                    getOverdue.invalidate()
+                    getDateReport.invalidate()
+                    kotlinx.coroutines.delay(300)
+                    refreshHistoryCards()
+                }
+        }
             templateStore.templates.collectLatest { list ->
                 _state.update { it.copy(templates = list) }
             }

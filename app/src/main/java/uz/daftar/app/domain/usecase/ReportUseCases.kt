@@ -516,7 +516,9 @@ object DebtMath {
                 "p" -> { bal -= tx.amount; if (d != null) lastPaymentDate = d }
                 "q" -> bal += tx.amount
                 else -> {
-                    val pr = tx.tOverride ?: priceAt(pricesByType[tx.type], tx.date)
+                    // v153: QARZ = N (sotuv) narx. tOverride = T (tannarx) — qarzda ISHLATILMAYDI.
+                    // Eski xato: `tx.tOverride ?: priceAt(...)` — narx yangilanganda eski tannarx qotib qolar edi.
+                    val pr = priceAt(pricesByType[tx.type], tx.date)
                     if (pr != null) bal += tx.amount * pr
                 }
             }

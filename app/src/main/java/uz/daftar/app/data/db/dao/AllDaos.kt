@@ -54,6 +54,10 @@ interface PriceHistoryDao {
 
     @Query("SELECT * FROM price_history WHERE user_id = :userId")
     suspend fun getAllForUser(userId: Long): List<PriceHistoryEntity>
+
+    /** v153: narx o'zgarishini kuzatish — narx yangilanganda hisobot/karta darrov yangilanadi */
+    @Query("SELECT COUNT(*) FROM price_history WHERE user_id = :userId")
+    fun observePriceCount(userId: Long): kotlinx.coroutines.flow.Flow<Int>
 }
 
 @Dao
