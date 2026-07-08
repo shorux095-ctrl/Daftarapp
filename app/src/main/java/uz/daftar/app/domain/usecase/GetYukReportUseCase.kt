@@ -1,5 +1,6 @@
 package uz.daftar.app.domain.usecase
 
+import kotlin.math.roundToLong
 import uz.daftar.app.data.db.dao.PriceHistoryDao
 import uz.daftar.app.data.db.dao.TransactionDao
 import uz.daftar.app.data.db.dao.YukNarxDao
@@ -130,8 +131,11 @@ class GetYukReportUseCase @Inject constructor(
     private fun priceAt(list: List<Pair<String, Double>>?, date: String): Double? {
         if (list.isNullOrEmpty()) return null
         var best: Double? = null
+        // v154: KUN darajasida solishtirish (take(10)) — boshqa hisobotlar bilan bir xil.
+        // Aks holda bugun 09:00 da qo'yilgan narx, bugun 08:00 dagi yukka tegmasdi.
+        val day = date.take(10)
         for ((d, p) in list) {
-            if (d <= date) best = p else break
+            if (d.take(10) <= day) best = p else break
         }
         return best ?: list.first().second // retroaktiv
     }
@@ -144,14 +148,17 @@ class GetYukReportUseCase @Inject constructor(
                 type == "p" -> p += tx.amount
                 type == "q" -> Unit
                 type in cargoTypes -> {
+                    // v154: T (tannarx) — o'z narxi; N (sotuv) — mijoz narxi.
+                    // N topilmasa 0 (tannarxga TUSHMAYDI) — aks holda "Farq (P−N)" xato bo'lardi.
                     val tPrice = tx.tOverride ?: priceAt(ctx.globalT[type], tx.date)
-                    val nPrice = priceAt(ctx.clientN[tx.clientName.lowercase()]?.get(type), tx.date) ?: tPrice
+                    val nPrice = priceAt(ctx.clientN[tx.clientName.lowercase()]?.get(type), tx.date)
                     if (tPrice != null) t += tx.amount * tPrice
                     if (nPrice != null) n += tx.amount * nPrice
                 }
             }
         }
-        return Triple(t.toLong(), n.toLong(), p.toLong())
+        // v154: roundToLong() — boshqa hisobotlar bilan bir xil (toLong() kesib tashlardi: 4999.9 → 4999)
+        return Triple(t.roundToLong(), n.roundToLong(), p.roundToLong())
     }
 
     // ───────── YUK SONI (pulsiz, faqat miqdor) ─────────
