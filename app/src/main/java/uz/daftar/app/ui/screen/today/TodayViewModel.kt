@@ -193,6 +193,12 @@ class TodayViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val userId: Long = 1L
+
+    // v155: butun ilova bo'ylab yagona zona (Asia/Tashkent) — sana yozishda telefon zonasiga bog'liq bo'lmaslik uchun
+    private val APP_ZONE = java.time.ZoneId.of("Asia/Tashkent")
+    private fun today(): LocalDate = LocalDate.now(APP_ZONE)
+    private fun nowStamp(): String =
+        java.time.LocalDateTime.now(APP_ZONE).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
     private val filterFlow = MutableStateFlow(Filter.TODAY)
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
@@ -229,6 +235,8 @@ class TodayViewModel @Inject constructor(
                     refreshHistoryCards()
                 }
         }
+        // Tezkor shablonlarni kuzatish
+        viewModelScope.launch {
             templateStore.templates.collectLatest { list ->
                 _state.update { it.copy(templates = list) }
             }
@@ -749,7 +757,7 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
             val storedName = cp?.transactions?.firstOrNull()?.clientName ?: DaftarParser.normalizeName(name)
-            val nowStr = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            val nowStr = nowStamp()  // v155: Asia/Tashkent
             runCatching {
                 repo.insertTransaction(uz.daftar.app.data.db.entity.TransactionEntity(
                     userId = userId, clientName = storedName, type = "p", amount = debt.toDouble(), date = nowStr))
@@ -2256,7 +2264,7 @@ class TodayViewModel @Inject constructor(
     private fun handleDeleteCommand(text: String) {
         val rawLines = text.lines().map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
         if (rawLines.isEmpty()) return
-        var date: LocalDate = LocalDate.now()
+        var date: LocalDate = today()
 
         // Birinchi qatorni tahlil qilish — sana aniqlash, qaerdan boshlash
         val firstLower = rawLines.first().lowercase()
@@ -2267,9 +2275,10 @@ class TodayViewModel @Inject constructor(
         val startIdx = when {
             dateXNameMatch != null -> {
                 runCatching {
-                    date = LocalDate.now()
-                        .withMonth(dateXNameMatch.groupValues[2].toInt())
-                        .withDayOfMonth(dateXNameMatch.groupValues[1].toInt())
+                    // v155: withMonth().withDayOfMonth() 31-kunli oyda crash berardi — LocalDate.of xavfsiz
+                    val mm = dateXNameMatch.groupValues[2].toInt()
+                    val dd = dateXNameMatch.groupValues[1].toInt()
+                    date = LocalDate.of(today().year, mm, dd)
                 }
                 // "09.06 x moxon" → birinchi qatorni "x moxon" ga aylantiramiz
                 rawLines[0] = "x " + dateXNameMatch.groupValues[4].trim()
@@ -2277,9 +2286,9 @@ class TodayViewModel @Inject constructor(
             }
             datePureMatch != null -> {
                 runCatching {
-                    date = LocalDate.now()
-                        .withMonth(datePureMatch.groupValues[2].toInt())
-                        .withDayOfMonth(datePureMatch.groupValues[1].toInt())
+                    val mm = datePureMatch.groupValues[2].toInt()
+                    val dd = datePureMatch.groupValues[1].toInt()
+                    date = LocalDate.of(today().year, mm, dd)
                 }
                 1
             }

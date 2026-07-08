@@ -101,9 +101,7 @@ class TransactionRepository @Inject constructor(
         return txDao.insert(entity)
     }
 
-    suspend fun deleteByClient(userId: Long, clientName: String): Int {
-        return txDao.deleteByClient(userId, clientName)
-    }
+    // v155: deleteByClient (repo) OLIB TASHLANDI — chaqirilmasdi, karzinasiz o'chirardi.
 
     fun observeClientNames(userId: Long): Flow<List<String>> =
         txDao.observeAllClientNames(userId)

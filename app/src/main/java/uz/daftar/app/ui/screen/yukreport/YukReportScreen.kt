@@ -67,6 +67,7 @@ private val TBlue = Color(0xFF2563EB)
 private val TRing = Color(0xFF3B82F6)
 private val TBg = Color(0xFFEFF4FF)
 private val NGreen = Color(0xFF16A34A)
+private val MONTHS_UZ_FULL = listOf("Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr")
 private val NRing = Color(0xFF22C55E)
 private val NBg = Color(0xFFECFBF1)
 private val PPurple = Color(0xFF7C3AED)
@@ -113,8 +114,7 @@ fun YukReportScreen(
     val state by vm.state.collectAsState()
 
     val periodLabel = if (state.yearly) state.year.toString()
-    else state.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) +
-        " " + state.month.year
+    else MONTHS_UZ_FULL[state.month.monthValue - 1] + " " + state.month.year
 
     Scaffold(
         topBar = {
