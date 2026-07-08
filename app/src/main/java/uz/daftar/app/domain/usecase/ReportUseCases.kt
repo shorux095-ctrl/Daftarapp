@@ -144,8 +144,8 @@ class GetMonthClientDebtUseCase @Inject constructor(
                 TxType.P -> arr[1] += tx.amount
                 TxType.Q -> arr[0] += tx.amount
                 in cargo -> {
+                    // v154: N (sotuv) hisobi — narx topilmasa 0, tannarxga (tOverride) TUSHMAYDI
                     val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao)
-                        ?: tx.tOverride
                     if (n != null) arr[0] += tx.amount * n
                 }
                 else -> {}
@@ -379,7 +379,8 @@ class GetClientProfitUseCase @Inject constructor(
                 "p" -> 0.0
                 "q" -> 0.0  // qo'lda qarz — foyda emas
                 in cargo -> {
-                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao) ?: tx.tOverride
+                    // v154: sotuv narxi (N) — topilmasa foyda 0; tannarxga (tOverride) TUSHMAYDI (aks holda foyda=0 emas, xato chiqardi)
+                    val n = findPriceForReport(userId, tx.clientName, tx.type, tx.date, priceDao, yukDao, clientPriceDao)
                     val globalCost = if (tx.costTier == "t1") (globalAt(t1Hist[tx.type], tx.date) ?: globalAt(tHist[tx.type], tx.date)) else globalAt(tHist[tx.type], tx.date)
                     val t = tx.tOverride ?: globalCost
                     if (n != null && t != null) tx.amount * (n - t)

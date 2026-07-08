@@ -20,7 +20,10 @@ class SetGlobalPriceUseCase @Inject constructor(
         prices: Map<String, Double>,
         date: LocalDate? = null
     ) {
-        val dateStr = (date?.atTime(12, 0) ?: LocalDateTime.now()).format(ISO)
+        // v154: timezone standartlashtirildi (Asia/Tashkent) — boshqa hamma joyda shunday.
+        // Aks holda telefon boshqa zonada bo'lsa T narx sanasi bir kunga siljib qolardi.
+        val nowT = LocalDateTime.now(java.time.ZoneId.of("Asia/Tashkent"))
+        val dateStr = (date?.atTime(12, 0) ?: nowT).format(ISO)
         for ((type, price) in prices) {
             yukDao.insert(
                 YukNarxEntity(

@@ -29,6 +29,7 @@ data class EditState(
     val note: String = "",
     val date: LocalDate = LocalDate.now(),
     val nNarx: String = "",
+    val origNarx: String = "",  // v154: yuklanishdagi asl narx — o'zgarmasa qayta yozilmaydi (dublikat oldini oladi)
     val tNarx: String = "",
     val isT1: Boolean = false,
     val isSaved: Boolean = false,
@@ -85,6 +86,7 @@ class EditTransactionViewModel @Inject constructor(
                         note = tx.note ?: "",
                         date = day,
                         nNarx = nNarx,
+                        origNarx = nNarx,
                         tNarx = tx.tOverride?.let { v -> fmtNum(v) } ?: "",
                         isT1 = tx.costTier == "t1"
                     )
@@ -178,7 +180,9 @@ class EditTransactionViewModel @Inject constructor(
                 )
                 if (s.isCargo) {
                     val n = s.nNarx.replace(",", ".").toDoubleOrNull()
-                    if (n != null && n > 0) {
+                    // v154: narx FAQAT o'zgarganda yoziladi (dublikat qatorlar to'planmaydi)
+                    val changed = s.nNarx.trim() != s.origNarx.trim()
+                    if (n != null && n > 0 && changed) {
                         priceDao.insert(
                             PriceHistoryEntity(
                                 userId = orig.userId,

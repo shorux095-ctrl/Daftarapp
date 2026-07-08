@@ -40,22 +40,9 @@ class TransactionRepository @Inject constructor(
         }
     }
 
-    /** Bir nechta yozuvni id bo'yicha o'chirish (multi-delete uchun) */
-    suspend fun deleteByIds(ids: Collection<Long>) {
-        ids.forEach { txDao.deleteById(it) }
-    }
-
-    /** Bir kunning BARCHA yozuvlarini o'chirish (faqat shu sana). Nechta o'chgani qaytadi. */
-    suspend fun deleteByDate(userId: Long, date: LocalDate): Int {
-        val start = "$date 00:00:00"
-        val end = "${date.plusDays(1)} 00:00:00"
-        return txDao.deleteByDateRange(userId, start, end)
-    }
-
-    /** Bitta mijozning BARCHA yozuvlarini o'chirish (butun tarix). Nechta o'chgani qaytadi. */
-    suspend fun deleteByClientAll(userId: Long, clientName: String): Int {
-        return txDao.deleteByClient(userId, clientName)
-    }
+    // v154: deleteByIds / deleteByDate / deleteByClientAll OLIB TASHLANDI —
+    // hech qayerda chaqirilmasdi va karzinani chetlab to'g'ridan-to'g'ri o'chirardi (xavfli).
+    // Barcha o'chirishlar DeleteToKarzinaUseCase orqali (7 kun tiklanadigan) amalga oshadi.
 
     /** Bitta yozuv qo'shish (masalan qarz yopish uchun P to'lov). */
     suspend fun insertTransaction(tx: uz.daftar.app.data.db.entity.TransactionEntity): Long {
