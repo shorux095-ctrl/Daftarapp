@@ -14,6 +14,7 @@ import uz.daftar.app.data.db.entity.RasxodEntity
 import uz.daftar.app.domain.model.TxType
 import uz.daftar.app.domain.usecase.AddRasxodUseCase
 import uz.daftar.app.domain.usecase.DeleteRasxodUseCase
+import uz.daftar.app.domain.usecase.UpdateRasxodUseCase
 import uz.daftar.app.domain.usecase.GetRasxodRangeUseCase
 import uz.daftar.app.domain.usecase.GetRasxodTotalUseCase
 import uz.daftar.app.domain.usecase.SetGlobalPriceUseCase
