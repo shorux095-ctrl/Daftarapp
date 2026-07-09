@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -379,7 +380,7 @@ fun RasxodScreen(
                 }
             } else {
                 items(state.items, key = { it.id }) { item ->
-                    RasxodRow(item, onDelete = { vm.delete(item.id) })
+                    RasxodRow(item, onDelete = { vm.delete(item.id) }, onUpdate = { amt, note -> vm.update(item.id, amt, note) })
                     Spacer(Modifier.height(4.dp))
                 }
             }
@@ -388,7 +389,8 @@ fun RasxodScreen(
 }
 
 @Composable
-private fun RasxodRow(item: RasxodEntity, onDelete: () -> Unit) {
+private fun RasxodRow(item: RasxodEntity, onDelete: () -> Unit, onUpdate: (Double, String) -> Unit) {
+    var showEdit by remember { mutableStateOf(false) }
     Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -409,10 +411,54 @@ private fun RasxodRow(item: RasxodEntity, onDelete: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            // v159: ✏️ Tahrirlash tugmasi
+            IconButton(onClick = { showEdit = true }) {
+                Icon(Icons.Outlined.Edit, contentDescription = "Tahrirlash", tint = Color(0xFF2563EB))
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Outlined.Delete, contentDescription = "O'chirish", tint = MaterialTheme.colorScheme.error)
             }
         }
+    }
+
+    if (showEdit) {
+        var amt by remember { mutableStateOf(item.amount.let { if (it == Math.floor(it)) it.toLong().toString() else it.toString() }) }
+        var note by remember { mutableStateOf(item.note) }
+        AlertDialog(
+            onDismissRequest = { showEdit = false },
+            title = { Text("✏️ Rasxodni tahrirlash") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = amt,
+                        onValueChange = { amt = it },
+                        label = { Text("Summa (so'm)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text("Izoh (nimaga rasxod bo'ldi)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = (amt.replace(",", ".").toDoubleOrNull() ?: 0.0) > 0.0,
+                    onClick = {
+                        val a = amt.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        onUpdate(a, note)
+                        showEdit = false
+                    }
+                ) { Text("Saqlash") }
+            },
+            dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Bekor") } }
+        )
     }
 }
 

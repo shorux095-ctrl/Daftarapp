@@ -40,6 +40,14 @@ class DeleteRasxodUseCase @Inject constructor(
         rasxodDao.deleteById(id) > 0
 }
 
+/** v159: rasxod summa/izohini tahrirlash */
+class UpdateRasxodUseCase @Inject constructor(
+    private val rasxodDao: RasxodDao
+) {
+    suspend operator fun invoke(id: Long, amount: Double, note: String): Boolean =
+        rasxodDao.updateById(id, amount, note.trim()) > 0
+}
+
 class GetRasxodRangeUseCase @Inject constructor(
     private val rasxodDao: RasxodDao
 ) {

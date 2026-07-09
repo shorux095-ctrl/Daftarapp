@@ -49,6 +49,7 @@ data class RasxodState(
 class RasxodViewModel @Inject constructor(
     private val addUC: AddRasxodUseCase,
     private val deleteUC: DeleteRasxodUseCase,
+    private val updateUC: UpdateRasxodUseCase,
     private val rangeUC: GetRasxodRangeUseCase,
     private val totalUC: GetRasxodTotalUseCase,
     private val txDao: TransactionDao,
@@ -207,6 +208,16 @@ class RasxodViewModel @Inject constructor(
         viewModelScope.launch {
             deleteUC(id)
             _state.update { it.copy(message = "🗑 O'chirildi") }
+            load()
+        }
+    }
+
+    /** v159: rasxodni tahrirlash — summa va izohni yangilaydi */
+    fun update(id: Long, amount: Double, note: String) {
+        viewModelScope.launch {
+            if (amount <= 0) { _state.update { it.copy(message = "Noto'g'ri summa") }; return@launch }
+            updateUC(id, amount, note)
+            _state.update { it.copy(message = "✏️ Tahrirlandi") }
             load()
         }
     }

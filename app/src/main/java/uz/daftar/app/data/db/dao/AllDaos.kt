@@ -150,6 +150,10 @@ interface RasxodDao {
     @Query("DELETE FROM rasxod WHERE id = :id")
     suspend fun deleteById(id: Long): Int
 
+    /** v159: rasxod tahrirlash — summa va izohni yangilaydi */
+    @Query("UPDATE rasxod SET amount = :amount, note = :note WHERE id = :id")
+    suspend fun updateById(id: Long, amount: Double, note: String): Int
+
     @Query("""
         SELECT SUM(amount) FROM rasxod
         WHERE user_id = :userId AND date >= :start AND date < :end

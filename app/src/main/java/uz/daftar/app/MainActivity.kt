@@ -176,9 +176,17 @@ private fun LockedScreen(onRetry: () -> Unit) {
             "Daftar qulflangan",
             style = MaterialTheme.typography.titleLarge
         )
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(4.dp))
+        // v159: foydalanuvchi PIN'ni unutsa ham telefon qulfi bilan ochadi — hech qachon bloklanmaydi
+        Text(
+            "Barmoq izingiz yoki telefon parolingiz bilan oching",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
         androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp))
         Button(onClick = onRetry) {
-            Text("Qulfni ochish")
+            Text("🔓 Qulfni ochish")
         }
     }
 }
