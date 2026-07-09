@@ -782,7 +782,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v160", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v161", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1455,35 +1455,35 @@ private fun PreviewHistoryCard(
         colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1) Yashil header
-            Column(
+            // 1) v161: Oq header — MIJOZ · OY, katta ism, o'ngda qizil oy qarzi (rasmdagi dizayn)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .background(cGreen)
-                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    "${name.replaceFirstChar { it.titlecase(Locale.getDefault()) }} \u2014 $monthLabel ${month.year}",
-                    color = androidx.compose.ui.graphics.Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(6.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.20f))
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "$monthLabel qarzi: ${monthDebt.toDouble().formatMoney()} so'm",
-                        color = androidx.compose.ui.graphics.Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        "MIJOZ \u00b7 ${monthLabel.uppercase()} ${month.year}",
+                        color = cGray, fontSize = 11.sp, fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        name.replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                        color = androidx.compose.ui.graphics.Color(0xFF1A237E),
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold
                     )
                 }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        (if (monthDebt > 0) "-" else if (monthDebt < 0) "+" else "") + Math.abs(monthDebt).toDouble().formatMoney(),
+                        color = if (monthDebt > 0) cRed else cGreen,
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text("oy qarzi, so'm", color = cGray, fontSize = 11.sp)
+                }
             }
+            HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
 
             if (monthTxs.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
@@ -1655,13 +1655,25 @@ private fun PreviewHistoryCard(
                 FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f)) { Text("\u2190 Oldingi") }
                 FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f)) { Text("Keyingi \u2192") }
             }
-            if (debt > 0) {
-                Button(
-                    onClick = onCloseDebt,
+            if (debt != 0L) {
+                Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = cGreen)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("\uD83D\uDCB0 Qarzni yopish (${debt.formatMoney()})")
+                    // Yashil — to'liq yopish
+                    Button(
+                        onClick = onCloseDebt,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = cGreen)
+                    ) { Text("Qarzni yopish \u00b7 ${Math.abs(debt).formatMoney()}", fontSize = 13.sp) }
+                    // Qizil — qisman to'lash (o'sha dialog, summa kiritiladi)
+                    if (debt > 0) {
+                        Button(
+                            onClick = onCloseDebt,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = cRed)
+                        ) { Text("Qarz \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
+                    }
                 }
             } else {
                 Spacer(Modifier.height(10.dp))
