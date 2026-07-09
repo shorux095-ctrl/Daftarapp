@@ -329,14 +329,51 @@ fun TodayScreen(
     }
 
     state.confirmCloseDebt?.let { (name, debt) ->
+        var payAmount by remember(name, debt) { mutableStateOf(debt.toString()) }
+        val payVal = payAmount.replace(",", ".").replace(" ", "").toDoubleOrNull() ?: 0.0
         AlertDialog(
             onDismissRequest = { vm.cancelCloseDebt() },
-            title = { Text("💰 Qarzni yopish") },
+            title = { Text("💰 Qarz to'lash") },
             text = {
-                Text("${name.replaceFirstChar { it.uppercase() }} — ${debt} so'm qarz to'liq yopiladi (bugungi sana bilan to'lov yoziladi). Davom etilsinmi?")
+                Column {
+                    Text(
+                        "${name.replaceFirstChar { it.uppercase() }} — qarzi ${debt.formatMoney()} so'm",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = payAmount,
+                        onValueChange = { payAmount = it },
+                        label = { Text("To'lov summasi (so'm)") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    // Tez tugmalar: yarmi / to'liq
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(onClick = { payAmount = (debt / 2).toString() }, label = { Text("Yarmi") })
+                        AssistChip(onClick = { payAmount = debt.toString() }, label = { Text("To'liq") })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (payVal > 0 && payVal < debt) {
+                        Text("Qoladigan qarz: ${(debt - payVal.toLong()).formatMoney()} so'm",
+                            fontSize = 13.sp, color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                    } else if (payVal >= debt) {
+                        Text("✅ Qarz to'liq yopiladi", fontSize = 13.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                    }
+                    Text("(bugungi sana bilan to'lov yoziladi)", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
+                }
             },
-            confirmButton = { TextButton(onClick = { vm.confirmCloseDebt() }) { Text("Ha, yop") } },
-            dismissButton = { TextButton(onClick = { vm.cancelCloseDebt() }) { Text("Yo'q") } }
+            confirmButton = {
+                TextButton(
+                    enabled = payVal > 0,
+                    onClick = { vm.confirmCloseDebt(payVal.toLong()) }
+                ) { Text("To'lash") }
+            },
+            dismissButton = { TextButton(onClick = { vm.cancelCloseDebt() }) { Text("Bekor") } }
         )
     }
 
@@ -745,7 +782,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v159", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v160", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1675,7 +1712,12 @@ private fun PrevTypeCol(letter: String, qty: Double, value: Double, color: andro
         Spacer(Modifier.height(4.dp))
         Text("${qty.formatQty()} dona", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
         Spacer(Modifier.height(2.dp))
-        Text("${value.formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
+        // v160: narx yo'q (value=0, lekin dona bor) — qizil "narx yo'q" ko'rsatiladi
+        if (value <= 0.0 && qty > 0.0) {
+            Text("narx yo'q", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+        } else {
+            Text("${value.formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
+        }
     }
 }
 @Composable

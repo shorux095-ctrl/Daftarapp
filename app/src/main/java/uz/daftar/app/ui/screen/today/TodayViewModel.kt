@@ -309,8 +309,9 @@ class TodayViewModel @Inject constructor(
             }
             if (pend.isNotEmpty()) persistChat()
             refreshHistoryCards()
+            // v160: fondan qaytganda (yoki 08:00 kelganda) ham kechki hisobot tekshiriladi
+            runCatching { maybeShowAutoReports() }
             // v158: fondan qaytganda (yoki 10:00 kelganda) ham eslatma tekshiriladi.
-            // Avval faqat ilova birinchi ochilishida tekshirilardi — 10:00 dan oldin ochib qo'ysa, eslatma kelmasdi.
             runCatching { ensureDebtReminder() }
         }
     }
@@ -539,9 +540,11 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /** Kuniga bir marta: kechagi (+ dushanba haftalik, 1-sanada oylik) hisobotni chatga qo'yadi. */
+    /** Kuniga bir marta: kechagi (+ dushanba haftalik, 1-sanada oylik) hisobotni chatga qo'yadi. Soat 08:00 dan keyin. */
     private suspend fun maybeShowAutoReports() {
-        val today = LocalDate.now()
+        val today = today()
+        // v160: soat 08:00 dan keyin (ertalab) — kechagi hisobot chiqadi
+        if (java.time.LocalTime.now(APP_ZONE).hour < 8) return
         val last = runCatching { chatStore.getLastReportDate() }.getOrDefault("")
         if (last == today.toString()) return
 
@@ -755,19 +758,25 @@ class TodayViewModel @Inject constructor(
     fun cancelCloseDebt() { _state.update { it.copy(confirmCloseDebt = null) } }
 
     /** "Ha" — qarz miqdorida P (to'lov) yozadi, qarz 0 bo'ladi, hisobotga tushadi. */
-    fun confirmCloseDebt() {
+    fun confirmCloseDebt(payAmount: Long? = null) {
         val pair = _state.value.confirmCloseDebt ?: return
         val (name, debt) = pair
+        val pay = (payAmount ?: debt).coerceIn(1L, debt)  // qisman yoki to'liq
         viewModelScope.launch {
             val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
             val storedName = cp?.transactions?.firstOrNull()?.clientName ?: DaftarParser.normalizeName(name)
             val nowStr = nowStamp()  // v155: Asia/Tashkent
             runCatching {
                 repo.insertTransaction(uz.daftar.app.data.db.entity.TransactionEntity(
-                    userId = userId, clientName = storedName, type = "p", amount = debt.toDouble(), date = nowStr))
+                    userId = userId, clientName = storedName, type = "p", amount = pay.toDouble(), date = nowStr))
             }
             _state.update { it.copy(confirmCloseDebt = null) }
-            appendChat(ChatItem.Info(nextChatId(), "💰 ${name.replaceFirstChar { it.uppercase() }} qarzi yopildi: ${debt.formatMoney()} so'm to'lov"))
+            val qoldi = debt - pay
+            val msg = if (qoldi > 0)
+                "💰 ${name.replaceFirstChar { it.uppercase() }} — ${pay.formatMoney()} so'm to'lov. Qoldi: ${qoldi.formatMoney()} so'm"
+            else
+                "💰 ${name.replaceFirstChar { it.uppercase() }} qarzi yopildi: ${pay.formatMoney()} so'm to'lov"
+            appendChat(ChatItem.Info(nextChatId(), msg))
             // Ochiq tarix kartalarini yangilash
             val fresh = runCatching { buildClientPreview(name, null) }.getOrNull()
             if (fresh != null) {
@@ -1977,7 +1986,7 @@ class TodayViewModel @Inject constructor(
                     val note = rm.groupValues[2].trim()
                     runCatching { addRasxod(userId, amt, note) }
                     appendChat(ChatItem.Info(nextChatId(),
-                        "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()}" + if (note.isNotBlank()) "  $note" else ""))
+                        "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()}" + (if (note.isNotBlank()) "  $note" else "") + " · 🕒 " + java.time.LocalTime.now(APP_ZONE).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))))
                     persistChat()
                     onInputChange("")
                     return@launch
@@ -2058,7 +2067,7 @@ class TodayViewModel @Inject constructor(
                 runCatching { addRasxod(userId, amt, note) }
                 _state.update { it.copy(input = "", parsed = emptyList(), rasxodAmount = null, rasxodNote = "") }
                 appendChat(ChatItem.User(nextChatId(), typed))
-                appendChat(ChatItem.Info(nextChatId(), "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()} so'm" + if (note.isNotBlank()) " — $note" else ""))
+                appendChat(ChatItem.Info(nextChatId(), "💸 Rasxod saqlandi: ${amt.toLong().formatMoney()} so'm" + (if (note.isNotBlank()) " — $note" else "") + " · 🕒 " + java.time.LocalTime.now(APP_ZONE).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))))
             }
             return
         }
