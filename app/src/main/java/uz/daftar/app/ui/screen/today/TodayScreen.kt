@@ -623,7 +623,7 @@ fun TodayScreen(
                                         onPrev = { vm.shiftHistoryMonth(item.id, -1) },
                                         onNext = { vm.shiftHistoryMonth(item.id, 1) },
                                         onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) },
-                                        onCloseDebtFull = { vm.closeDebtFull(item.preview.name, item.preview.debt) },
+                                        onCloseDebtFull = { vm.requestCloseDebt(item.preview.name, item.preview.debt) },
                                         onEditTx = onEditTx,
                                         onDeleteTx = { vm.deleteOne(it) }
                                     )
@@ -783,7 +783,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v164", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v165", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1457,7 +1457,7 @@ private fun PreviewHistoryCard(
         colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1) v161: Oq header — MIJOZ · OY, katta ism, o'ngda qizil oy qarzi (rasmdagi dizayn)
+            // 1) v164: Oq header — MIJOZ · OY + katta ism (qarz tepada emas, kartochkalarda ko'rinadi)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1475,14 +1475,6 @@ private fun PreviewHistoryCard(
                         color = androidx.compose.ui.graphics.Color(0xFF1A237E),
                         fontSize = 22.sp, fontWeight = FontWeight.Bold
                     )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        (if (monthDebt > 0) "-" else if (monthDebt < 0) "+" else "") + Math.abs(monthDebt).toDouble().formatMoney(),
-                        color = if (monthDebt > 0) cRed else cGreen,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold
-                    )
-                    Text("oy qarzi, so'm", color = cGray, fontSize = 11.sp)
                 }
             }
             HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
@@ -1599,96 +1591,6 @@ private fun PreviewHistoryCard(
                     }
                 }
 
-                // JAMI HISOBOT
-                run {
-                    val cargoTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
-                    // Har yuk turi: SONI (amount yig'indisi) + summasi (amount × narx)
-                    val qtyByType = LinkedHashMap<TxType, Double>()
-                    val valByType = HashMap<TxType, Double>()
-                    for (tx in monthTxs) {
-                        val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
-                        if (t in cargoTypes) {
-                            qtyByType[t] = (qtyByType[t] ?: 0.0) + tx.amount
-                            val p = priceByTx[tx.id]; if (p != null) valByType[t] = (valByType[t] ?: 0.0) + tx.amount * p
-                        }
-                    }
-                    val pay = monthTxs.filter { it.type.equals("p", true) }.sumOf { it.amount }
-                    val takenTypes = cargoTypes.filter { (qtyByType[it] ?: 0.0) > 0.0 }
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Color(0xFFF4F8F5)).padding(12.dp)
-                    ) {
-                        Text("JAMI HISOBOT", fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                            color = androidx.compose.ui.graphics.Color(0xFF1A1A1A),
-                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(3.dp))
-                        Text("Olingan yuklar (soni)", fontSize = 10.sp,
-                            color = androidx.compose.ui.graphics.Color(0xFF6B7280),
-                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(10.dp))
-                        // Har olingan yuk turi — O'Z RANGIDA, soni bilan (Farq olib tashlandi)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            for (t in takenTypes) {
-                                PrevTypeCol(
-                                    letter = t.code.uppercase(),
-                                    qty = qtyByType[t] ?: 0.0,
-                                    value = valByType[t] ?: 0.0,
-                                    color = typeColor(t.code),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            // Pul (pul olganim) — yuklar yonida, QIZIL
-                            if (pay > 0.0) {
-                                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(
-                                        modifier = Modifier.size(32.dp).clip(CircleShape).background(cRed.copy(alpha = 0.18f)),
-                                        contentAlignment = Alignment.Center
-                                    ) { Text("P", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = cRed) }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text("Pul", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
-                                    Spacer(Modifier.height(2.dp))
-                                    Text("${Math.round(pay).toDouble().formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cRed)
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        // Jami yuk (barcha yuk puli) — to'q kulrang
-                        val jamiYuk = valByType.values.sum()
-                        Box(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(androidx.compose.ui.graphics.Color(0xFF374151).copy(alpha = 0.10f)).padding(vertical = 9.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("\uD83D\uDCE6 Jami yuk: ${Math.round(jamiYuk).toDouble().formatMoney()} so'm",
-                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = androidx.compose.ui.graphics.Color(0xFF374151))
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        // Pul (pul olganim) — QIZIL
-                        Box(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(cRed.copy(alpha = 0.10f)).padding(vertical = 9.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("\uD83D\uDCB5 Pul: ${Math.round(pay).toDouble().formatMoney()} so'm",
-                                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = cRed)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(if (debt > 0) cRed.copy(alpha = 0.10f) else cGreen.copy(alpha = 0.12f))
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                if (debt > 0) "\uD83D\uDCB3 Qarz: ${debt.toDouble().formatMoney()} so'm"
-                                else if (debt == 0L) "\u2705 Qarz yo'q"
-                                else "\uD83D\uDC9A Ortiq: ${(-debt).toDouble().formatMoney()} so'm",
-                                fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                                color = if (debt > 0) cRed else cGreen
-                            )
-                        }
-                    }
-                }
             }
 
             // Oldingi / Keyingi
