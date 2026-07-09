@@ -623,6 +623,7 @@ fun TodayScreen(
                                         onPrev = { vm.shiftHistoryMonth(item.id, -1) },
                                         onNext = { vm.shiftHistoryMonth(item.id, 1) },
                                         onCloseDebt = { vm.requestCloseDebt(item.preview.name, item.preview.debt) },
+                                        onCloseDebtFull = { vm.closeDebtFull(item.preview.name, item.preview.debt) },
                                         onEditTx = onEditTx,
                                         onDeleteTx = { vm.deleteOne(it) }
                                     )
@@ -782,7 +783,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v163", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v164", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1405,6 +1406,7 @@ private fun PreviewHistoryCard(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onCloseDebt: () -> Unit = {},
+    onCloseDebtFull: () -> Unit = {},
     onEditTx: (Long) -> Unit = {},
     onDeleteTx: (Long) -> Unit = {}
 ) {
@@ -1484,6 +1486,48 @@ private fun PreviewHistoryCard(
                 }
             }
             HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
+
+            // v164: 2-rasm dizayni — A/B/C/JAMI YUK/PUL/QARZ kartochkalari gorizontal scroll (header ostida)
+            run {
+                val cargoTypes = listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+                val qtyByType = LinkedHashMap<TxType, Double>()
+                val valByType = HashMap<TxType, Double>()
+                for (tx in monthTxs) {
+                    val t = uz.daftar.app.domain.model.TxType.fromCode(tx.type) ?: continue
+                    if (t in cargoTypes) {
+                        qtyByType[t] = (qtyByType[t] ?: 0.0) + tx.amount
+                        val p = priceByTx[tx.id]; if (p != null) valByType[t] = (valByType[t] ?: 0.0) + tx.amount * p
+                    }
+                }
+                val takenTypes = cargoTypes.filter { (qtyByType[it] ?: 0.0) > 0.0 }
+                val payTop = monthTxs.filter { it.type.equals("p", true) }.sumOf { it.amount }
+                val jamiYukTop = valByType.values.sum()
+                val jamiDonaTop = takenTypes.sumOf { qtyByType[it] ?: 0.0 }
+                if (takenTypes.isNotEmpty() || payTop > 0) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        takenTypes.forEach { t ->
+                            MiniStatCard(
+                                letter = t.code.uppercase(),
+                                emoji = "\uD83D\uDCE6",
+                                sub = "${t.code.uppercase()}: ${(qtyByType[t] ?: 0.0).formatQty()} dona",
+                                value = (valByType[t] ?: 0.0),
+                                color = typeColor(t.code)
+                            )
+                        }
+                        MiniStatBox("\uD83D\uDCE6 JAMI YUK", "${jamiYukTop.let { Math.round(it).toDouble().formatMoney() }} so'm",
+                            "(${jamiDonaTop.formatQty()} dona)", cGreen)
+                        if (payTop > 0) MiniStatBox("\uD83D\uDCB5 PUL", "${Math.round(payTop).toDouble().formatMoney()} so'm", "", cRed)
+                        MiniStatBox("\uD83D\uDCB3 QARZ", "${Math.abs(monthDebt).toDouble().formatMoney()} so'm", "", if (monthDebt > 0) cRed else cGreen)
+                    }
+                    HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
+                }
+            }
 
             if (monthTxs.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
@@ -1660,13 +1704,13 @@ private fun PreviewHistoryCard(
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Yashil — to'liq yopish
+                    // Yashil — TO'LIQ yopish (to'g'ridan-to'g'ri, dialogsiz)
                     Button(
-                        onClick = onCloseDebt,
+                        onClick = onCloseDebtFull,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = cGreen)
                     ) { Text("Qarzni yopish \u00b7 ${Math.abs(debt).formatMoney()}", fontSize = 13.sp) }
-                    // Qizil — qisman to'lash (o'sha dialog, summa kiritiladi)
+                    // Qizil — QISMAN yopish (summa kiritish dialogi)
                     if (debt > 0) {
                         Button(
                             onClick = onCloseDebt,
@@ -1713,6 +1757,51 @@ private fun PreviewHistoryCard(
     }
 }
 
+
+// v164: 2-rasm — kartochka: harf + emoji + soni + summa
+@Composable
+private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Double, color: androidx.compose.ui.graphics.Color) {
+    Column(
+        modifier = Modifier
+            .width(150.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = 0.10f))
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(color.copy(alpha = 0.20f)),
+                contentAlignment = Alignment.Center
+            ) { Text(letter, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+            Spacer(Modifier.weight(1f))
+            Text(emoji, fontSize = 16.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        Spacer(Modifier.height(2.dp))
+        Text("${Math.round(value).toDouble().formatMoney()} so'm", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+// v164: 2-rasm — JAMI YUK / PUL / QARZ katta kartochkasi
+@Composable
+private fun MiniStatBox(title: String, big: String, sub: String, color: androidx.compose.ui.graphics.Color) {
+    Column(
+        modifier = Modifier
+            .width(150.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = 0.08f))
+            .padding(12.dp)
+    ) {
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        Spacer(Modifier.height(10.dp))
+        Text(big, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
+        if (sub.isNotBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        }
+    }
+}
 
 @Composable
 private fun PrevTypeCol(letter: String, qty: Double, value: Double, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {

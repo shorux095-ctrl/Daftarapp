@@ -746,6 +746,22 @@ class TodayViewModel @Inject constructor(
         _state.update { it.copy(confirmCloseDebt = name to debt) }
     }
 
+    /** v164: yashil tugma — qarzni TO'LIQ yopadi (dialogsiz, to'g'ridan-to'g'ri to'lov yoziladi) */
+    fun closeDebtFull(name: String, debt: Long) {
+        if (debt <= 0) return
+        viewModelScope.launch {
+            val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
+            val storedName = cp?.transactions?.firstOrNull()?.clientName ?: DaftarParser.normalizeName(name)
+            runCatching {
+                repo.insertTransaction(uz.daftar.app.data.db.entity.TransactionEntity(
+                    userId = userId, clientName = storedName, type = "p", amount = debt.toDouble(), date = nowStamp()))
+            }
+            appendChat(ChatItem.Info(nextChatId(), "💰 ${name.replaceFirstChar { it.uppercase() }} qarzi yopildi: ${debt.formatMoney()} so'm to'lov"))
+            persistChat()
+            refreshHistoryCards()
+        }
+    }
+
     /** v140: hisobotda ism bosilsa — mijoz tarixi kartasi chatga qo'shiladi */
     fun openClientHistory(name: String) {
         viewModelScope.launch {
