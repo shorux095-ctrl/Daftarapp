@@ -103,7 +103,7 @@ class RasxodViewModel @Inject constructor(
                 RasxodPeriod.MONTH -> Triple(
                     s.anchor.withDayOfMonth(1),
                     s.anchor.withDayOfMonth(s.anchor.lengthOfMonth()),
-                    s.anchor.format(FMT_MONTH)
+                    MONTHS_UZ_R[s.anchor.monthValue - 1] + " " + s.anchor.year  // v157: o'zbekcha (avval telefon tili — "июля")
                 )
                 RasxodPeriod.YEAR -> Triple(
                     s.anchor.withDayOfYear(1),
@@ -218,6 +218,7 @@ class RasxodViewModel @Inject constructor(
     companion object {
         private val FMT_DAY = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
         private val FMT_MONTH = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy")
+        private val MONTHS_UZ_R = listOf("Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr")
         private val ISO = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     }
 }

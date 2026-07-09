@@ -489,7 +489,7 @@ class TodayViewModel @Inject constructor(
                             }
                         }
                         "debt" -> {
-                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
+                            val l = runCatching { getOverdue(userId) }.getOrNull()
                             if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
                         }
                         else -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.Info(id, t, ts) else null }
@@ -584,10 +584,10 @@ class TodayViewModel @Inject constructor(
 
     /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull() ?: return
-        // Kuniga 1 marta, soat 10:00 dan keyin (birinchi ochilishda) chiqadi
-        val today = LocalDate.now().toString()
-        val hour = java.time.LocalTime.now().hour
+        // v157: barcha qarzdorlarni ko'rsatamiz (avval faqat >=10 kun edi — yosh qarzlar chiqmasdi)
+        val list = runCatching { getOverdue(userId) }.getOrNull() ?: return
+        val today = today().toString()
+        val hour = java.time.LocalTime.now(APP_ZONE).hour
         if (hour < 10) return
         val last = runCatching { chatStore.getLastDebtRemDate() }.getOrDefault("")
         if (last == today) return
@@ -1740,9 +1740,9 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
+                val list = getOverdue(userId)
                 if (list.isEmpty()) {
-                    appendChat(ChatItem.Info(nextChatId(), "✅ 10 kundan oshgan qarz yo'q."))
+                    appendChat(ChatItem.Info(nextChatId(), "✅ Qarzdor yo'q."))
                 } else {
                     appendChat(ChatItem.DebtRep(nextChatId(), list))
                 }

@@ -349,13 +349,25 @@ fun RasxodScreen(
                 }
             }
 
-            // v151: YILLIK rejimda ro'yxat ko'rsatilmaydi — 12 oylik jadval yetarli
+            // v157: sarlavhada JAMI ham ko'rsatiladi
             if (state.period != RasxodPeriod.YEAR) item {
-                Text(
-                    "Xarajatlar ro'yxati",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Xarajatlar ro'yxati",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Jami: ${state.items.sumOf { it.amount }.formatMoney()} so'm",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD32F2F)
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
             }
 

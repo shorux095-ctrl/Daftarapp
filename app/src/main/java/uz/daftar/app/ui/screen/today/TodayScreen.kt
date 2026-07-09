@@ -591,6 +591,7 @@ fun TodayScreen(
                                     )
                                     is ChatItem.DebtRep -> DebtReminderCard(
                                         debtors = item.debtors,
+                                        ts = item.ts,
                                         onClose = { vm.removeChat(item.id) }
                                     )
                                     is ChatItem.Saved -> SavedCard(item.info)
@@ -744,7 +745,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v156", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v157", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -2194,9 +2195,13 @@ private fun SavedCard(info: SavedInfo) {
 @Composable
 private fun DebtReminderCard(
     debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>,
+    ts: Long,
     onClose: () -> Unit
 ) {
     val total = debtors.sumOf { it.debt }
+    val timeStr = remember(ts) {
+        java.text.SimpleDateFormat("dd.MM HH:mm", java.util.Locale.US).format(java.util.Date(ts))
+    }
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = Color(0xFFFFF8F0),
@@ -2210,7 +2215,7 @@ private fun DebtReminderCard(
                 Column(Modifier.weight(1f)) {
                     Text("Qarz eslatmasi", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A1A1A))
                     Text(
-                        "Jami " + total.formatMoney() + " so'm \u00b7 " + debtors.size + " mijoz",
+                        "Jami " + total.formatMoney() + " so'm \u00b7 " + debtors.size + " mijoz \u00b7 \uD83D\uDD52 " + timeStr,
                         fontSize = 12.sp, color = Color(0xFF8A8A8A)
                     )
                 }
@@ -2219,10 +2224,11 @@ private fun DebtReminderCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            DebtBucket("🔵 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
-            DebtBucket("🟡 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
-            DebtBucket("🟠 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
-            DebtBucket("🔴 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
+            DebtBucket("\uD83D\uDFE2 1\u20139 kun (yangi)", debtors.filter { it.daysOverdue in 0..9 }, Color(0xFF2E7D32), Color(0xFFE8F5E9))
+            DebtBucket("\uD83D\uDD35 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
+            DebtBucket("\uD83D\uDFE1 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
+            DebtBucket("\uD83D\uDFE0 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
+            DebtBucket("\uD83D\uDD34 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
         }
     }
 }
