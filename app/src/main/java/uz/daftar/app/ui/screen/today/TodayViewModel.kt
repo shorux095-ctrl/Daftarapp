@@ -309,6 +309,9 @@ class TodayViewModel @Inject constructor(
             }
             if (pend.isNotEmpty()) persistChat()
             refreshHistoryCards()
+            // v158: fondan qaytganda (yoki 10:00 kelganda) ham eslatma tekshiriladi.
+            // Avval faqat ilova birinchi ochilishida tekshirilardi — 10:00 dan oldin ochib qo'ysa, eslatma kelmasdi.
+            runCatching { ensureDebtReminder() }
         }
     }
 
@@ -489,7 +492,7 @@ class TodayViewModel @Inject constructor(
                             }
                         }
                         "debt" -> {
-                            val l = runCatching { getOverdue(userId) }.getOrNull()
+                            val l = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrNull()
                             if (!l.isNullOrEmpty()) ChatItem.DebtRep(id, l, ts) else null
                         }
                         else -> { val t = o.optString("t"); if (t.isNotBlank()) ChatItem.Info(id, t, ts) else null }
@@ -584,8 +587,9 @@ class TodayViewModel @Inject constructor(
 
     /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        // v157: barcha qarzdorlarni ko'rsatamiz (avval faqat >=10 kun edi — yosh qarzlar chiqmasdi)
-        val list = runCatching { getOverdue(userId) }.getOrNull() ?: return
+        // v158: 10 kundan oshgan qarzdorlar (10-14, 15-29, 30-59, 60+). 1-9 kun ko'rsatilmaydi.
+        val all = runCatching { getOverdue(userId) }.getOrNull() ?: return
+        val list = all.filter { it.daysOverdue >= 10 }
         val today = today().toString()
         val hour = java.time.LocalTime.now(APP_ZONE).hour
         if (hour < 10) return
@@ -1740,9 +1744,9 @@ class TodayViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             try {
-                val list = getOverdue(userId)
+                val list = getOverdue(userId).filter { it.daysOverdue >= 10 }
                 if (list.isEmpty()) {
-                    appendChat(ChatItem.Info(nextChatId(), "✅ Qarzdor yo'q."))
+                    appendChat(ChatItem.Info(nextChatId(), "✅ 10 kundan oshgan qarzdor yo'q."))
                 } else {
                     appendChat(ChatItem.DebtRep(nextChatId(), list))
                 }

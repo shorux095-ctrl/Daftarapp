@@ -64,6 +64,7 @@ import javax.inject.Inject
 class QuickAddActivity : ComponentActivity() {
 
     @Inject lateinit var addTx: AddTransactionUseCase
+    @Inject lateinit var addRasxod: uz.daftar.app.domain.usecase.AddRasxodUseCase
     @Inject lateinit var repo: TransactionRepository
     @Inject lateinit var db: uz.daftar.app.data.db.DaftarDatabase
     @Inject lateinit var chatStore: uz.daftar.app.core.chat.ChatStore
@@ -138,7 +139,7 @@ class QuickAddActivity : ComponentActivity() {
                                 Spacer(Modifier.height(10.dp))
                                 // Qatorlar tekshiruvi: ✅ tushunarli / ❓ tushunarsiz
                                 val checks = vc.lines().filter { it.isNotBlank() }
-                                    .map { it.trim() to (DaftarParser.parse(it.trim()) is ParseResult.Success) }
+                                    .map { it.trim() to (parseRasxodLine(it.trim()) != null || DaftarParser.parse(it.trim()) is ParseResult.Success) }
                                 val okCount = checks.count { it.second }
                                 checks.forEach { (ln, ok) ->
                                     Text(
@@ -237,11 +238,18 @@ class QuickAddActivity : ComponentActivity() {
     }
 
     private suspend fun saveText(text: String): Int {
-        // v152: ATOMIK — barcha qatorlar bitta tranzaksiyada (yarim saqlash bo'lmaydi)
+        // v158: ATOMIK — barcha qatorlar bitta tranzaksiyada (yarim saqlash bo'lmaydi)
         var count = 0
         db.withTransaction {
             for (line in text.lines()) {
                 if (line.isBlank()) continue
+                // v158: "rasxod 40" / "r 40" / "xarajat 40" — RASXOD sifatida saqlanadi
+                val rx = parseRasxodLine(line)
+                if (rx != null) {
+                    addRasxod(userId, rx.first, rx.second)
+                    count++
+                    continue
+                }
                 val r = DaftarParser.parse(line)
                 if (r is ParseResult.Success) {
                     addTx(userId, r.entry)
@@ -251,5 +259,14 @@ class QuickAddActivity : ComponentActivity() {
             }
         }
         return count
+    }
+
+    /** "rasxod 40 benzin" / "r 40" / "xarajat 40" → (summa, izoh). Aks holda null. */
+    private fun parseRasxodLine(line: String): Pair<Double, String>? {
+        val m = Regex("""^\s*(rasxod|rashod|rasxad|xarajat|r)\s+(\d+(?:[.,]\d+)?)\s*(.*)$""", RegexOption.IGNORE_CASE)
+            .matchEntire(line.trim()) ?: return null
+        val amount = m.groupValues[2].replace(",", ".").toDoubleOrNull() ?: return null
+        if (amount <= 0) return null
+        return amount to m.groupValues[3].trim()
     }
 }
