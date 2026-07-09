@@ -1790,8 +1790,8 @@ class TodayViewModel @Inject constructor(
         }
         val lines = trimmed.lines().map { it.trim() }.filter { it.isNotBlank() }
 
-        // Marker bormi? (a10, b5, p100, n a20, t a15)
-        val markerRe = Regex("""(^|\s)[abcdkpqnt](\d|\s|$)""", RegexOption.IGNORE_CASE)
+        // Marker bormi? (a10, b5, p100, n a20, t a15) — YOLG'IZ harf + raqam/probel (so'z ichidagi harf emas)
+        val markerRe = Regex("""(^|\s)[abcdkpqnt]\d""", RegexOption.IGNORE_CASE)
         // Faqat ism-only qatorlarni olamiz (yuk/narx markeri bo'lmagan, 2+ belgi, kamida 1 harf)
         val nameLines = lines.filter { line ->
             !markerRe.containsMatchIn(line) &&

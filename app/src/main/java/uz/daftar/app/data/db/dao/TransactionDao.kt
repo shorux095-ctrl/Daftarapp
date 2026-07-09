@@ -141,9 +141,14 @@ interface TransactionDao {
     @Query("""
         SELECT LOWER(client_name) AS name
         FROM transactions
-        WHERE user_id = :userId AND LOWER(client_name) LIKE LOWER(:prefix) || '%'
+        WHERE user_id = :userId AND (
+            LOWER(client_name) LIKE LOWER(:prefix) || '%'
+            OR LOWER(client_name) LIKE '%' || LOWER(:prefix) || '%'
+        )
         GROUP BY LOWER(client_name)
-        ORDER BY MAX(date) DESC
+        ORDER BY
+            CASE WHEN LOWER(client_name) LIKE LOWER(:prefix) || '%' THEN 0 ELSE 1 END,
+            MAX(date) DESC
         LIMIT 8
     """)
     suspend fun suggestClients(userId: Long, prefix: String): List<String>
