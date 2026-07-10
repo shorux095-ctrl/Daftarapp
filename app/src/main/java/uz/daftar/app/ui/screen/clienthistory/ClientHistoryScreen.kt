@@ -281,27 +281,17 @@ fun ClientHistoryScreen(
 @Composable
 private fun GreenHeader(name: String, monthLabel: String, year: Int, monthDebt: Long) {
     val disp = name.replaceFirstChar { it.uppercase() }
-    Box(
+    // v168: oq header (bosh ekrandagi mijoz kartasi bilan bir xil dizayn)
+    Column(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
-            .background(Brush.horizontalGradient(listOf(GreenA, GreenB)))
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
+            .background(Color.White)
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 10.dp)
     ) {
-        Column {
-            Text("$disp — $monthLabel $year", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                    .background(Color.White.copy(alpha = 0.20f))
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    "$monthLabel qarzi: ${monthDebt.formatMoney()} so'm",
-                    color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium
-                )
-            }
-        }
+        Text("MIJOZ \u00b7 ${monthLabel.uppercase()} $year", color = InkGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(2.dp))
+        Text(disp, color = Color(0xFF1A237E), fontSize = 22.sp, fontWeight = FontWeight.Bold)
     }
+    androidx.compose.material3.HorizontalDivider(color = Color(0x11000000))
 }
 
 @OptIn(ExperimentalFoundationApi::class)

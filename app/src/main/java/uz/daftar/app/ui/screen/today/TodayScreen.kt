@@ -1682,44 +1682,42 @@ private fun PreviewHistoryCard(
 private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Double, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(150.dp)
-            .height(96.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .width(110.dp)
+            .height(50.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = 0.10f))
-            .padding(12.dp)
+            .padding(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(26.dp).clip(CircleShape).background(color.copy(alpha = 0.20f)),
+                modifier = Modifier.size(18.dp).clip(CircleShape).background(color.copy(alpha = 0.20f)),
                 contentAlignment = Alignment.Center
-            ) { Text(letter, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color) }
+            ) { Text(letter, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = color) }
             Spacer(Modifier.weight(1f))
-            Text(emoji, fontSize = 15.sp)
+            Text(emoji, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(6.dp))
-        Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
         Spacer(Modifier.height(2.dp))
-        Text("${Math.round(value).toDouble().formatMoney()} so'm", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+        Text(sub, fontSize = 9.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
+        Text("${Math.round(value).toDouble().formatMoney()} so'm", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
     }
 }
 
-// v167: JAMI YUK / PUL / QARZ kartochkasi — MiniStatCard bilan BIR XIL o'lcham
+// v168: JAMI YUK / PUL / QARZ — MiniStatCard bilan BIR XIL o'lcham (110×50)
 @Composable
 private fun MiniStatBox(title: String, big: String, sub: String, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(150.dp)
-            .height(96.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .width(110.dp)
+            .height(50.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = 0.08f))
-            .padding(12.dp)
+            .padding(8.dp)
     ) {
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
-        Spacer(Modifier.height(8.dp))
-        Text(big, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+        Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        Text(big, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
         if (sub.isNotBlank()) {
-            Spacer(Modifier.height(2.dp))
-            Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
+            Text(sub, fontSize = 9.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
         }
     }
 }
