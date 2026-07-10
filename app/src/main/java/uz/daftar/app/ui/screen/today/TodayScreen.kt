@@ -783,7 +783,7 @@ private fun ChatTopBar(
     }
 
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v165", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Daftar · v166", fontWeight = FontWeight.SemiBold) },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
@@ -1529,7 +1529,7 @@ private fun PreviewHistoryCard(
                 val scrollState = rememberScrollState()
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 320.dp)
+                        .heightIn(max = 440.dp)
                         .verticalScroll(scrollState)
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
@@ -1593,36 +1593,53 @@ private fun PreviewHistoryCard(
 
             }
 
-            // Oldingi / Keyingi
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f)) { Text("\u2190 Oldingi") }
-                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f)) { Text("Keyingi \u2192") }
-            }
-            if (debt != 0L) {
+            // v166: Qarz tugmalari YUQORIDA
+            if (debt > 0L) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Yashil — TO'LIQ yopish (to'g'ridan-to'g'ri, dialogsiz)
+                    // Yashil — TO'LIQ yopish (Ha/Yo'q so'raydi)
                     Button(
                         onClick = onCloseDebtFull,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = cGreen)
-                    ) { Text("Qarzni yopish \u00b7 ${Math.abs(debt).formatMoney()}", fontSize = 13.sp) }
-                    // Qizil — QISMAN yopish (summa kiritish dialogi)
-                    if (debt > 0) {
-                        Button(
-                            onClick = onCloseDebt,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = cRed)
-                        ) { Text("Qarz \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
-                    }
+                    ) { Text("Qarzni yopish \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
+                    // Qizil — QISMAN yopish
+                    Button(
+                        onClick = onCloseDebt,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = cRed)
+                    ) { Text("Qarz \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
+                }
+            } else if (debt < 0L) {
+                // Ortiqcha to'lov (haqi bor)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp)).background(cGreen.copy(alpha = 0.12f)).padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("\uD83D\uDCB0 Ortiqcha: ${Math.abs(debt).formatMoney()} so'm (haqi bor)",
+                        color = cGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             } else {
-                Spacer(Modifier.height(10.dp))
+                // v166: qarz 0 — "Qarz yo'q" yashil yozuv
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp)).background(cGreen.copy(alpha = 0.12f)).padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("\u2705 Qarz yo'q", color = cGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+
+            // v166: ⬅️ Oldingi / Keyingi ➡️ — ENG OXIRIDA
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f)) { Text("\u2190 Oldingi") }
+                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f)) { Text("Keyingi \u2192") }
             }
         }
     }
@@ -1665,7 +1682,7 @@ private fun PreviewHistoryCard(
 private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Double, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(150.dp)
+            .width(168.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.10f))
             .padding(12.dp)
@@ -1690,7 +1707,7 @@ private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Doub
 private fun MiniStatBox(title: String, big: String, sub: String, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(150.dp)
+            .width(168.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.08f))
             .padding(12.dp)

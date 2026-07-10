@@ -1863,10 +1863,12 @@ class TodayViewModel @Inject constructor(
         val balAfter = mutableMapOf<Long, Long>()
         for (tx in asc) {
             when (tx.type.lowercase()) {
-                "p" -> { running -= tx.amount; balAfter[tx.id] = running.toLong() }
+                "p" -> { running -= tx.amount }
                 "q" -> running += tx.amount
                 else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
             }
+            // v166: kesish (toLong) emas — roundToLong, umumiy qarz (debt) bilan bir xil bo'lsin (2046≠2049 farqi yo'qoladi)
+            balAfter[tx.id] = Math.round(running)
         }
         return ClientPreview(
             name = displayName,
