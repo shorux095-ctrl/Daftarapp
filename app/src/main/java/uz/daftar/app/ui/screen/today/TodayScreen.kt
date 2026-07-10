@@ -1682,42 +1682,44 @@ private fun PreviewHistoryCard(
 private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Double, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(168.dp)
+            .width(150.dp)
+            .height(96.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.10f))
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(30.dp).clip(CircleShape).background(color.copy(alpha = 0.20f)),
+                modifier = Modifier.size(26.dp).clip(CircleShape).background(color.copy(alpha = 0.20f)),
                 contentAlignment = Alignment.Center
-            ) { Text(letter, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+            ) { Text(letter, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color) }
             Spacer(Modifier.weight(1f))
-            Text(emoji, fontSize = 16.sp)
+            Text(emoji, fontSize = 15.sp)
         }
-        Spacer(Modifier.height(8.dp))
-        Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+        Spacer(Modifier.height(6.dp))
+        Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
         Spacer(Modifier.height(2.dp))
-        Text("${Math.round(value).toDouble().formatMoney()} so'm", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
+        Text("${Math.round(value).toDouble().formatMoney()} so'm", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
     }
 }
 
-// v164: 2-rasm — JAMI YUK / PUL / QARZ katta kartochkasi
+// v167: JAMI YUK / PUL / QARZ kartochkasi — MiniStatCard bilan BIR XIL o'lcham
 @Composable
 private fun MiniStatBox(title: String, big: String, sub: String, color: androidx.compose.ui.graphics.Color) {
     Column(
         modifier = Modifier
-            .width(168.dp)
+            .width(150.dp)
+            .height(96.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.08f))
             .padding(12.dp)
     ) {
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
-        Spacer(Modifier.height(10.dp))
-        Text(big, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
+        Spacer(Modifier.height(8.dp))
+        Text(big, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
         if (sub.isNotBlank()) {
             Spacer(Modifier.height(2.dp))
-            Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
+            Text(sub, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280), maxLines = 1)
         }
     }
 }
