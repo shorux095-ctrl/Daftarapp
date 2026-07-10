@@ -121,7 +121,7 @@ class EditTransactionViewModel @Inject constructor(
     fun saveAsNew() = saveInternal(asNew = true)
 
     /** v144: ➕ dialogdan — TANLANGAN tur va miqdor bilan YANGI yozuv qo'shadi. Asl yozuvga TEGMAYDI. */
-    fun addNew(type: TxType, amountStr: String, note: String = "") {
+    fun addNew(type: TxType, amountStr: String, note: String = "", narxStr: String = "") {
         val s = state.value
         val orig = s.original ?: return
         val amt = amountStr.replace(",", ".").toDoubleOrNull()
@@ -131,12 +131,13 @@ class EditTransactionViewModel @Inject constructor(
         }
         val timePart = if (orig.date.length > 10) orig.date.substring(10) else " 12:00:00"
         val newDate = s.date.toString() + timePart
+        val cleanName = uz.daftar.app.core.parser.DaftarParser.normalizeName(s.clientName).ifBlank { orig.clientName }
         viewModelScope.launch {
             try {
                 editUC(
                     id = 0L,
                     userId = orig.userId,
-                    clientName = uz.daftar.app.core.parser.DaftarParser.normalizeName(s.clientName).ifBlank { orig.clientName },
+                    clientName = cleanName,
                     note = note.trim().ifBlank { null },
                     type = type,
                     amount = amt,
@@ -144,6 +145,20 @@ class EditTransactionViewModel @Inject constructor(
                     tOverride = null,
                     costTier = null
                 )
+                // v169: yangi yukka NARX ham qo'yish mumkin (shu sanadan boshlab shu mijoz uchun)
+                val isCargoType = type in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
+                val narx = narxStr.replace(",", ".").toDoubleOrNull()
+                if (isCargoType && narx != null && narx > 0) {
+                    priceDao.insert(
+                        PriceHistoryEntity(
+                            userId = orig.userId,
+                            clientName = cleanName.lowercase(),
+                            priceType = type.code,
+                            price = narx,
+                            date = newDate
+                        )
+                    )
+                }
                 _state.update { it.copy(isSaved = true, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }

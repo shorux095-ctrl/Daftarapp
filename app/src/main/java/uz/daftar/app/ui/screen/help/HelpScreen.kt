@@ -129,7 +129,7 @@ fun HelpScreen(onBack: () -> Unit) {
                 Body("N narx (sotilgan) bo'yicha — 🔢 JAMI pul. Tur filtri: 30.05 a b")
                 Spacer(Modifier.height(6.dp))
                 Cmd("01.05 25.05        •        01.05 25.05 p")
-                Body("Sana ORALIG'I hisoboti. Tur filtri qo'shsangiz — faqat o'sha turlar:\n• 01.05 25.05 p — oraliqда P (to'lov) qilganlar, ism + summa + jami\n• 10.05 15.05 a b c — A/B/C yuklar (bir nechta tur birga)\n• 10.05 15.05 ali a b — faqat Ali, A va B\n• Oxiriga n qo'shsangiz — N (sotilgan) narx bo'yicha")
+                Body("Sana ORALIG'I hisoboti (yozib yuboring):\n• 01.05 20.05 — hamma yuklar (soni) + pullar\n• 01.05 25.05 pul — faqat P (to'lov) qilganlar, ism + summa + jami\n• 10.05 15.05 a c — faqat A va C yuklar\n• 10.05 15.05 ali a — faqat Ali, A yuki")
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
 

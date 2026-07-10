@@ -630,9 +630,10 @@ fun TodayScreen(
                                     is ChatItem.DebtRep -> DebtReminderCard(
                                         debtors = item.debtors,
                                         ts = item.ts,
-                                        onClose = { vm.removeChat(item.id) }
+                                        onClose = { vm.removeChat(item.id) },
+                                        onClient = { vm.openClientHistory(it) }
                                     )
-                                    is ChatItem.Saved -> SavedCard(item.info)
+                                    is ChatItem.Saved -> SavedCard(item.info, onName = { vm.openClientHistory(it) })
                                 }
                                 if (deleteChatId == item.id) {
                                     val clip = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -2142,7 +2143,7 @@ private fun JamiBadge(
 
 
 @Composable
-private fun SavedCard(info: SavedInfo) {
+private fun SavedCard(info: SavedInfo, onName: (String) -> Unit = {}) {
     val green = androidx.compose.ui.graphics.Color(0xFF1AA35A)
     val greenTint = androidx.compose.ui.graphics.Color(0xFFE9F6EF)
     val red = androidx.compose.ui.graphics.Color(0xFFE53935)
@@ -2197,7 +2198,9 @@ private fun SavedCard(info: SavedInfo) {
                         Text(firstType.uppercase(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = typeColor(firstType))
                     }
                     Spacer(Modifier.width(10.dp))
-                    Text(info.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink)
+                    // v169: ism bosilsa — mijoz tarixi ochiladi
+                    Text(info.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink,
+                        modifier = Modifier.clickable { onName(info.name) })
                 }
                 Spacer(Modifier.height(8.dp))
                 info.lines.forEach { line ->
@@ -2258,7 +2261,8 @@ private fun SavedCard(info: SavedInfo) {
 private fun DebtReminderCard(
     debtors: List<uz.daftar.app.domain.usecase.OverdueDebtor>,
     ts: Long,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onClient: (String) -> Unit = {}
 ) {
     val total = debtors.sumOf { it.debt }
     val timeStr = remember(ts) {
@@ -2286,10 +2290,10 @@ private fun DebtReminderCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            DebtBucket("\uD83D\uDD35 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE))
-            DebtBucket("\uD83D\uDFE1 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1))
-            DebtBucket("\uD83D\uDFE0 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6))
-            DebtBucket("\uD83D\uDD34 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA))
+            DebtBucket("\uD83D\uDD35 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE), onClient)
+            DebtBucket("\uD83D\uDFE1 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1), onClient)
+            DebtBucket("\uD83D\uDFE0 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6), onClient)
+            DebtBucket("\uD83D\uDD34 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA), onClient)
         }
     }
 }
@@ -2299,7 +2303,8 @@ private fun DebtBucket(
     title: String,
     items: List<uz.daftar.app.domain.usecase.OverdueDebtor>,
     accent: Color,
-    badgeBg: Color
+    badgeBg: Color,
+    onClient: (String) -> Unit = {}
 ) {
     if (items.isEmpty()) return
     Text(
@@ -2309,7 +2314,9 @@ private fun DebtBucket(
     items.sortedBy { it.daysOverdue }.forEach { d ->
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            modifier = Modifier.fillMaxWidth()
+                .clickable { onClient(d.client) }  // v169: mijoz bosilsa tarixi ochiladi
+                .padding(vertical = 3.dp)
         ) {
             Box(Modifier.size(7.dp).background(accent, CircleShape))
             Spacer(Modifier.width(8.dp))

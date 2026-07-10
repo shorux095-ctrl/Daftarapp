@@ -121,6 +121,7 @@ fun EditTransactionScreen(
                         var newType by remember { mutableStateOf(TxType.A) }
                         var newAmount by remember { mutableStateOf("") }
                         var newNote by remember { mutableStateOf("") }
+                        var newNarx by remember { mutableStateOf("") }  // v169
                         val newIsCargo = newType in listOf(TxType.A, TxType.B, TxType.C, TxType.D, TxType.K)
                         AlertDialog(
                             onDismissRequest = { showAddDialog = false },
@@ -147,6 +148,18 @@ fun EditTransactionScreen(
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth()
                                     )
+                                    // v169: yangi yukka NARX ham qo'yish mumkin
+                                    if (newIsCargo) {
+                                        Spacer(Modifier.height(8.dp))
+                                        OutlinedTextField(
+                                            value = newNarx,
+                                            onValueChange = { newNarx = it },
+                                            label = { Text("N narx (ixtiyoriy)") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                     Spacer(Modifier.height(8.dp))
                                     Text(
                                         "Asl yozuv o'zgarmaydi — ${state.clientName.trim().replaceFirstChar { c -> c.uppercase() }} ga YANGI yozuv qo'shiladi (${state.date.format(fmt)})",
@@ -159,7 +172,7 @@ fun EditTransactionScreen(
                                 Button(
                                     enabled = (newAmount.replace(",", ".").toDoubleOrNull() ?: 0.0) > 0.0,
                                     onClick = {
-                                        vm.addNew(newType, newAmount, newNote)
+                                        vm.addNew(newType, newAmount, newNote, newNarx)
                                         showAddDialog = false
                                     }
                                 ) { Text("Saqlash") }

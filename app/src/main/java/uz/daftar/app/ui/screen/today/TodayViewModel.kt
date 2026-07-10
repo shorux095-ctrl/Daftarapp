@@ -762,7 +762,83 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /** v140: hisobotda ism bosilsa — mijoz tarixi kartasi chatga qo'shiladi */
+    /**
+     * v169: ORALIQ SANA hisoboti. "01.05 20.05" — hamma yuk+pul; "01.05 20.05 a c" — faqat A,C;
+     * "01.05 20.05 pul" — faqat pullar. Yil: joriy yil (agar oy kelajakda bo'lsa — o'tgan yil).
+     */
+    private suspend fun buildRangeReport(d1: Int, m1: Int, d2: Int, m2: Int, filterRaw: String, typed: String) {
+        val nowY = today().year
+        fun mk(d: Int, m: Int): LocalDate {
+            val mm = m.coerceIn(1, 12)
+            return LocalDate.of(nowY, mm, d.coerceIn(1, java.time.YearMonth.of(nowY, mm).lengthOfMonth()))
+        }
+        var from = mk(d1, m1); var to = mk(d2, m2)
+        if (to.isBefore(from)) { val t = from; from = to; to = t }
+        // Filtr: harflar (a,b,c,d,k) yoki "pul"/"p" yoki MIJOZ ISMI yoki bo'sh (hammasi)
+        val tokens = filterRaw.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val cargoAll = listOf("a", "b", "c", "d", "k")
+        // v169: 2+ harfli so'zlar (pul emas) — mijoz ismi filtri ("01.05 25.05 ali a")
+        val nameTokens = tokens.filter { it.length >= 2 && it != "pul" && it !in cargoAll && it.all { c -> c.isLetter() || c == '\'' } }
+        val clientFilter = nameTokens.joinToString(" ")
+        val wantPul = tokens.any { it == "pul" || it == "p" } || tokens.none { it in cargoAll || it == "pul" || it == "p" }
+        val wantTypes = tokens.filter { it in cargoAll }.ifEmpty { if (tokens.any { it == "pul" || it == "p" }) emptyList() else cargoAll }
+
+        val txsAll = repo.getRange(userId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
+        val txs = if (clientFilter.isBlank()) txsAll
+                  else txsAll.filter { it.clientName.lowercase().contains(clientFilter.lowercase()) }
+        val cargo = txs.filter { it.type.lowercase() in wantTypes }
+        val pays = if (wantPul) txs.filter { it.type.equals("p", true) } else emptyList()
+
+        val sb = StringBuilder()
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM")
+        sb.append("📊 ${from.format(fmt)} – ${to.format(fmt)} hisobot")
+        if (clientFilter.isNotBlank()) sb.append(" · ${clientFilter.replaceFirstChar { it.uppercase() }}")
+        if (wantTypes.size in 1 until cargoAll.size) sb.append(" (${wantTypes.joinToString(", ") { it.uppercase() }})")
+        else if (wantTypes.isEmpty()) sb.append(" (faqat pul)")
+        sb.append("\n")
+
+        if (wantTypes.isNotEmpty()) {
+            // Turlar bo'yicha jami soni
+            sb.append("\n📦 YUKLAR (soni):\n")
+            var anyC = false
+            for (t in wantTypes) {
+                val sum = cargo.filter { it.type.equals(t, true) }.sumOf { it.amount }
+                if (sum > 0) { sb.append("  ${t.uppercase()}: ${sum.formatQty()} dona\n"); anyC = true }
+            }
+            if (!anyC) sb.append("  (yuk yo'q)\n")
+            // Mijozlar kesimi
+            val byClient = cargo.groupBy { it.clientName.lowercase() }
+            if (byClient.isNotEmpty()) {
+                sb.append("\n👥 MIJOZLAR:\n")
+                val entries = byClient.entries.sortedByDescending { e -> e.value.sumOf { it.amount } }.take(40)
+                entries.forEachIndexed { i, (cn, list) ->
+                    val parts = wantTypes.mapNotNull { t ->
+                        val q = list.filter { it.type.equals(t, true) }.sumOf { it.amount }
+                        if (q > 0) "${t.uppercase()}:${q.formatQty()}" else null
+                    }
+                    if (parts.isNotEmpty())
+                        sb.append("  ${i + 1}. ${cn.replaceFirstChar { it.uppercase() }}  ${parts.joinToString(" ")}\n")
+                }
+                if (byClient.size > 40) sb.append("  … yana ${byClient.size - 40} mijoz\n")
+            }
+        }
+        if (wantPul) {
+            val totalP = pays.sumOf { it.amount }
+            sb.append("\n💵 PUL: ${Math.round(totalP).toDouble().formatMoney()} so'm (${pays.size} ta to'lov)\n")
+            if (wantTypes.isEmpty() && pays.isNotEmpty()) {
+                val byC = pays.groupBy { it.clientName.lowercase() }
+                    .entries.sortedByDescending { e -> e.value.sumOf { it.amount } }.take(40)
+                byC.forEachIndexed { i, (cn, list) ->
+                    sb.append("  ${i + 1}. ${cn.replaceFirstChar { it.uppercase() }}  ${Math.round(list.sumOf { it.amount }).toDouble().formatMoney()}\n")
+                }
+            }
+        }
+        appendChat(ChatItem.User(nextChatId(), typed))
+        appendChat(ChatItem.Info(nextChatId(), sb.toString().trimEnd()))
+        persistChat()
+    }
+
+    /** v169: hisobotda ism bosilsa — tarix kartasi chatga qo'shiladi */
     fun openClientHistory(name: String) {
         viewModelScope.launch {
             val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
@@ -2066,6 +2142,22 @@ class TodayViewModel @Inject constructor(
     fun send() {
         val s = state.value
         val raw = s.input.trim()
+        // v169: ORALIQ SANA hisoboti — "01.05 20.05" (+ ixtiyoriy filtr: "a c" / "pul" / bo'sh=hammasi)
+        val rangeM = Regex("""^(\d{1,2})[.](\d{1,2})\s+(\d{1,2})[.](\d{1,2})(?:\s+(.+))?$""")
+            .matchEntire(raw)
+        if (rangeM != null) {
+            val d1 = rangeM.groupValues[1].toIntOrNull(); val m1 = rangeM.groupValues[2].toIntOrNull()
+            val d2 = rangeM.groupValues[3].toIntOrNull(); val m2 = rangeM.groupValues[4].toIntOrNull()
+            val filterRaw = rangeM.groupValues[5].trim().lowercase()
+            if (d1 != null && m1 != null && d2 != null && m2 != null) {
+                viewModelScope.launch {
+                    runCatching { buildRangeReport(d1, m1, d2, m2, filterRaw, raw) }
+                        .onFailure { appendChat(ChatItem.Info(nextChatId(), "❓ Oraliq hisobotda xato: ${it.message}")) }
+                }
+                _state.update { it.copy(input = "", parsed = emptyList(), errorMessage = null, suggestions = emptyList(), quickFills = emptyList(), isViewCommand = false, previews = emptyList()) }
+                return
+            }
+        }
         // 0) "delete 02.06" — tasdiq so'raydi (hali o'chirmaydi)
         if (s.deleteAllDate != null) {
             requestDeleteAll()
