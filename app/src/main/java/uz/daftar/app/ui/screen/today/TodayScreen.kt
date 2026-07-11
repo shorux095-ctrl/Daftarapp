@@ -1970,8 +1970,9 @@ private fun JamiSummary(report: uz.daftar.app.domain.usecase.DateReport) {
                                 contentAlignment = Alignment.Center
                             ) { Text(t.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colorFor(t)) }
                             Spacer(Modifier.height(5.dp))
-                            Text("${cnt.formatQty()} dona", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF6B7280))
-                            Text(money.formatMoney(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colorFor(t))
+                            // v173: DONA katta (asosiy), summa kichik (ikkilamchi)
+                            Text("${cnt.formatQty()} dona", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colorFor(t))
+                            Text(money.formatMoney() + " so'm", fontSize = 10.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
                         }
                     }
                 }

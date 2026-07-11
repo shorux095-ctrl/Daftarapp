@@ -844,8 +844,14 @@ class TodayViewModel @Inject constructor(
     fun openClientHistory(name: String) {
         viewModelScope.launch {
             val cp = runCatching { buildClientPreview(name, null) }.getOrNull()
+            // v173: agar shu mijozning kartasi allaqachon ochiq bo'lsa — eskisini olib tashlaymiz (dublikat bo'lmasin),
+            // yangisini oxiriga qo'yamiz — auto-scroll pastga tushadi va darrov ko'rinadi.
+            _state.update { st ->
+                st.copy(chat = st.chat.filterNot { it is ChatItem.History && it.preview.name.equals(name, ignoreCase = true) })
+            }
             if (cp != null) appendChat(ChatItem.History(nextChatId(), cp))
             else appendChat(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — yozuv topilmadi"))
+            persistChat()
         }
     }
 
