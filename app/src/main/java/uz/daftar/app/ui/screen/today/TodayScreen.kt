@@ -1477,6 +1477,22 @@ private fun PreviewHistoryCard(
                         fontSize = 22.sp, fontWeight = FontWeight.Bold
                     )
                 }
+                // v170: kichik QIZIL qarz tugmasi — Gusto yonida, bosilsa qisman to'lash dialogi
+                if (debt > 0L) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(cRed)
+                            .clickable { onCloseDebt() }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            "Qarz \u00b7 ${debt.formatMoney()}",
+                            color = androidx.compose.ui.graphics.Color.White,
+                            fontSize = 13.sp, fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
 
@@ -1594,25 +1610,13 @@ private fun PreviewHistoryCard(
 
             }
 
-            // v166: Qarz tugmalari YUQORIDA
+            // v170: Qarz tugmasi — faqat YASHIL (to'liq yopish, Ha/Yo'q so'raydi). Qizil TEPAGA ko'chdi.
             if (debt > 0L) {
-                Row(
+                Button(
+                    onClick = onCloseDebtFull,
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Yashil — TO'LIQ yopish (Ha/Yo'q so'raydi)
-                    Button(
-                        onClick = onCloseDebtFull,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = cGreen)
-                    ) { Text("Qarzni yopish \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
-                    // Qizil — QISMAN yopish
-                    Button(
-                        onClick = onCloseDebt,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = cRed)
-                    ) { Text("Qarz \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
-                }
+                    colors = ButtonDefaults.buttonColors(containerColor = cGreen)
+                ) { Text("Qarzni yopish \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
             } else if (debt < 0L) {
                 // Ortiqcha to'lov (haqi bor)
                 Box(
@@ -1684,7 +1688,7 @@ private fun MiniStatCard(letter: String, emoji: String, sub: String, value: Doub
     Column(
         modifier = Modifier
             .width(110.dp)
-            .height(50.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = 0.10f))
             .padding(8.dp)
@@ -1709,7 +1713,7 @@ private fun MiniStatBox(title: String, big: String, sub: String, color: androidx
     Column(
         modifier = Modifier
             .width(110.dp)
-            .height(50.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = 0.08f))
             .padding(8.dp)

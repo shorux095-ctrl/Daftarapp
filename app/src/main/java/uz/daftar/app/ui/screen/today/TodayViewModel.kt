@@ -786,8 +786,8 @@ class TodayViewModel @Inject constructor(
         val txsAll = repo.getRange(userId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
         val txs = if (clientFilter.isBlank()) txsAll
                   else txsAll.filter { it.clientName.lowercase().contains(clientFilter.lowercase()) }
-        val cargo = txs.filter { it.type.lowercase() in wantTypes }
-        val pays = if (wantPul) txs.filter { it.type.equals("p", true) } else emptyList()
+        val cargo = txs.filter { it.type.code in wantTypes }  // v170: type = TxType enum, .code = "a".."k"
+        val pays = if (wantPul) txs.filter { it.type == TxType.P } else emptyList()
 
         val sb = StringBuilder()
         val fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM")
@@ -802,7 +802,7 @@ class TodayViewModel @Inject constructor(
             sb.append("\n📦 YUKLAR (soni):\n")
             var anyC = false
             for (t in wantTypes) {
-                val sum = cargo.filter { it.type.equals(t, true) }.sumOf { it.amount }
+                val sum = cargo.filter { it.type.code == t }.sumOf { it.amount }
                 if (sum > 0) { sb.append("  ${t.uppercase()}: ${sum.formatQty()} dona\n"); anyC = true }
             }
             if (!anyC) sb.append("  (yuk yo'q)\n")
@@ -813,7 +813,7 @@ class TodayViewModel @Inject constructor(
                 val entries = byClient.entries.sortedByDescending { e -> e.value.sumOf { it.amount } }.take(40)
                 entries.forEachIndexed { i, (cn, list) ->
                     val parts = wantTypes.mapNotNull { t ->
-                        val q = list.filter { it.type.equals(t, true) }.sumOf { it.amount }
+                        val q = list.filter { it.type.code == t }.sumOf { it.amount }
                         if (q > 0) "${t.uppercase()}:${q.formatQty()}" else null
                     }
                     if (parts.isNotEmpty())
