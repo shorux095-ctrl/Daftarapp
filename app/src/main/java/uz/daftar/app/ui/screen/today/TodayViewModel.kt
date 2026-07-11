@@ -592,18 +592,21 @@ class TodayViewModel @Inject constructor(
 
     /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        // v158: 10 kundan oshgan qarzdorlar (10-14, 15-29, 30-59, 60+). 1-9 kun ko'rsatilmaydi.
-        val all = runCatching { getOverdue(userId) }.getOrNull() ?: return
-        val list = all.filter { it.daysOverdue >= 10 }
-        val today = today().toString()
+        // v174: HAR KUNI bosh ekranga qarz eslatmasi (10 kundan oshgan qarzdorlar).
+        // Shart: soat 10:00 dan keyin + o'sha kuni hali ko'rsatilmagan bo'lsa.
         val hour = java.time.LocalTime.now(APP_ZONE).hour
         if (hour < 10) return
+        val today = today().toString()
         val last = runCatching { chatStore.getLastDebtRemDate() }.getOrDefault("")
-        if (last == today) return
+        if (last == today) return  // bugun allaqachon ko'rsatilgan
+
+        val all = runCatching { getOverdue(userId) }.getOrNull() ?: return
+        val list = all.filter { it.daysOverdue >= 10 }
+        // Bugun ko'rsatilgan deb belgilaymiz (qarzdor bo'lmasa ham — kuniga 1 marta tekshiriladi)
+        runCatching { chatStore.setLastDebtRemDate(today) }
         if (list.isNotEmpty()) {
             appendChat(ChatItem.DebtRep(nextChatId(), list))
             persistChat()
-            runCatching { chatStore.setLastDebtRemDate(today) }
         }
     }
 
