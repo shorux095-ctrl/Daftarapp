@@ -97,6 +97,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -585,9 +586,11 @@ fun TodayScreen(
                     )
                 }
             } else {
+                // v174: chat + pastga tushirish ⬇️ tugmasi (Box bilan o'raladi)
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -688,6 +691,22 @@ fun TodayScreen(
                         }
                     }
                 }
+                // v174: ⬇️ pastga tushirish — oxirgi elementga kelmagan bo'lsa ko'rinadi
+                val notAtBottom by remember {
+                    derivedStateOf {
+                        val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                        state.chat.isNotEmpty() && last < state.chat.size - 1
+                    }
+                }
+                if (notAtBottom) {
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = { calScope.launch { runCatching { listState.animateScrollToItem(state.chat.size - 1) } } },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(44.dp),
+                        containerColor = androidx.compose.ui.graphics.Color(0xFF5B5FE0),
+                        contentColor = androidx.compose.ui.graphics.Color.White
+                    ) { Text("\u2193", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+                }
+                }
             }
         }
     }
@@ -784,8 +803,18 @@ private fun ChatTopBar(
         pendingNav = null
     }
 
+    val todayStr = remember {
+        val d = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tashkent"))
+        val oylar = listOf("yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","sentabr","oktabr","noyabr","dekabr")
+        "%d-%s %d".format(d.dayOfMonth, oylar[d.monthValue - 1], d.year)
+    }
     CenterAlignedTopAppBar(
-        title = { Text("Daftar · v166", fontWeight = FontWeight.SemiBold) },
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Daftar · v174", fontWeight = FontWeight.SemiBold)
+                Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
+            }
+        },
         navigationIcon = {
             // Asosiy menu — chapda hamburger (☰)
             Box {
