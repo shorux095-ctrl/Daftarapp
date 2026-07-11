@@ -1948,14 +1948,15 @@ class TodayViewModel @Inject constructor(
         val asc = history.transactions.sortedBy { it.date }
         var running = 0.0
         val balAfter = mutableMapOf<Long, Long>()
-        for (tx in asc) {
+        for ((i, tx) in asc.withIndex()) {
             when (tx.type.lowercase()) {
                 "p" -> { running -= tx.amount }
                 "q" -> running += tx.amount
                 else -> { val p = priceByTx[tx.id]; if (p != null) running += tx.amount * p }
             }
-            // v166: kesish (toLong) emas — roundToLong, umumiy qarz (debt) bilan bir xil bo'lsin (2046≠2049 farqi yo'qoladi)
-            balAfter[tx.id] = Math.round(running)
+            // v175: OXIRGI yozuvning balansi = umumiy qarz (calcDebt bilan aynan bir xil).
+            // Aks holda kasrli narxlarda kunlik balans (1000) va tugmadagi qarz (1002) farq qilardi.
+            balAfter[tx.id] = if (i == asc.size - 1) history.debt else Math.round(running)
         }
         return ClientPreview(
             name = displayName,
