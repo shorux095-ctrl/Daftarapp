@@ -85,5 +85,23 @@ fun scheduleDebtReminderAlarm(context: Context) {
         context, 99001, intent,
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
-    runCatching { am.cancel(pi) }
+    // v174: keyingi soat 10:00 ni hisoblaymiz (agar bugun 10:00 o'tган bo'lsa — ertaga)
+    val now = Calendar.getInstance()
+    val target = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 10)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
+    }
+    // ANIQ alarm (Doze rejimida ham ishlaydi). Ruxsat bo'lmasa — oddiy alarm.
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pi)
+        } else {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pi)
+        }
+    } catch (_: SecurityException) {
+        runCatching { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pi) }
+    }
 }

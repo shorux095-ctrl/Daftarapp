@@ -38,6 +38,8 @@ class EslatmaBootReceiver : BroadcastReceiver() {
                     .filter { !it.done && it.triggerAt > now }
                     .forEach { scheduleEslatmaAlarm(context, it.id, it.text, it.triggerAt) }
             }
+            // v174: telefon o'chib-yonganda qarz eslatma (10:00) alarmini ham qayta tiklash
+            runCatching { scheduleDebtReminderAlarm(context) }
             pending.finish()
         }
     }

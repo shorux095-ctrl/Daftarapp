@@ -86,6 +86,8 @@ class DaftarApplication : Application(), Configuration.Provider {
         scheduleTelegramBackup() // har kuni 23:00 — bazani Telegramga (sozlangan bo'lsa)
         scheduleDriveSync()      // har 30 daqiqa — Drive'ga fon sinxron (internet bo'lganda; yo'q bo'lsa kutadi)
         scheduleNightlyLocalBackup() // v148: HAR KECHASI 02:00 — lokal avto-zaxira
+        // v174: HAR KUNI 10:00 — qarz eslatma BILDIRISHNOMASI (ilova yopiq bo'lsa ham keladi)
+        runCatching { uz.daftar.app.core.notify.scheduleDebtReminderAlarm(this) }
         // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)
         Thread { runCatching { backupManager.dailyLocalBackupIfNeeded() } }.apply { isDaemon = true }.start()
         // scheduleDailyAutoReport()
