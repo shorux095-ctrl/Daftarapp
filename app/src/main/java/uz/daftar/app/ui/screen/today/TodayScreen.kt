@@ -1479,10 +1479,11 @@ private fun PreviewHistoryCard(
                 }
                 // v170: kichik QIZIL qarz tugmasi — Gusto yonida, bosilsa qisman to'lash dialogi
                 if (debt > 0L) {
+                    // v171: tepadagi Qarz — YASHIL (bosilsa qisman to'lash)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(cRed)
+                            .background(cGreen)
                             .clickable { onCloseDebt() }
                             .padding(horizontal = 12.dp, vertical = 7.dp)
                     ) {
@@ -1615,7 +1616,7 @@ private fun PreviewHistoryCard(
                 Button(
                     onClick = onCloseDebtFull,
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = cGreen)
+                    colors = ButtonDefaults.buttonColors(containerColor = cRed)  // v171: QIZIL — qarz borligi bilinadi
                 ) { Text("Qarzni yopish \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
             } else if (debt < 0L) {
                 // Ortiqcha to'lov (haqi bor)
@@ -1643,8 +1644,8 @@ private fun PreviewHistoryCard(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(onClick = onPrev, modifier = Modifier.weight(1f)) { Text("\u2190 Oldingi") }
-                FilledTonalButton(onClick = onNext, modifier = Modifier.weight(1f)) { Text("Keyingi \u2192") }
+                GradientNavBtn("Oldingi", forward = false, onClick = onPrev, modifier = Modifier.weight(1f))
+                GradientNavBtn("Keyingi", forward = true, onClick = onNext, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -1681,6 +1682,40 @@ private fun PreviewHistoryCard(
     }
 }
 
+
+// v171: GRADIENT PILL navigatsiya tugmasi (ko'k → binafsha, oq doira ichida strelka)
+@Composable
+fun GradientNavBtn(text: String, forward: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val gStart = androidx.compose.ui.graphics.Color(0xFF4A5CF0)
+    val gEnd = androidx.compose.ui.graphics.Color(0xFF8B3DE8)
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(28.dp))
+            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(gStart, gEnd)))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (forward) Arrangement.End else Arrangement.Start
+    ) {
+        if (!forward) {
+            Box(
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White),
+                contentAlignment = Alignment.Center
+            ) { Text("\u2190", color = gStart, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.weight(1f))
+            Text(text, color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+            Text(text, color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White),
+                contentAlignment = Alignment.Center
+            ) { Text("\u2192", color = gEnd, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
 
 // v164: 2-rasm — kartochka: harf + emoji + soni + summa
 @Composable

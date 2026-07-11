@@ -243,8 +243,9 @@ fun ClientHistoryScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        NavBtn("← Oldingi", Modifier.weight(1f)) { vm.prevMonth() }
-                        NavBtn("Keyingi →", Modifier.weight(1f)) { vm.nextMonth() }
+                        // v171: Gradient Pill dizayni (bosh ekran bilan bir xil)
+                        uz.daftar.app.ui.screen.today.GradientNavBtn("Oldingi", forward = false, onClick = { vm.prevMonth() }, modifier = Modifier.weight(1f))
+                        uz.daftar.app.ui.screen.today.GradientNavBtn("Keyingi", forward = true, onClick = { vm.nextMonth() }, modifier = Modifier.weight(1f))
                     }
                 }
             }
