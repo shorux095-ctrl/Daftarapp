@@ -2,6 +2,7 @@ package uz.daftar.app.ui.screen.today
 
 import uz.daftar.app.core.util.yukRangi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -1477,23 +1478,7 @@ private fun PreviewHistoryCard(
                         fontSize = 22.sp, fontWeight = FontWeight.Bold
                     )
                 }
-                // v170: kichik QIZIL qarz tugmasi — Gusto yonida, bosilsa qisman to'lash dialogi
-                if (debt > 0L) {
-                    // v171: tepadagi Qarz — YASHIL (bosilsa qisman to'lash)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(cGreen)
-                            .clickable { onCloseDebt() }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    ) {
-                        Text(
-                            "Qarz \u00b7 ${debt.formatMoney()}",
-                            color = androidx.compose.ui.graphics.Color.White,
-                            fontSize = 13.sp, fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                // v172: tepadagi qarz pill O'CHIRILDI — pastdagi qizil "Qarz" tugmasi yetarli
             }
             HorizontalDivider(color = androidx.compose.ui.graphics.Color(0x11000000))
 
@@ -1614,10 +1599,10 @@ private fun PreviewHistoryCard(
             // v170: Qarz tugmasi — faqat YASHIL (to'liq yopish, Ha/Yo'q so'raydi). Qizil TEPAGA ko'chdi.
             if (debt > 0L) {
                 Button(
-                    onClick = onCloseDebtFull,
+                    onClick = onCloseDebt,  // v172: dialog ochiladi — to'liq yoki qisman summani o'zingiz kiritasiz
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = cRed)  // v171: QIZIL — qarz borligi bilinadi
-                ) { Text("Qarzni yopish \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
+                    colors = ButtonDefaults.buttonColors(containerColor = cRed)
+                ) { Text("Qarz \u00b7 ${debt.formatMoney()}", fontSize = 13.sp) }
             } else if (debt < 0L) {
                 // Ortiqcha to'lov (haqi bor)
                 Box(
@@ -1683,15 +1668,17 @@ private fun PreviewHistoryCard(
 }
 
 
-// v171: GRADIENT PILL navigatsiya tugmasi (ko'k → binafsha, oq doira ichida strelka)
+// v172: GLASS (Glassmorphism) navigatsiya tugmasi — yarim shaffof, oq border, yumshoq
 @Composable
 fun GradientNavBtn(text: String, forward: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val gStart = androidx.compose.ui.graphics.Color(0xFF4A5CF0)
-    val gEnd = androidx.compose.ui.graphics.Color(0xFF8B3DE8)
+    val glassBg = androidx.compose.ui.graphics.Color(0xFFECEEFC)      // yarim shaffof lavanda
+    val circleBg = androidx.compose.ui.graphics.Color(0xFFDDE1F9)     // doira — biroz to'qroq
+    val ink = androidx.compose.ui.graphics.Color(0xFF5B5FE0)          // ko'k-binafsha matn/strelka
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(28.dp))
-            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(gStart, gEnd)))
+            .background(glassBg.copy(alpha = 0.75f))
+            .border(1.5.dp, androidx.compose.ui.graphics.Color.White, RoundedCornerShape(28.dp))
             .clickable { onClick() }
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1699,20 +1686,20 @@ fun GradientNavBtn(text: String, forward: Boolean, onClick: () -> Unit, modifier
     ) {
         if (!forward) {
             Box(
-                modifier = Modifier.size(32.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White),
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(circleBg),
                 contentAlignment = Alignment.Center
-            ) { Text("\u2190", color = gStart, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("\u2190", color = ink, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.weight(1f))
-            Text(text, color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
         } else {
             Spacer(Modifier.weight(1f))
-            Text(text, color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
             Box(
-                modifier = Modifier.size(32.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White),
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(circleBg),
                 contentAlignment = Alignment.Center
-            ) { Text("\u2192", color = gEnd, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("\u2192", color = ink, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }

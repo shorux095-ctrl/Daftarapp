@@ -309,6 +309,8 @@ class TodayViewModel @Inject constructor(
             }
             if (pend.isNotEmpty()) persistChat()
             refreshHistoryCards()
+            // v172: Mijozlar/Qarzdorlar'dan bosilgan mijoz — YANGI KARTA sifatida ochiladi
+            runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
             // v160: fondan qaytganda (yoki 08:00 kelganda) ham kechki hisobot tekshiriladi
             runCatching { maybeShowAutoReports() }
             // v158: fondan qaytganda (yoki 10:00 kelganda) ham eslatma tekshiriladi.

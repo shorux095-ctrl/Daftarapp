@@ -32,6 +32,19 @@ class ChatStore @Inject constructor(
         return on
     }
 
+    /** v172: Mijozlar/Qarzdorlar'dan bosilgan mijoz — bosh ekranda YANGI KARTA sifatida ochish uchun. */
+    fun setPendingOpenClient(name: String) {
+        context.getSharedPreferences("open_client", Context.MODE_PRIVATE)
+            .edit().putString("name", name).apply()
+    }
+
+    fun consumePendingOpenClient(): String? {
+        val p = context.getSharedPreferences("open_client", Context.MODE_PRIVATE)
+        val n = p.getString("name", null)
+        if (n != null) p.edit().remove("name").apply()
+        return n
+    }
+
     suspend fun save(json: String) {
         context.chatDataStore.edit { it[chatKey] = json }
     }

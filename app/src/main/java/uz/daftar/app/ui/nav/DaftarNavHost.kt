@@ -92,6 +92,16 @@ fun DaftarNavHost() {
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastNav.longValue >= 400L) { lastNav.longValue = now; true } else false
     }
+    // v172: Mijozlar/Qarzdorlar/Bashorat/Tahrir'dan mijoz bosilsa — BOSH EKRANDA yangi karta ochiladi
+    val navCtx = androidx.compose.ui.platform.LocalContext.current
+    val openClientAsCard: (String) -> Unit = { name ->
+        navCtx.getSharedPreferences("open_client", android.content.Context.MODE_PRIVATE)
+            .edit().putString("name", name).apply()
+        if (canNav()) nav.navigate(Routes.TODAY) {
+            popUpTo(Routes.TODAY) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
     // Har navigatsiyada (oldinga/orqaga) klaviatura va fokusni tozalaymiz.
     // Bu IME (klaviatura insets) sababli yuzaga keladigan OQ EKRAN bug'ini barcha ekranda oldini oladi.
     val imeFocusMgr = androidx.compose.ui.platform.LocalFocusManager.current
@@ -156,7 +166,7 @@ fun DaftarNavHost() {
             ClientsScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
                 onClientClick = { name ->
-                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                    openClientAsCard(name)
                 }
             )
         }
@@ -165,7 +175,7 @@ fun DaftarNavHost() {
             ClientsScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
                 onClientClick = { name ->
-                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                    openClientAsCard(name)
                 },
                 debtorsOnly = true
             )
@@ -175,7 +185,7 @@ fun DaftarNavHost() {
             uz.daftar.app.ui.screen.qarzdorlar.QarzdorlarScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
                 onOpenClient = { name ->
-                    if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name")
+                    openClientAsCard(name)
                 }
             )
         }
@@ -232,7 +242,7 @@ fun DaftarNavHost() {
         composable(Routes.YUK_REPORT) { DiagIn("yuk_report"); uz.daftar.app.ui.screen.yukreport.YukReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.TOLIQ) { DiagIn("toliq"); uz.daftar.app.ui.screen.toliq.ToliqHisobotScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.DAILY) { DiagIn("daily"); uz.daftar.app.ui.screen.daily.DailyReportScreen(onBack = { if (canNav()) nav.popBackStack() }) }
-        composable(Routes.BASHORAT) { DiagIn("bashorat"); uz.daftar.app.ui.screen.bashorat.BashoratScreen(onBack = { if (canNav()) nav.popBackStack() }, onOpenClient = { name -> if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name") }) }
+        composable(Routes.BASHORAT) { DiagIn("bashorat"); uz.daftar.app.ui.screen.bashorat.BashoratScreen(onBack = { if (canNav()) nav.popBackStack() }, onOpenClient = { name -> openClientAsCard(name) }) }
         composable(Routes.GRAFIK) { DiagIn("grafik"); uz.daftar.app.ui.screen.grafik.GrafikScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.STATISTIKA) { DiagIn("statistika"); StatistikaScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.QOSHIMCHA) { DiagIn("qoshimcha");
@@ -254,7 +264,7 @@ fun DaftarNavHost() {
         composable(Routes.HELP) { DiagIn("help"); uz.daftar.app.ui.screen.help.HelpScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.ESLAT) { DiagIn("eslat"); uz.daftar.app.ui.screen.eslat.EslatScreen(onBack = { if (canNav()) nav.popBackStack() }) }
         composable(Routes.SKLAD) { DiagIn("sklad"); uz.daftar.app.ui.screen.sklad.SkladScreen(onBack = { if (canNav()) nav.popBackStack() }) }
-        composable(Routes.TAHRIR) { DiagIn("tahrir"); TahrirScreen(onBack = { if (canNav()) nav.popBackStack() }, onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") }, onOpenClient = { name -> if (canNav()) nav.navigate("${Routes.CLIENT_HISTORY}/$name") }) }
+        composable(Routes.TAHRIR) { DiagIn("tahrir"); TahrirScreen(onBack = { if (canNav()) nav.popBackStack() }, onEditTx = { txId -> if (canNav()) nav.navigate("${Routes.EDIT_TX}/$txId") }, onOpenClient = { name -> openClientAsCard(name) }) }
     }
     // (diagnostika olib tashlandi)
     }
