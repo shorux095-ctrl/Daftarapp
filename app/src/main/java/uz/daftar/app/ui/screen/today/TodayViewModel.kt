@@ -59,6 +59,7 @@ data class ClientPreview(
 
 data class TodayUiState(
     val filter: Filter = Filter.TODAY,
+    val debtorCount: Int = 0,   // v176: toolbar 💳 yonidagi son
     val isLoading: Boolean = true,
     val restored: Boolean = false,
     val transactions: List<Transaction> = emptyList(),
@@ -221,6 +222,7 @@ class TodayViewModel @Inject constructor(
                     getDateReport.invalidate()   // hisobot keshini ham yangilaymiz
                     kotlinx.coroutines.delay(300)   // ketma-ket saqlashlarni jamlaymiz
                     refreshHistoryCards()
+                    refreshDebtorCount()   // v176: qarz o'zgarsa — toolbar soni ham yangilanadi
                 }
         }
         // v153: NARX o'zgarishini alohida kuzatamiz — "n c4.1" faqat price_history'ni o'zgartiradi,
@@ -311,6 +313,7 @@ class TodayViewModel @Inject constructor(
             refreshHistoryCards()
             // v172: Mijozlar/Qarzdorlar'dan bosilgan mijoz — YANGI KARTA sifatida ochiladi
             runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
+            refreshDebtorCount()   // v176
             // v160: fondan qaytganda (yoki 08:00 kelganda) ham kechki hisobot tekshiriladi
             runCatching { maybeShowAutoReports() }
             // v158: fondan qaytganda (yoki 10:00 kelganda) ham eslatma tekshiriladi.
@@ -841,6 +844,29 @@ class TodayViewModel @Inject constructor(
         appendChat(ChatItem.User(nextChatId(), typed))
         appendChat(ChatItem.Info(nextChatId(), sb.toString().trimEnd()))
         persistChat()
+    }
+
+    /** v176: 🔔 toolbar tugmasi — qarz eslatma oynasini DARROV ko'rsatadi (10/15/30/60/90 kun) */
+    fun showDebtReminder() {
+        viewModelScope.launch {
+            val list = runCatching { getOverdue(userId).filter { it.daysOverdue >= 10 } }.getOrDefault(emptyList())
+            if (list.isEmpty()) {
+                appendChat(ChatItem.Info(nextChatId(), "\u2705 10 kundan oshgan qarzdor yo'q."))
+            } else {
+                // eskisini olib tashlaymiz — dublikat bo'lmasin
+                _state.update { st -> st.copy(chat = st.chat.filterNot { it is ChatItem.DebtRep }) }
+                appendChat(ChatItem.DebtRep(nextChatId(), list))
+            }
+            persistChat()
+        }
+    }
+
+    /** v176: qarzdorlar sonini yangilash (toolbar 💳 yonida) */
+    private fun refreshDebtorCount() {
+        viewModelScope.launch {
+            val n = runCatching { getOverdue(userId).size }.getOrDefault(0)
+            _state.update { it.copy(debtorCount = n) }
+        }
     }
 
     /** v169: hisobotda ism bosilsa — tarix kartasi chatga qo'shiladi */

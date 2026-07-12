@@ -441,6 +441,9 @@ fun TodayScreen(
                     onTahrir = onTahrir,
                     onQoshimcha = onQoshimcha,
                     onYukType = { yukTypeDialog = it },
+                    onQarzdorlar = onQarz,                       // v176: 💳 toolbar tugmasi
+                    onBell = { vm.showDebtReminder() },          // v176: 🔔 qarz eslatma oynasi
+                    debtorCount = state.debtorCount,
                     menuOpen = menuOpen,
                     onMenuOpenChange = { menuOpen = it }
                 )
@@ -800,6 +803,9 @@ private fun ChatTopBar(
     onJumpToDate: (java.time.LocalDate) -> Unit = {},
     onImport: () -> Unit = {},
     onYukType: (String) -> Unit,
+    onQarzdorlar: () -> Unit = {},
+    onBell: () -> Unit = {},
+    debtorCount: Int = 0,
     menuOpen: Boolean,
     onMenuOpenChange: (Boolean) -> Unit
 ) {
@@ -855,11 +861,26 @@ private fun ChatTopBar(
                 )
                 Spacer(Modifier.width(6.dp))
             }
+            // v176 (A): 💳 Qarzdorlar (soni) — bosilsa ro'yxat, 🔔 — qarz eslatma oynasi
+            TextButton(
+                onClick = { onQarzdorlar() },
+                contentPadding = PaddingValues(horizontal = 6.dp)
+            ) {
+                Text("\uD83D\uDCB3", fontSize = 15.sp)
+                if (debtorCount > 0) {
+                    Spacer(Modifier.width(3.dp))
+                    Text("$debtorCount", fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
+                }
+            }
+            IconButton(onClick = { onBell() }, modifier = Modifier.size(36.dp)) {
+                Text("\uD83D\uDD14", fontSize = 17.sp)
+            }
             // 📅 Sana — istalgan kun yozuvlarini ko'rsatadi (Bugun o'rniga)
-            TextButton(onClick = onOpenCalendar, contentPadding = PaddingValues(horizontal = 10.dp)) {
+            TextButton(onClick = onOpenCalendar, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("Sana")
+                Spacer(Modifier.width(4.dp))
+                Text("Sana", fontSize = 13.sp)
             }
         }
     )
@@ -1605,6 +1626,14 @@ private fun PreviewHistoryCard(
                         val monIdx = (if (tx.date.length >= 7) tx.date.substring(5, 7).toIntOrNull() else null) ?: month.monthValue
                         val monAbbr = MONTHS_UZ_TODAY[(monIdx - 1).coerceIn(0, 11)].take(4).uppercase()
                         val time = if (tx.date.length >= 16) tx.date.substring(11, 16) else ""
+                        // v176 (C): har yozuvda HAFTA KUNI ham (Juma, Shanba...)
+                        val weekDay = remember(tx.date) {
+                            runCatching {
+                                val hafta = listOf("Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba")
+                                val d = java.time.LocalDate.parse(tx.date.take(10))
+                                hafta[d.dayOfWeek.value % 7]
+                            }.getOrDefault("")
+                        }
                         val bal = Math.round(balMap[tx.id] ?: 0.0)
                         val balColor = if (bal > 0) cRed else cGreen
                         Row(
@@ -1632,7 +1661,7 @@ private fun PreviewHistoryCard(
                                 Text(desc, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tc)
                                 if (time.isNotEmpty()) {
                                     Spacer(Modifier.height(3.dp))
-                                    Text("\uD83D\uDD50 $time", fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
+                                    Text("\uD83D\uDD50 $time" + (if (weekDay.isNotBlank()) " \u00b7 $weekDay" else ""), fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
                                 }
                             }
                             Spacer(Modifier.width(8.dp))
@@ -1839,27 +1868,33 @@ private fun isSameDay(a: Long, b: Long): Boolean {
 
 @Composable
 private fun ChatDateSeparator(ts: Long) {
-    val z = java.time.ZoneId.systemDefault()
+    val z = java.time.ZoneId.of("Asia/Tashkent")
     val d = java.time.Instant.ofEpochMilli(ts).atZone(z).toLocalDate()
-    val today = java.time.LocalDate.now()
+    val today = java.time.LocalDate.now(z)
+    // v176 (B): Telegram uslubi — "Bugun · 11-iyul, Juma" / "Kecha · 10-iyul" / "8-iyul, Chorshanba"
+    val hafta = listOf("Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba")
+    val oy = MONTHS_UZ_TODAY[d.monthValue - 1].lowercase()
+    val kun = hafta[d.dayOfWeek.value % 7]
     val label = when (d) {
-        today -> "Bugun"
-        today.minusDays(1) -> "Kecha"
-        else -> d.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+        today -> "Bugun \u00b7 ${d.dayOfMonth}-$oy, $kun"
+        today.minusDays(1) -> "Kecha \u00b7 ${d.dayOfMonth}-$oy, $kun"
+        else -> "${d.dayOfMonth}-$oy, $kun"
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.Center
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shape = RoundedCornerShape(12.dp)
+            color = androidx.compose.ui.graphics.Color(0xFFE8EAF6),
+            shape = RoundedCornerShape(14.dp),
+            tonalElevation = 1.dp
         ) {
             Text(
                 label,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = androidx.compose.ui.graphics.Color(0xFF5B5FE0)
             )
         }
     }
@@ -2368,10 +2403,12 @@ private fun DebtReminderCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
+            // v176: 10 / 15 / 30 / 60 / 90 kunlik guruhlar
             DebtBucket("\uD83D\uDD35 10\u201314 kun", debtors.filter { it.daysOverdue in 10..14 }, Color(0xFF1565C0), Color(0xFFE8F0FE), onClient)
             DebtBucket("\uD83D\uDFE1 15\u201329 kun", debtors.filter { it.daysOverdue in 15..29 }, Color(0xFFF9A825), Color(0xFFFFF8E1), onClient)
             DebtBucket("\uD83D\uDFE0 30\u201359 kun", debtors.filter { it.daysOverdue in 30..59 }, Color(0xFFE65100), Color(0xFFFFF1E6), onClient)
-            DebtBucket("\uD83D\uDD34 60 kun va undan ortiq", debtors.filter { it.daysOverdue >= 60 }, Color(0xFFD32F2F), Color(0xFFFDECEA), onClient)
+            DebtBucket("\uD83D\uDD34 60\u201389 kun", debtors.filter { it.daysOverdue in 60..89 }, Color(0xFFD32F2F), Color(0xFFFDECEA), onClient)
+            DebtBucket("\u26AB 90 kun va undan ortiq", debtors.filter { it.daysOverdue >= 90 }, Color(0xFF6A1B9A), Color(0xFFF3E5F5), onClient)
         }
     }
 }
