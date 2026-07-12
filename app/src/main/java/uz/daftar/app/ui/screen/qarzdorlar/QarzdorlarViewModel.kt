@@ -16,7 +16,8 @@ data class QarzdorlarState(
     val debtors: List<OverdueDebtor> = emptyList(),
     val totalDebt: Long = 0,
     val loading: Boolean = true,
-    val rating: Boolean = true  // v148: 🏆 reyting (katta qarz yuqorida) / 📅 kun bo'yicha
+    val rating: Boolean = true,  // v148: 🏆 reyting (katta qarz yuqorida) / 📅 kun bo'yicha
+    val eslatma: Boolean = false // v177: 🔔 guruhli ko'rinish (10/15/30/60/90 kun)
 )
 
 @HiltViewModel
@@ -42,6 +43,11 @@ class QarzdorlarViewModel @Inject constructor(
     /** v148: 🏆 Reyting — eng katta qarz yuqorida; 📅 Kun — yangi qarzlar yuqorida */
     fun setRating(r: Boolean) {
         _state.update { it.copy(rating = r) }
+
+    /** v177: 🔔 guruhli eslatma ko'rinishini yoqish/o'chirish */
+    fun toggleEslatma() {
+        _state.update { it.copy(eslatma = !it.eslatma) }
+    }
         applySort()
     }
 

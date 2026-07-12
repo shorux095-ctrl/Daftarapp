@@ -831,7 +831,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v177", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v178", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -861,21 +861,7 @@ private fun ChatTopBar(
                 )
                 Spacer(Modifier.width(6.dp))
             }
-            // v176 (A): 💳 Qarzdorlar (soni) — bosilsa ro'yxat, 🔔 — qarz eslatma oynasi
-            TextButton(
-                onClick = { onQarzdorlar() },
-                contentPadding = PaddingValues(horizontal = 6.dp)
-            ) {
-                Text("\uD83D\uDCB3", fontSize = 15.sp)
-                if (debtorCount > 0) {
-                    Spacer(Modifier.width(3.dp))
-                    Text("$debtorCount", fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        color = androidx.compose.ui.graphics.Color(0xFFD32F2F))
-                }
-            }
-            IconButton(onClick = { onBell() }, modifier = Modifier.size(36.dp)) {
-                Text("\uD83D\uDD14", fontSize = 17.sp)
-            }
+            // v177: 💳/🔔 toolbar'dan OLIB TASHLANDI — endi Qarzdorlar ekranida (tepada)
             // 📅 Sana — istalgan kun yozuvlarini ko'rsatadi (Bugun o'rniga)
             TextButton(onClick = onOpenCalendar, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1533,14 +1519,18 @@ private fun PreviewHistoryCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Column(Modifier.weight(1f)) {
-                    // v176: MIJOZ · sana + hafta kuni (11-iyul, Juma)
+                    // v177: "MIJOZ" so'zi olib tashlandi — sana, hafta kuni va VAQT (emojisiz)
                     val headerDate = remember(month) {
                         val hafta = listOf("Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba")
-                        val d = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tashkent"))
-                        "%d-%s, %s".format(d.dayOfMonth, monthLabel, hafta[d.dayOfWeek.value % 7])
+                        val z = java.time.ZoneId.of("Asia/Tashkent")
+                        val d = java.time.LocalDate.now(z)
+                        val t = java.time.LocalTime.now(z)
+                        "%d-%s, %s  %02d:%02d".format(
+                            d.dayOfMonth, monthLabel, hafta[d.dayOfWeek.value % 7], t.hour, t.minute
+                        )
                     }
                     Text(
-                        "MIJOZ \u00b7 ${headerDate.uppercase()}",
+                        headerDate.uppercase(),
                         color = cGray, fontSize = 11.sp, fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(2.dp))

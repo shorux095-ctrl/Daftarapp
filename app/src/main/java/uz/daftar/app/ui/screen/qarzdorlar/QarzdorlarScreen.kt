@@ -48,6 +48,10 @@ fun QarzdorlarScreen(
                     }
                 },
                 actions = {
+                    // v177: 🔔 Qarz eslatma — 10/15/30/60/90 kunlik guruhlar bo'yicha ko'rish
+                    IconButton(onClick = { vm.toggleEslatma() }) {
+                        Text("\uD83D\uDD14", fontSize = 18.sp)
+                    }
                     // v150: 📄 PDF — qarzdorlar ro'yxatini ilovasiz ham ochiladigan faylga chiqarish
                     IconButton(onClick = {
                         runCatching {
@@ -130,6 +134,40 @@ fun QarzdorlarScreen(
             if (s.debtors.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("✅ Qarzdor yo'q", fontSize = 16.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
+                }
+            } else if (s.eslatma) {
+                // v177: 🔔 GURUHLI ko'rinish — 10/15/30/60/90 kun
+                val groups = listOf(
+                    Triple("\uD83D\uDD35 10\u201314 kun", Color(0xFF1565C0), s.debtors.filter { it.daysOverdue in 10..14 }),
+                    Triple("\uD83D\uDFE1 15\u201329 kun", Color(0xFFF9A825), s.debtors.filter { it.daysOverdue in 15..29 }),
+                    Triple("\uD83D\uDFE0 30\u201359 kun", Color(0xFFE65100), s.debtors.filter { it.daysOverdue in 30..59 }),
+                    Triple("\uD83D\uDD34 60\u201389 kun", Color(0xFFD32F2F), s.debtors.filter { it.daysOverdue in 60..89 }),
+                    Triple("\u26AB 90 kun va undan ortiq", Color(0xFF6A1B9A), s.debtors.filter { it.daysOverdue >= 90 })
+                )
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    groups.forEach { (title, col, list) ->
+                        if (list.isNotEmpty()) {
+                            item(title) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .background(col.copy(alpha = 0.08f))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = col)
+                                    Text(
+                                        "${list.size} ta \u00b7 ${list.sumOf { it.debt }.formatMoney()} so'm",
+                                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = col
+                                    )
+                                }
+                            }
+                            itemsIndexed(list, key = { _, d -> "g" + d.client }) { i, d ->
+                                DebtorRow(i + 1, d, false) { onOpenClient(d.client) }
+                                HorizontalDivider(color = Color(0x0F000000))
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(20.dp)) }
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
