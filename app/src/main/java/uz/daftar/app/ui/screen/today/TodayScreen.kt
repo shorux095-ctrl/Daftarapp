@@ -594,7 +594,11 @@ fun TodayScreen(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(state.chat, key = { _, it -> it.id }) { index, item ->
+                    itemsIndexed(
+                        state.chat,
+                        key = { _, it -> it.id },
+                        contentType = { _, it -> it::class.simpleName }  // v176: bir xil kartalarni qayta ishlatadi — scroll silliq
+                    ) { index, item ->
                         val prevTs = if (index == 0) null else state.chat[index - 1].ts
                         val showHeader = prevTs == null || !isSameDay(prevTs, item.ts)
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -700,7 +704,17 @@ fun TodayScreen(
                 }
                 if (notAtBottom) {
                     androidx.compose.material3.FloatingActionButton(
-                        onClick = { calScope.launch { runCatching { listState.animateScrollToItem(state.chat.size - 1) } } },
+                        onClick = {
+                            calScope.launch {
+                                runCatching {
+                                    val target = state.chat.size - 1
+                                    val cur = listState.firstVisibleItemIndex
+                                    // v176: uzoq bo'lsa avval yaqinga sakraymiz, keyin silliq — qotmaydi
+                                    if (target - cur > 15) listState.scrollToItem((target - 8).coerceAtLeast(0))
+                                    listState.animateScrollToItem(target)
+                                }
+                            }
+                        },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(44.dp),
                         containerColor = androidx.compose.ui.graphics.Color(0xFF5B5FE0),
                         contentColor = androidx.compose.ui.graphics.Color.White
@@ -811,7 +825,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v175", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v176", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -1461,16 +1475,18 @@ private fun PreviewHistoryCard(
     }
 
     // Har bir yozuvdan keyingi umumiy qoldiq (timeline o'ngi uchun)
-    val balMap = remember(allTxs, priceByTx) {
+    val balMap = remember(allTxs, priceByTx, debt) {
         var b = 0.0
         val m = HashMap<Long, Double>()
-        allTxs.sortedBy { it.date }.forEach { tx ->
+        val sorted = allTxs.sortedBy { it.date }
+        sorted.forEachIndexed { i, tx ->
             when (tx.type.lowercase()) {
                 "p" -> b -= tx.amount
                 "q" -> b += tx.amount
                 else -> { val p = priceByTx[tx.id]; if (p != null) b += tx.amount * p }
             }
-            m[tx.id] = b
+            // v176: OXIRGI yozuv balansi = umumiy qarz (tugmadagi bilan aynan bir xil, 1000≠1002 farqi yo'q)
+            m[tx.id] = if (i == sorted.size - 1) debt.toDouble() else b
         }
         m
     }
@@ -1496,8 +1512,14 @@ private fun PreviewHistoryCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Column(Modifier.weight(1f)) {
+                    // v176: MIJOZ · sana + hafta kuni (11-iyul, Juma)
+                    val headerDate = remember(month) {
+                        val hafta = listOf("Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba")
+                        val d = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tashkent"))
+                        "%d-%s, %s".format(d.dayOfMonth, monthLabel, hafta[d.dayOfWeek.value % 7])
+                    }
                     Text(
-                        "MIJOZ \u00b7 ${monthLabel.uppercase()} ${month.year}",
+                        "MIJOZ \u00b7 ${headerDate.uppercase()}",
                         color = cGray, fontSize = 11.sp, fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(2.dp))
