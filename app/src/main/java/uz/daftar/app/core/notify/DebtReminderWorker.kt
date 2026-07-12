@@ -45,7 +45,8 @@ class DebtReminderWorker @AssistedInject constructor(
                 else runCatching { org.json.JSONArray(json) }.getOrDefault(org.json.JSONArray())
                 arr.put(org.json.JSONObject().put("k", "debt").put("ts", System.currentTimeMillis()))
                 chatStore.save(arr.toString())
-                chatStore.setLastDebtRemDate(today)
+                // v177: setLastDebtRemDate OLIB TASHLANDI — aks holda ilova ochilganda
+                // "bugun ko'rsatilgan" deb o'ylab kartani qo'shmasdi va worker yozgani ham yo'qolardi.
             }
         }
         return Result.success()

@@ -595,21 +595,25 @@ class TodayViewModel @Inject constructor(
 
     /** Qarz eslatmasi: KUNIGA 1 MARTA, soat 10:00 dan keyin birinchi ochilishda chiqadi. */
     private suspend fun ensureDebtReminder() {
-        // v174: HAR KUNI bosh ekranga qarz eslatmasi (10 kundan oshgan qarzdorlar).
-        // Shart: soat 10:00 dan keyin + o'sha kuni hali ko'rsatilmagan bo'lsa.
+        // v177: ASOSIY TUZATISH — "bugun ko'rsatilgan" belgisiga ishonmaymiz (Worker ham o'sha belgini
+        // qo'yadi va karta yo'qolib ketardi). Endi CHATNING O'ZINI tekshiramiz: bugungi DebtRep bormi?
         val hour = java.time.LocalTime.now(APP_ZONE).hour
         if (hour < 10) return
-        val today = today().toString()
-        val last = runCatching { chatStore.getLastDebtRemDate() }.getOrDefault("")
-        if (last == today) return  // bugun allaqachon ko'rsatilgan
+
+        val todayD = today()
+        val zone = APP_ZONE
+        val alreadyToday = _state.value.chat.any { item ->
+            item is ChatItem.DebtRep &&
+                java.time.Instant.ofEpochMilli(item.ts).atZone(zone).toLocalDate() == todayD
+        }
+        if (alreadyToday) return   // bugungi eslatma allaqachon chatda turibdi
 
         val all = runCatching { getOverdue(userId) }.getOrNull() ?: return
         val list = all.filter { it.daysOverdue >= 10 }
-        // Bugun ko'rsatilgan deb belgilaymiz (qarzdor bo'lmasa ham — kuniga 1 marta tekshiriladi)
-        runCatching { chatStore.setLastDebtRemDate(today) }
         if (list.isNotEmpty()) {
             appendChat(ChatItem.DebtRep(nextChatId(), list))
             persistChat()
+            runCatching { chatStore.setLastDebtRemDate(todayD.toString()) }
         }
     }
 

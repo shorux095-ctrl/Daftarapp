@@ -211,6 +211,10 @@ interface DeletedTransactionDao {
     @Query("DELETE FROM deleted_transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /** v177: Karzinani BUTUNLAY tozalash */
+    @Query("DELETE FROM deleted_transactions WHERE user_id = :userId")
+    suspend fun clearAllDeleted(userId: Long): Int
+
     /** 7 kundan oldingilarni tozalash — chaqirilganda ishlatiladi. */
     @Query("DELETE FROM deleted_transactions WHERE user_id = :userId AND deleted_at < :cutoff")
     suspend fun deleteOlderThan(userId: Long, cutoff: String): Int

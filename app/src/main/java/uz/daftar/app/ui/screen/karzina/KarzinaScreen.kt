@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -41,6 +42,7 @@ data class KarzinaState(
 class KarzinaViewModel @Inject constructor(
     private val getDeleted: GetDeletedTransactionsUseCase,
     private val restore: RestoreTransactionUseCase,
+    private val deletedDao: uz.daftar.app.data.db.dao.DeletedTransactionDao,   // v177
     private val purge: PurgeKarzinaUseCase
 ) : ViewModel() {
 
@@ -71,6 +73,15 @@ class KarzinaViewModel @Inject constructor(
         }
     }
 
+    /** v177: Karzinani butunlay tozalash */
+    fun clearAll() {
+        viewModelScope.launch {
+            val n = runCatching { deletedDao.clearAllDeleted(1L) }.getOrDefault(0)
+            _state.update { it.copy(message = "\uD83D\uDDD1 Karzina tozalandi ($n ta)") }
+            load()
+        }
+    }
+
     fun clearMessage() {
         _state.update { it.copy(message = null) }
     }
@@ -84,6 +95,21 @@ fun KarzinaScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var confirmClear by remember { mutableStateOf(false) }   // v177
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("\uD83D\uDDD1 Karzinani tozalash") },
+            text = { Text("Karzinadagi ${state.items.size} ta yozuv BUTUNLAY o'chiriladi. Ular endi tiklanmaydi. Davom etilsinmi?") },
+            confirmButton = {
+                TextButton(onClick = { vm.clearAll(); confirmClear = false }) {
+                    Text("Ha, tozalansin", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Bekor") } }
+        )
+    }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -101,7 +127,15 @@ fun KarzinaScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
-                actions = { uz.daftar.app.ui.common.HomeButton() }
+                actions = {
+                    // v177: Karzinani tozalash
+                    if (state.items.isNotEmpty()) {
+                        IconButton(onClick = { confirmClear = true }) {
+                            Text("\uD83E\uDDF9", fontSize = 18.sp)
+                        }
+                    }
+                    uz.daftar.app.ui.common.HomeButton()
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(snackbarData = it) } }

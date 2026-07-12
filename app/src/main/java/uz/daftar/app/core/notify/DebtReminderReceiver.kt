@@ -28,14 +28,30 @@ class DebtReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            // v177: BILDIRISHNOMA YO'Q. Har kuni 10:00 da BOSH EKRAN chatiga eslatma kartasi yoziladi
+            // (ilova yopiq bo'lsa ham — WorkManager va bu alarm ikkalasi ham ishlaydi, dublikat bo'lmaydi).
             runCatching {
-                createReminderChannel(context)
-                // Barcha qarzdorlar (muddatidan qat'i nazar — mayda/yangi qarzlar ham)
-                val list = getOverdue(1L)
+                val list = getOverdue(1L).filter { it.daysOverdue >= 10 }
                 if (list.isNotEmpty()) {
-                    val total = list.sumOf { it.debt }
-                    val maxDays = list.maxOf { it.daysOverdue }
-                    postDebtReminder(context, list.size, total, maxDays)
+                    val store = uz.daftar.app.core.chat.ChatStore(context)
+                    val today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tashkent")).toString()
+                    val json = store.load()
+                    val arr = if (json.isBlank()) org.json.JSONArray()
+                    else runCatching { org.json.JSONArray(json) }.getOrDefault(org.json.JSONArray())
+                    // Bugun allaqachon qo'shilganmi? (worker qo'shган bo'lishi mumkin)
+                    var already = false
+                    for (i in 0 until arr.length()) {
+                        val o = arr.optJSONObject(i) ?: continue
+                        if (o.optString("k") == "debt") {
+                            val d = java.time.Instant.ofEpochMilli(o.optLong("ts"))
+                                .atZone(java.time.ZoneId.of("Asia/Tashkent")).toLocalDate().toString()
+                            if (d == today) { already = true; break }
+                        }
+                    }
+                    if (!already) {
+                        arr.put(org.json.JSONObject().put("k", "debt").put("ts", System.currentTimeMillis()))
+                        store.save(arr.toString())
+                    }
                 }
             }
             // Ertangi 10:00 ga qayta rejalashtirish (kunlik zanjir)
