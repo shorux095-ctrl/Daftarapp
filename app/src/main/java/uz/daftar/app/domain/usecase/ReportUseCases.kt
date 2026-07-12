@@ -523,8 +523,11 @@ object DebtMath {
                     if (pr != null) bal += tx.amount * pr
                 }
             }
-            if (before <= 0.0 && bal > 0.0 && d != null) firstDebtDate = d
-            if (bal <= 0.0) firstDebtDate = null
+            // v179 ASOSIY TUZATISH: kasrli qoldiq (masalan 0.0000001) sababli qarz "yopilmagan" deb
+            // hisoblanib, kun eski sanadan sanalardi (140 kun). Endi 0.5 so'mgacha = NOL deb qaraladi.
+            // Ya'ni kun OXIRGI 0 bo'lgan (yoki oxirgi to'lov) kundan boshlab to'g'ri hisoblanadi.
+            if (before <= 0.5 && bal > 0.5 && d != null) firstDebtDate = d
+            if (bal <= 0.5) firstDebtDate = null
         }
         if (bal <= 0.5) return null
         val fdd = firstDebtDate
