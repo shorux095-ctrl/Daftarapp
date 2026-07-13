@@ -49,6 +49,7 @@ object Routes {
     const val YUK_NARX = "yuk_narx"
     const val YUK_REPORT = "yuk_report"
     const val CLIENT_HISTORY = "client_history"
+    const val TOP30 = "top30"
     const val QARZ = "qarz"
     const val QARZ_REYTING = "qarz_reyting"
     const val EDIT_TX = "edit_tx"
@@ -148,6 +149,7 @@ fun DaftarNavHost() {
                 onRasxod = { if (canNav()) nav.navigate(Routes.RASXOD) },
                 onKarzina = { if (canNav()) nav.navigate(Routes.KARZINA) },
                 onQarz = { if (canNav()) nav.navigate(Routes.QARZ) },
+                onTop30 = { if (canNav()) nav.navigate(Routes.TOP30) },
                 onManager = { if (canNav()) nav.navigate(Routes.MANAGER) },
                 onDashboard = { if (canNav()) nav.navigate(Routes.DASHBOARD) },
                 onQoshimcha = { if (canNav()) nav.navigate(Routes.QOSHIMCHA) },
@@ -187,6 +189,13 @@ fun DaftarNavHost() {
                 onOpenClient = { name ->
                     openClientAsCard(name)
                 }
+            )
+        }
+
+        composable(Routes.TOP30) {
+            uz.daftar.app.ui.screen.top30.Top30Screen(
+                onBack = { if (canNav()) nav.popBackStack() },
+                onOpenClient = { name -> openClientAsCard(name) }
             )
         }
 
