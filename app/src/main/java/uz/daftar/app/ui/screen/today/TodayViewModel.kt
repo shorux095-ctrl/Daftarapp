@@ -60,6 +60,7 @@ data class ClientPreview(
 data class TodayUiState(
     val filter: Filter = Filter.TODAY,
     val debtorCount: Int = 0,   // v176: toolbar 💳 yonidagi son
+    val scrollTick: Long = 0L,  // v181: karta ochilganda pastga MAJBURIY scroll (hajm o'zgarmasa ham)
     val isLoading: Boolean = true,
     val restored: Boolean = false,
     val transactions: List<Transaction> = emptyList(),
@@ -789,8 +790,9 @@ class TodayViewModel @Inject constructor(
         // Filtr: harflar (a,b,c,d,k) yoki "pul"/"p" yoki MIJOZ ISMI yoki bo'sh (hammasi)
         val tokens = filterRaw.split(Regex("\\s+")).filter { it.isNotBlank() }
         val cargoAll = listOf("a", "b", "c", "d", "k")
+        val full = tokens.any { it == "toliq" || it == "to'liq" || it == "hammasi" }  // v182: to'liq ro'yxat
         // v169: 2+ harfli so'zlar (pul emas) — mijoz ismi filtri ("01.05 25.05 ali a")
-        val nameTokens = tokens.filter { it.length >= 2 && it != "pul" && it !in cargoAll && it.all { c -> c.isLetter() || c == '\'' } }
+        val nameTokens = tokens.filter { it.length >= 2 && it != "pul" && it != "toliq" && it != "to'liq" && it != "hammasi" && it !in cargoAll && it.all { c -> c.isLetter() || c == '\'' } }
         val clientFilter = nameTokens.joinToString(" ")
         val wantPul = tokens.any { it == "pul" || it == "p" } || tokens.none { it in cargoAll || it == "pul" || it == "p" }
         val wantTypes = tokens.filter { it in cargoAll }.ifEmpty { if (tokens.any { it == "pul" || it == "p" }) emptyList() else cargoAll }
@@ -821,9 +823,10 @@ class TodayViewModel @Inject constructor(
             // Mijozlar kesimi
             val byClient = cargo.groupBy { it.clientName.lowercase() }
             if (byClient.isNotEmpty()) {
-                sb.append("\n👥 MIJOZLAR:\n")
-                val entries = byClient.entries.sortedByDescending { e -> e.value.sumOf { it.amount } }.take(40)
-                entries.forEachIndexed { i, (cn, list) ->
+                val sortedAll = byClient.entries.sortedByDescending { e -> e.value.sumOf { it.amount } }
+                val show = if (full) sortedAll else sortedAll.take(10)   // v182: default TOP-10
+                sb.append("\n👥 MIJOZLAR (${byClient.size} ta):\n")
+                show.forEachIndexed { i, (cn, list) ->
                     val parts = wantTypes.mapNotNull { t ->
                         val q = list.filter { it.type.code == t }.sumOf { it.amount }
                         if (q > 0) "${t.uppercase()}:${q.formatQty()}" else null
@@ -831,7 +834,15 @@ class TodayViewModel @Inject constructor(
                     if (parts.isNotEmpty())
                         sb.append("  ${i + 1}. ${cn.replaceFirstChar { it.uppercase() }}  ${parts.joinToString(" ")}\n")
                 }
-                if (byClient.size > 40) sb.append("  … yana ${byClient.size - 40} mijoz\n")
+                if (!full && byClient.size > 10)
+                    sb.append("  … yana ${byClient.size - 10} mijoz — TO'LIQ uchun: \"$typed toliq\"\n")
+                // v182: OXIRIDA JAMI — har doim ko'rinadi
+                sb.append("\n📊 JAMI:\n")
+                for (t in wantTypes) {
+                    val sum = cargo.filter { it.type.code == t }.sumOf { it.amount }
+                    if (sum > 0) sb.append("  ${t.uppercase()}: ${sum.formatQty()} dona\n")
+                }
+                sb.append("  Mijozlar: ${byClient.size} ta\n")
             }
         }
         if (wantPul) {
@@ -885,6 +896,9 @@ class TodayViewModel @Inject constructor(
             if (cp != null) appendChat(ChatItem.History(nextChatId(), cp))
             else appendChat(ChatItem.Info(nextChatId(), "👤 ${name.replaceFirstChar { it.uppercase() }} — yozuv topilmadi"))
             persistChat()
+            // v181: MAJBURIY scroll — eski karta o'chirilib yangisi qo'shilsa hajm o'zgarmaydi,
+            // avto-scroll ishlamasdi (shuning uchun 3-4 marta bosishga to'g'ri kelardi)
+            _state.update { it.copy(scrollTick = it.scrollTick + 1) }
         }
     }
 

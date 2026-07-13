@@ -224,6 +224,17 @@ fun TodayScreen(
 
     // Yangi xabar qo'shilsa, chat oxiriga scroll (birinchi marta — DARHOL, sakramasdan)
     var firstScrollDone by remember { mutableStateOf(false) }
+    // v181: karta ochilganda majburiy pastga scroll (hajm o'zgarmasa ham)
+    LaunchedEffect(state.scrollTick) {
+        if (state.scrollTick > 0 && state.chat.isNotEmpty()) {
+            runCatching {
+                val target = state.chat.size - 1
+                val cur = listState.firstVisibleItemIndex
+                if (target - cur > 15) listState.scrollToItem((target - 8).coerceAtLeast(0))
+                listState.animateScrollToItem(target)
+            }
+        }
+    }
     LaunchedEffect(state.chat.size) {
         runCatching {
             if (state.chat.isNotEmpty()) {
@@ -831,7 +842,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v180", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v182", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },

@@ -97,8 +97,8 @@ fun DaftarNavHost() {
     val openClientAsCard: (String) -> Unit = { name ->
         navCtx.getSharedPreferences("open_client", android.content.Context.MODE_PRIVATE)
             .edit().putString("name", name).apply()
+        // v182: popUpTo OLIB TASHLANDI — orqaga bosilsa Qarzdorlar/Mijozlar bo'limiga QAYTADI
         if (canNav()) nav.navigate(Routes.TODAY) {
-            popUpTo(Routes.TODAY) { inclusive = false }
             launchSingleTop = true
         }
     }
