@@ -831,7 +831,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v179", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v180", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -1871,22 +1871,33 @@ private fun ChatDateSeparator(ts: Long) {
         else -> "${d.dayOfMonth}-$oy, $kun"
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // v180: chap chiziq — sanalar aniq ajralib tursin
+        HorizontalDivider(
+            modifier = Modifier.weight(1f).padding(end = 10.dp),
+            thickness = 1.5.dp,
+            color = androidx.compose.ui.graphics.Color(0xFFBFC3E8)
+        )
         Surface(
-            color = androidx.compose.ui.graphics.Color(0xFFE8EAF6),
-            shape = RoundedCornerShape(14.dp),
-            tonalElevation = 1.dp
+            color = androidx.compose.ui.graphics.Color(0xFF5B5FE0),
+            shape = RoundedCornerShape(18.dp),
+            shadowElevation = 2.dp
         ) {
             Text(
                 label,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = androidx.compose.ui.graphics.Color(0xFF5B5FE0)
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = androidx.compose.ui.graphics.Color.White
             )
         }
+        HorizontalDivider(
+            modifier = Modifier.weight(1f).padding(start = 10.dp),
+            thickness = 1.5.dp,
+            color = androidx.compose.ui.graphics.Color(0xFFBFC3E8)
+        )
     }
 }
 
