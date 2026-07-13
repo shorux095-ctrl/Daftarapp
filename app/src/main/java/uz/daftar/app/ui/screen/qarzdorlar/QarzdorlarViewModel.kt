@@ -43,12 +43,12 @@ class QarzdorlarViewModel @Inject constructor(
     /** v148: 🏆 Reyting — eng katta qarz yuqorida; 📅 Kun — yangi qarzlar yuqorida */
     fun setRating(r: Boolean) {
         _state.update { it.copy(rating = r) }
+        applySort()
+    }
 
     /** v177: 🔔 guruhli eslatma ko'rinishini yoqish/o'chirish */
     fun toggleEslatma() {
         _state.update { it.copy(eslatma = !it.eslatma) }
-    }
-        applySort()
     }
 
     private fun applySort() {
