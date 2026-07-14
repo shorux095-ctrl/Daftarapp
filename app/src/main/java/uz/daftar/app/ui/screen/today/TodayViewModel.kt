@@ -334,6 +334,17 @@ class TodayViewModel @Inject constructor(
 
     /** v145: widjet yozuvi ham ilovadagi kabi CHIROYLI KARTA bo'ladi, vaqt yonida "widjet" yozuvi bilan. */
     private suspend fun widgetSavedItem(line: String): ChatItem {
+        // v184: widjetdan kelgan RASXOD ("rasxod 40" / "r 40" / "xarajat 40") — Info sifatida ko'rsatiladi
+        run {
+            val rxm = Regex("""^(?:rasxod|xarajat|r)\s+(\d+(?:[.,]\d+)?)(?:\s+(.+))?$""", RegexOption.IGNORE_CASE)
+                .matchEntire(line.trim())
+            if (rxm != null) {
+                val amt = rxm.groupValues[1].replace(",", ".")
+                val note = rxm.groupValues[2].trim()
+                return ChatItem.Info(nextChatId(),
+                    "\uD83D\uDCB8 Rasxod saqlandi (widjet): $amt so'm" + (if (note.isNotBlank()) " \u2014 $note" else ""))
+            }
+        }
         val entry = (runCatching { DaftarParser.parse(line) }.getOrNull() as? ParseResult.Success)?.entry
         if (entry == null || !entry.isValid)
             return ChatItem.Info(nextChatId(), "✅ Saqlandi (widjet):\n$line")
@@ -527,6 +538,8 @@ class TodayViewModel @Inject constructor(
                 _state.update { it.copy(restored = true) }
                 restored = true
                 runCatching { ensureDebtReminder() }
+                // v184: Qarzdorlar/Mijozlar'dan kelgan mijozni shu yerda ham ochamiz
+                runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
                 return@launch
             }
             // Og'ir disk o'qish + JSON parse — fon thread'da (Main qotmasin, tez ochilsin)
@@ -543,6 +556,9 @@ class TodayViewModel @Inject constructor(
             // jonli o'zgarishlarni observer kuzatadi — bu yerda takroriy so'rov shart emas (tezroq, miltillamaydi)
             runCatching { ensureDebtReminder() }
             restored = true
+            // v184 ASOSIY TUZATISH: Qarzdorlar'dan mijoz bosilganda YANGI ekran nusxasi ochiladi,
+            // refresh() esa chat tiklanmaguncha ishlamaydi — kutayotgan mijoz shu yerda ochiladi.
+            runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
         }
     }
 

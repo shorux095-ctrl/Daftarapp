@@ -17,6 +17,11 @@ data class CargoTxLite(val type: String, val amount: Double, val date: String)
 @Dao
 interface TransactionDao {
 
+    /** v184: har mijozning ENG BIRINCHI yozuv sanasi (yangi klientlarni aniqlash uchun) */
+    @Query("SELECT LOWER(client_name) AS name, MIN(date) AS first FROM transactions WHERE user_id = :userId GROUP BY LOWER(client_name)")
+    suspend fun getClientFirstDates(userId: Long): List<ClientFirst>
+
+
     // ───────── Paging 3 (Qidiruv) ─────────
     @Query("""
         SELECT * FROM transactions
@@ -181,3 +186,6 @@ interface TransactionDao {
 
 /** 🏆 Statistika natijasi: mijoz + jami miqdor */
 data class ClientTotal(val clientName: String, val total: Double)
+
+/** v184: TOP ekrani uchun — mijoz + birinchi yozuv sanasi */
+data class ClientFirst(val name: String, val first: String)

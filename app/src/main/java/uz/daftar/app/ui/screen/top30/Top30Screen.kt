@@ -47,9 +47,11 @@ data class TopRow(
 
 data class Top30State(
     val month: java.time.YearMonth = java.time.YearMonth.now(java.time.ZoneId.of("Asia/Tashkent")),
-    val tab: Int = 0,                       // 0 = 📦 Yuk, 1 = 💵 Pul
+    val yearly: Boolean = false,            // v184: Oy / Yil rejimi
+    val tab: Int = 0,                       // 0 = 📦 Yuk, 1 = 💵 Pul, 2 = 🆕 Yangi klient
     val yukRows: List<TopRow> = emptyList(),
     val pulRows: List<TopRow> = emptyList(),
+    val newRows: List<TopRow> = emptyList(),  // v184: davrda BIRINCHI yozuvi bo'lgan mijozlar
     val isLoading: Boolean = true
 )
 
@@ -66,8 +68,9 @@ class Top30ViewModel @Inject constructor(
     init { load() }
 
     fun setTab(t: Int) = _state.update { it.copy(tab = t) }
-    fun prevMonth() { _state.update { it.copy(month = it.month.minusMonths(1)) }; load() }
-    fun nextMonth() { _state.update { it.copy(month = it.month.plusMonths(1)) }; load() }
+    fun setYearly(y: Boolean) { _state.update { it.copy(yearly = y) }; load() }
+    fun prevMonth() { _state.update { it.copy(month = if (it.yearly) it.month.minusYears(1) else it.month.minusMonths(1)) }; load() }
+    fun nextMonth() { _state.update { it.copy(month = if (it.yearly) it.month.plusYears(1) else it.month.plusMonths(1)) }; load() }
 
     private fun priceAt(list: List<Pair<String, Double>>?, date: String): Double? {
         if (list.isNullOrEmpty()) return null
@@ -81,8 +84,9 @@ class Top30ViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             val m = _state.value.month
-            val start = m.atDay(1).toString() + " 00:00:00"
-            val end = m.plusMonths(1).atDay(1).toString() + " 00:00:00"
+            val yearly = _state.value.yearly
+            val start = (if (yearly) m.atDay(1).withDayOfYear(1) else m.atDay(1)).toString() + " 00:00:00"
+            val end = (if (yearly) m.atDay(1).withDayOfYear(1).plusYears(1) else m.plusMonths(1).atDay(1)).toString() + " 00:00:00"
             val result = withContext(Dispatchers.IO) {
                 val txs = txDao.getRange(userId, start, end)
                 val cargoCodes = setOf("a", "b", "c", "d", "k")
@@ -119,12 +123,18 @@ class Top30ViewModel @Inject constructor(
                         }
                     }
                 }
-                val yukRows = yukMap.values.sortedByDescending { it.money }.take(30)
-                val pulRows = pulMap.entries.sortedByDescending { it.value }.take(30)
+                val yukRows = yukMap.values.sortedByDescending { it.money }.take(50)   // v184: TOP 50
+                val pulRows = pulMap.entries.sortedByDescending { it.value }.take(50)
                     .map { TopRow(it.key, 0.0, it.value, 0.0) }
-                yukRows to pulRows
+                // v184: 🆕 YANGI KLIENTLAR — birinchi yozuvi shu davrga to'g'ri kelganlar (foyda bilan)
+                val firsts = runCatching { txDao.getClientFirstDates(userId) }.getOrDefault(emptyList())
+                val newNames = firsts.filter { it.first >= start && it.first < end }.map { it.name }.toSet()
+                val newRows = newNames.map { n ->
+                    yukMap[n] ?: TopRow(n, 0.0, pulMap[n] ?: 0.0, 0.0)
+                }.sortedByDescending { it.money }.take(50)
+                Triple(yukRows, pulRows, newRows)
             }
-            _state.update { it.copy(yukRows = result.first, pulRows = result.second, isLoading = false) }
+            _state.update { it.copy(yukRows = result.first, pulRows = result.second, newRows = result.third, isLoading = false) }
         }
     }
 }
@@ -148,7 +158,7 @@ fun Top30Screen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("\uD83C\uDFC6 TOP 30") },
+                title = { Text("\uD83C\uDFC6 TOP 50") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
@@ -166,12 +176,22 @@ fun Top30Screen(
             ) {
                 FilledTonalButton(onClick = { vm.prevMonth() }) { Text("\u2190") }
                 Text(
-                    "${MONTHS_T30[s.month.monthValue - 1]} ${s.month.year}",
+                    if (s.yearly) "${s.month.year}-yil" else "${MONTHS_T30[s.month.monthValue - 1]} ${s.month.year}",
                     modifier = Modifier.weight(1f),
                     fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 FilledTonalButton(onClick = { vm.nextMonth() }) { Text("\u2192") }
+            }
+            // v184: Oy / Yil rejimi
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(selected = !s.yearly, onClick = { vm.setYearly(false) },
+                    label = { Text("Oy") }, modifier = Modifier.weight(1f))
+                FilterChip(selected = s.yearly, onClick = { vm.setYearly(true) },
+                    label = { Text("Yil") }, modifier = Modifier.weight(1f))
             }
             // Tablar
             Row(
@@ -179,15 +199,17 @@ fun Top30Screen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(selected = s.tab == 0, onClick = { vm.setTab(0) },
-                    label = { Text("\uD83D\uDCE6 Yuk olganlar") }, modifier = Modifier.weight(1f))
+                    label = { Text("\uD83D\uDCE6 Yuk", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
                 FilterChip(selected = s.tab == 1, onClick = { vm.setTab(1) },
-                    label = { Text("\uD83D\uDCB5 Pul berganlar") }, modifier = Modifier.weight(1f))
+                    label = { Text("\uD83D\uDCB5 Pul", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
+                FilterChip(selected = s.tab == 2, onClick = { vm.setTab(2) },
+                    label = { Text("\uD83C\uDD95 Yangi", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
             }
 
             if (s.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                val rows = if (s.tab == 0) s.yukRows else s.pulRows
+                val rows = when (s.tab) { 0 -> s.yukRows; 1 -> s.pulRows; else -> s.newRows }
                 if (rows.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Bu oyda ma'lumot yo'q", color = gray)
@@ -225,7 +247,7 @@ fun Top30Screen(
                                             r.name.replaceFirstChar { it.uppercase() },
                                             fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ink
                                         )
-                                        if (s.tab == 0) {
+                                        if (s.tab != 1 && r.qty > 0) {
                                             Text("${r.qty.formatQty()} dona", fontSize = 11.sp, color = gray)
                                         }
                                     }
@@ -233,9 +255,9 @@ fun Top30Screen(
                                         Text(
                                             "${Math.round(r.money).toDouble().formatMoney()} so'm",
                                             fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                                            color = if (s.tab == 0) green else red
+                                            color = if (s.tab == 1) red else green
                                         )
-                                        if (s.tab == 0) {
+                                        if (s.tab != 1) {
                                             val fCol = if (r.foyda >= 0) green else red
                                             Text(
                                                 "foyda: ${Math.round(r.foyda).toDouble().formatMoney()}",

@@ -845,7 +845,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v183", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v184", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -923,7 +923,7 @@ private fun ChatTopBar(
                     MenuItem("🔮", "Bashorat", "Kim qachon oladi", Color(0xFFE3E0FF), onBashorat),
                     MenuItem("⏰", "Eslatma", "Eslatma + bildirishnoma", Color(0xFFFFE0E6), onEslat),
                     MenuItem("💳", "Qarzdorlar", "Qarzdorlar ro'yxati", Color(0xFFFFEEC2), onQarz),
-                    MenuItem("🏆", "TOP 30", "Yuk · Pul · Foyda", Color(0xFFFFF3C4), onTop30),
+                    MenuItem("🏆", "TOP 50", "Yuk · Pul · Yangi", Color(0xFFFFF3C4), onTop30),
                     MenuItem("🚚", "Narx", "Narxlar ro'yxati", Color(0xFFDCE8FF), onYukNarx),
                     MenuItem("💵", "Rasxod", "Rasxodlar hisobi", Color(0xFFD6F5E0), onRasxod),
                     MenuItem("🏬", "Sklad", "Ombor ma'lumoti", Color(0xFFEDE3FF), onSklad),

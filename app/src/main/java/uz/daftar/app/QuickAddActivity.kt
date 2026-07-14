@@ -248,6 +248,7 @@ class QuickAddActivity : ComponentActivity() {
                 if (rx != null) {
                     addRasxod(userId, rx.first, rx.second)
                     count++
+                    runCatching { chatStore.addPending(line.trim()) }   // v184: bosh ekranda ko'rinsin
                     continue
                 }
                 val r = DaftarParser.parse(line)
