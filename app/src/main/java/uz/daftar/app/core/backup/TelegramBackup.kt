@@ -52,6 +52,18 @@ class TelegramBackup @Inject constructor(
         }
     }
 
+    /** v187: tayyor FAYLNI (masalan qarzdorlar PDF) Telegramga yuboradi */
+    suspend fun sendFile(file: File, filename: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val token = getToken()
+            val chat = getChatId()
+            if (token.isBlank() || chat.isBlank()) error("Token yoki chat_id kiritilmagan")
+            if (!file.exists()) error("Fayl topilmadi")
+            uploadDocument(token, chat, file, filename)
+            "\u2705 Telegramga yuborildi: $filename"
+        }
+    }
+
     /** Telegram Bot API: sendDocument (multipart/form-data) */
     private fun uploadDocument(token: String, chatId: String, file: File, filename: String) {
         val boundary = "DaftarBoundary" + System.currentTimeMillis()

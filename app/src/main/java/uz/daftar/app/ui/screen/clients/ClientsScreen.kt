@@ -94,6 +94,22 @@ fun ClientsScreen(
                             androidx.compose.material3.Text("\uD83D\uDD14", fontSize = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp))
                         }
                     }
+                    // v187: ✈️ mayda tugma — qarzdorlar PDF darrov Telegramga (internet bo'lmasa keyinroq o'zi)
+                    if (debtorsOnly) {
+                        val tgCtx = androidx.compose.ui.platform.LocalContext.current
+                        IconButton(onClick = {
+                            val req = androidx.work.OneTimeWorkRequestBuilder<uz.daftar.app.core.notify.DebtPdfTelegramWorker>()
+                                .setConstraints(
+                                    androidx.work.Constraints.Builder()
+                                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                                        .build()
+                                ).build()
+                            androidx.work.WorkManager.getInstance(tgCtx).enqueue(req)
+                            android.widget.Toast.makeText(tgCtx, "\u2708\uFE0F Telegramga yuborilmoqda\u2026", android.widget.Toast.LENGTH_SHORT).show()
+                        }, modifier = Modifier.size(36.dp)) {
+                            androidx.compose.material3.Text("\u2708\uFE0F", fontSize = androidx.compose.ui.unit.TextUnit(15f, androidx.compose.ui.unit.TextUnitType.Sp))
+                        }
+                    }
                     uz.daftar.app.ui.common.HomeButton()
                 }
             )

@@ -88,6 +88,7 @@ class DaftarApplication : Application(), Configuration.Provider {
         scheduleNightlyLocalBackup() // v148: HAR KECHASI 02:00 — lokal avto-zaxira
         // v174: HAR KUNI 10:00 — qarz eslatma BILDIRISHNOMASI (ilova yopiq bo'lsa ham keladi)
         runCatching { uz.daftar.app.core.notify.scheduleDebtReminderAlarm(this) }
+        scheduleDebtPdfTelegram()  // v187: har kuni 10:00 — qarzdorlar PDF Telegramga
         // Kunlik LOKAL zaxira — ilova ochilganda (har kuni kamida bitta .db nusxa, oxirgi 14 tasi saqlanadi)
         Thread { runCatching { backupManager.dailyLocalBackupIfNeeded() } }.apply { isDaemon = true }.start()
         // scheduleDailyAutoReport()
@@ -165,6 +166,32 @@ class DaftarApplication : Application(), Configuration.Provider {
     }
 
     /** Har kuni 10:00 da qarz eslatma ishini rejalashtiradi */
+    /** v187: HAR KUNI 10:00 — qarzdorlar PDF Telegramga (internet bo'lmasa keyinroq o'zi yuboradi) */
+    private fun scheduleDebtPdfTelegram() {
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 10)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val delay = target.timeInMillis - now.timeInMillis
+        val request = PeriodicWorkRequestBuilder<uz.daftar.app.core.notify.DebtPdfTelegramWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .setConstraints(
+                androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "daily_debt_pdf_tg",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
     private fun scheduleDailyReminder() {
         val now = Calendar.getInstance()
         val target = Calendar.getInstance().apply {
