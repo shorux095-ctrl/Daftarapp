@@ -135,12 +135,8 @@ class Top30ViewModel @Inject constructor(
                 val yukRows = yukMap.values.sortedByDescending { it.money }.take(50)   // v184: TOP 50
                 val pulRows = pulMap.entries.sortedByDescending { it.value }.take(50)
                     .map { TopRow(it.key, 0.0, it.value, 0.0) }
-                // v184: 🆕 YANGI KLIENTLAR — birinchi yozuvi shu davrga to'g'ri kelganlar (foyda bilan)
-                val firsts = runCatching { txDao.getClientFirstDates(userId) }.getOrDefault(emptyList())
-                val newNames = firsts.filter { it.first >= start && it.first < end }.map { it.name }.toSet()
-                val newRows = newNames.map { n ->
-                    yukMap[n] ?: TopRow(n, 0.0, pulMap[n] ?: 0.0, 0.0)
-                }.sortedByDescending { it.foyda }.take(50)   // v185: eng ko'p FOYDA keltirgan yangi klient yuqorida
+                // v188: 💰 FOYDA tabi — HAMMA mijoz, eng ko'p foyda keltirgan yuqorida (aniq hisob)
+                val newRows = yukMap.values.sortedByDescending { it.foyda }.take(50)
                 Triple(yukRows, pulRows, newRows)
             }
             _state.update { it.copy(yukRows = result.first, pulRows = result.second, newRows = result.third, isLoading = false) }
@@ -212,7 +208,7 @@ fun Top30Screen(
                 FilterChip(selected = s.tab == 1, onClick = { vm.setTab(1) },
                     label = { Text("\uD83D\uDCB5 Pul", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
                 FilterChip(selected = s.tab == 2, onClick = { vm.setTab(2) },
-                    label = { Text("\uD83C\uDD95 Yangi", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
+                    label = { Text("\uD83D\uDCB0 Foyda", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
             }
             // v185: Yuk tabida TUR filtri — qaysi mijoz qaysi turdan ko'p olganini ko'rish
             if (s.tab == 0) {
@@ -321,12 +317,17 @@ fun Top30Screen(
                                         }
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
+                                        // v188: Foyda tabida FOYDA katta ko'rinadi
+                                        val mainVal = if (s.tab == 2) r.foyda else r.money
                                         Text(
-                                            "${Math.round(r.money).toDouble().formatMoney()} so'm",
+                                            "${Math.round(mainVal).toDouble().formatMoney()} so'm",
                                             fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                                            color = if (s.tab == 1) red else green
+                                            color = if (s.tab == 1) red else if (mainVal >= 0) green else red
                                         )
-                                        if (s.tab != 1) {
+                                        if (s.tab == 2) {
+                                            Text("yuk: ${Math.round(r.money).toDouble().formatMoney()}",
+                                                fontSize = 11.sp, color = gray)
+                                        } else if (s.tab != 1) {
                                             val fCol = if (r.foyda >= 0) green else red
                                             Text(
                                                 "foyda: ${Math.round(r.foyda).toDouble().formatMoney()}",

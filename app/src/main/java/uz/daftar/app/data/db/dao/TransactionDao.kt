@@ -21,6 +21,10 @@ interface TransactionDao {
     @Query("SELECT LOWER(client_name) AS name, MIN(date) AS first FROM transactions WHERE user_id = :userId GROUP BY LOWER(client_name)")
     suspend fun getClientFirstDates(userId: Long): List<ClientFirst>
 
+    /** v188: har mijozning ENG OXIRGI yozuvi (yuk yoki pul) sanasi — PDF uchun */
+    @Query("SELECT LOWER(client_name) AS name, MAX(date) AS first FROM transactions WHERE user_id = :userId GROUP BY LOWER(client_name)")
+    suspend fun getClientLastDates(userId: Long): List<ClientFirst>
+
 
     // ───────── Paging 3 (Qidiruv) ─────────
     @Query("""

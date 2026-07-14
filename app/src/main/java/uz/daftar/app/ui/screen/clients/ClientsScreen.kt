@@ -66,6 +66,15 @@ fun ClientsScreen(
     onEslatma: (() -> Unit)? = null,   // v185: 🔔 guruhli qarz eslatma ekrani
     vm: ClientsViewModel = hiltViewModel()
 ) {
+    // v188: ekranga QAYTGANDA qarzlar qayta hisoblanadi (narx o'zgarsa ham darrov yangilanadi)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.load()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val shown = if (debtorsOnly) state.filtered.filter { it.debt > 0 } else state.filtered
     val context = LocalContext.current

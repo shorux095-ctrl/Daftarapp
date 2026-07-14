@@ -431,6 +431,23 @@ class GetOverdueDebtorsUseCase @Inject constructor(
     /** Yozuv qo'shilgach/o'chgach chaqiriladi — keyingi so'rov yangidan hisoblaydi. */
     fun invalidate() { cache = null }
 
+    /** v188: ORTIQCHA pul berganlar (haqi bor, bal < 0) — PDF pastida alohida ko'rsatiladi */
+    suspend fun overpaid(userId: Long): List<Pair<String, Long>> {
+        val today = LocalDate.now()
+        val allTxs = txDao.getRange(userId, "2000-01-01", today.plusDays(1).toString())
+        val txByClient = allTxs.groupBy { it.clientName.lowercase() }
+        val pricesByClient = priceDao.getAllForUser(userId)
+            .groupBy { it.clientName.lowercase() }
+            .mapValues { (_, l) -> l.sortedBy { it.date }.groupBy { it.priceType } }
+        val out = mutableListOf<Pair<String, Long>>()
+        for ((cn, txs) in txByClient) {
+            if (txs.isEmpty()) continue
+            val cb = DebtMath.clientBalance(txs, pricesByClient[cn] ?: emptyMap(), today, keepNegative = true) ?: continue
+            if (cb.balance < -0.5) out += txs.first().clientName to Math.round(-cb.balance)
+        }
+        return out.sortedByDescending { it.second }
+    }
+
     suspend operator fun invoke(userId: Long): List<OverdueDebtor> {
         val nowMs = System.currentTimeMillis()
         cache?.let { if (cacheUser == userId && nowMs - cacheAt < cacheTtlMs) return it }
@@ -503,7 +520,8 @@ object DebtMath {
     fun clientBalance(
         txs: List<uz.daftar.app.data.db.entity.TransactionEntity>,
         pricesByType: Map<String, List<uz.daftar.app.data.db.entity.PriceHistoryEntity>>,
-        today: LocalDate
+        today: LocalDate,
+        keepNegative: Boolean = false   // v188: true — ortiqcha to'laganlar (bal<0) ham qaytadi
     ): ClientBalance? {
         var bal = 0.0
         var firstDebtDate: LocalDate? = null    // qarz 0'dan musbatga o'tgan sana
@@ -529,7 +547,13 @@ object DebtMath {
             if (before <= 0.5 && bal > 0.5 && d != null) firstDebtDate = d
             if (bal <= 0.5) firstDebtDate = null
         }
-        if (bal <= 0.5) return null
+        if (bal <= 0.5) {
+            // v188: ortiqcha to'laganlar (haqi bor) — keepNegative rejimida qaytariladi
+            if (keepNegative && bal < -0.5) {
+                return ClientBalance(bal, lastPaymentDate ?: today, 0)
+            }
+            return null
+        }
         val fdd = firstDebtDate
         val lpd = lastPaymentDate
         val since = when {
