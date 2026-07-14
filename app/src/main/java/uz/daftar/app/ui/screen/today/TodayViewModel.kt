@@ -1581,7 +1581,10 @@ class TodayViewModel @Inject constructor(
         var wj = wi
         while (wj < partsLL.size) {
             val w = partsLL[wj]
-            if (w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' }) { nameWords.add(w); wj++ } else break
+            if (w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' }) { nameWords.add(w); wj++ }
+            // v189: SOF RAQAM ham ism qismi ("Dom 160", "Dom 24") — yordam yo'qolmasin
+            else if (nameWords.isNotEmpty() && w.all { it.isDigit() }) { nameWords.add(w); wj++ }
+            else break
         }
         val nameWord = nameWords.joinToString(" ")
         val onlyName = nameWord.isNotBlank()
@@ -2127,8 +2130,16 @@ class TodayViewModel @Inject constructor(
             val cand = if (typed.isEmpty()) w else "$typed $w"
             if (lname.startsWith(cand.lowercase())) typed = cand else break
         }
-        val rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
+        var rest = if (typed.isEmpty()) lastLine.substringAfter(' ', missingDelimiterValue = "")
                    else lastLine.removePrefix(typed).trimStart()
+        // v189: boshdagi SOF RAQAM tokenlar — ism bo'lagi edi ("dom 24" da "24"), taklif tanlanganda yutiladi
+        while (true) {
+            val firstTok = rest.substringBefore(' ')
+            if (firstTok.isNotBlank() && firstTok.all { it.isDigit() } &&
+                name.lowercase().contains(firstTok)) {
+                rest = rest.substringAfter(' ', missingDelimiterValue = "").trimStart()
+            } else break
+        }
         val tail = if (rest.isBlank()) "$name " else "$name $rest"
         onInputChange(prefix + datePrefix + delPrefix + tail)
     }

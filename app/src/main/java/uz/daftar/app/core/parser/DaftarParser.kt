@@ -84,7 +84,17 @@ object DaftarParser {
             }
 
             // ISM qismi (yuk yoki marker emas, faqat ism boshlangunaqa)
-            if (!nameDone && pl.isNotEmpty() && !pl[0].isDigit()) {
+            // v189: ism ICHIDAGI raqam ham qabul qilinadi ("dom 160 a50" → mijoz "dom160").
+            // Faqat ism BOSHLANGANDAN keyin va toza raqam bo'lsa (marker emas).
+            val isPlainNumber = pl.isNotEmpty() && pl.all { it.isDigit() || it == '.' || it == ',' }
+            if (!nameDone && pl.isNotEmpty() && (!pl[0].isDigit() || (ismParts.isNotEmpty() && isPlainNumber))) {
+                ismParts.add(p)
+                i++
+                continue
+            }
+            // v189: SOF RAQAM ham ism qismi bo'la oladi ("Dom 160", "Dom 24 etaj") —
+            // faqat ismdan KEYIN, marker boshlanmasidan OLDIN va ism bo'sh bo'lmasa
+            if (!nameDone && ismParts.isNotEmpty() && pl.all { it.isDigit() }) {
                 ismParts.add(p)
                 i++
                 continue
