@@ -845,7 +845,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v185", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v186", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -1667,6 +1667,15 @@ private fun PreviewHistoryCard(
                                 if (time.isNotEmpty()) {
                                     Spacer(Modifier.height(3.dp))
                                     Text("\uD83D\uDD50 $time" + (if (weekDay.isNotBlank()) " \u00b7 $weekDay" else ""), fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF9AA0A6))
+                                }
+                                // v186: 📝 IZOH — alohida qatorda (yozilgan bo'lsa)
+                                if (!tx.note.isNullOrBlank()) {
+                                    Text(
+                                        "\uD83D\uDCDD ${tx.note}",
+                                        fontSize = 12.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = androidx.compose.ui.graphics.Color(0xFF7A7F8C)
+                                    )
                                 }
                             }
                             Spacer(Modifier.width(8.dp))

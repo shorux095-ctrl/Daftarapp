@@ -28,7 +28,8 @@ data class Transaction(
     val amount: Double,
     val date: LocalDateTime,
     val tOverride: Double? = null,
-    val costTier: String? = null   // null/"t" = T tarif, "t1" = T1 tarif
+    val costTier: String? = null,  // null/"t" = T tarif, "t1" = T1 tarif
+    val note: String? = null       // v186: 📝 izoh — tarixda ko'rsatiladi
 )
 
 /** Kunlik hisobot — bot.py'dagi rep_daily */
