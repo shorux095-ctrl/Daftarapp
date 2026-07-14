@@ -550,15 +550,15 @@ class TodayViewModel @Inject constructor(
             }
             if (list.isNotEmpty()) _state.update { it.copy(chat = list) }
             _state.update { it.copy(restored = true) }   // chat tayyor (yoki bo'sh) — endi ko'rsatish mumkin
+            restored = true
+            // v185 TEZLIK: kutayotgan mijoz ENG AVVAL ochiladi (og'ir eslatma/hisobot hisob-kitobidan OLDIN) —
+            // Qarzdorlar/Mijozlar'dan bosilganda karta bir zumda chiqadi, "zagruzka" sezilmaydi.
+            runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
             runCatching { maybeShowAutoReports() }
             drainPendingWidget()
             // refreshHistoryCards() OLIB TASHLANDI: deserializeChat endi kartalarni yangi (jonli DB) yasaydi,
             // jonli o'zgarishlarni observer kuzatadi — bu yerda takroriy so'rov shart emas (tezroq, miltillamaydi)
             runCatching { ensureDebtReminder() }
-            restored = true
-            // v184 ASOSIY TUZATISH: Qarzdorlar'dan mijoz bosilganda YANGI ekran nusxasi ochiladi,
-            // refresh() esa chat tiklanmaguncha ishlamaydi — kutayotgan mijoz shu yerda ochiladi.
-            runCatching { chatStore.consumePendingOpenClient() }.getOrNull()?.let { openClientHistory(it) }
         }
     }
 

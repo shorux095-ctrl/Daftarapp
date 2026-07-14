@@ -176,6 +176,7 @@ fun DaftarNavHost() {
         composable(Routes.QARZ) { DiagIn("qarz");
             ClientsScreen(
                 onBack = { if (canNav()) nav.popBackStack() },
+                onEslatma = { if (canNav()) nav.navigate(Routes.QARZ_REYTING) },
                 onClientClick = { name ->
                     openClientAsCard(name)
                 },

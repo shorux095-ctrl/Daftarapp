@@ -17,7 +17,7 @@ data class QarzdorlarState(
     val totalDebt: Long = 0,
     val loading: Boolean = true,
     val rating: Boolean = true,  // v148: 🏆 reyting (katta qarz yuqorida) / 📅 kun bo'yicha
-    val eslatma: Boolean = false // v177: 🔔 guruhli ko'rinish (10/15/30/60/90 kun)
+    val eslatma: Boolean = true  // v185: 🔔 dan kirilganda darrov GURUHLI ko'rinadi
 )
 
 @HiltViewModel

@@ -63,6 +63,7 @@ fun ClientsScreen(
     onBack: () -> Unit,
     onClientClick: (String) -> Unit = {},
     debtorsOnly: Boolean = false,
+    onEslatma: (() -> Unit)? = null,   // v185: 🔔 guruhli qarz eslatma ekrani
     vm: ClientsViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -86,7 +87,15 @@ fun ClientsScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
-                actions = { IconButton(onClick = { vm.load() }) { Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash") }; uz.daftar.app.ui.common.HomeButton() }
+                actions = {
+                    // v185: 🔄 OLIB TASHLANDI. Qarzdorlarda 🔔 — guruhli (10/15/30/60/90 kun) eslatma
+                    if (debtorsOnly && onEslatma != null) {
+                        IconButton(onClick = { onEslatma() }) {
+                            androidx.compose.material3.Text("\uD83D\uDD14", fontSize = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp))
+                        }
+                    }
+                    uz.daftar.app.ui.common.HomeButton()
+                }
             )
         }
     ) { padding ->

@@ -38,17 +38,21 @@ import javax.inject.Inject
 
 /** v183: TOP 30 — oy bo'yicha eng ko'p YUK olganlar / PUL berganlar + FOYDA */
 
+data class TypeStat(val qty: Double = 0.0, val money: Double = 0.0, val foyda: Double = 0.0)
+
 data class TopRow(
     val name: String,
     val qty: Double,       // jami dona (yuk tab)
     val money: Double,     // yuk summasi (N) yoki to'lov summasi
-    val foyda: Double      // (N - T) * dona
+    val foyda: Double,     // (N - T) * dona
+    val types: Map<String, TypeStat> = emptyMap()   // v185: tur kesimi (a/b/c/d/k)
 )
 
 data class Top30State(
     val month: java.time.YearMonth = java.time.YearMonth.now(java.time.ZoneId.of("Asia/Tashkent")),
     val yearly: Boolean = false,            // v184: Oy / Yil rejimi
     val tab: Int = 0,                       // 0 = 📦 Yuk, 1 = 💵 Pul, 2 = 🆕 Yangi klient
+    val typeFilter: String = "",            // v185: Yuk tabida "" = hammasi, "a".."k" = bitta tur
     val yukRows: List<TopRow> = emptyList(),
     val pulRows: List<TopRow> = emptyList(),
     val newRows: List<TopRow> = emptyList(),  // v184: davrda BIRINCHI yozuvi bo'lgan mijozlar
@@ -68,6 +72,7 @@ class Top30ViewModel @Inject constructor(
     init { load() }
 
     fun setTab(t: Int) = _state.update { it.copy(tab = t) }
+    fun setTypeFilter(t: String) = _state.update { it.copy(typeFilter = t) }
     fun setYearly(y: Boolean) { _state.update { it.copy(yearly = y) }; load() }
     fun prevMonth() { _state.update { it.copy(month = if (it.yearly) it.month.minusYears(1) else it.month.minusMonths(1)) }; load() }
     fun nextMonth() { _state.update { it.copy(month = if (it.yearly) it.month.plusYears(1) else it.month.plusMonths(1)) }; load() }
@@ -119,7 +124,11 @@ class Top30ViewModel @Inject constructor(
                             val money = if (n != null) tx.amount * n else 0.0
                             val f = if (n != null && t != null) tx.amount * (n - t) else 0.0
                             val prev = yukMap[cn] ?: TopRow(cn, 0.0, 0.0, 0.0)
-                            yukMap[cn] = prev.copy(qty = prev.qty + tx.amount, money = prev.money + money, foyda = prev.foyda + f)
+                            val ts = prev.types[code] ?: TypeStat()
+                            yukMap[cn] = prev.copy(
+                                qty = prev.qty + tx.amount, money = prev.money + money, foyda = prev.foyda + f,
+                                types = prev.types + (code to TypeStat(ts.qty + tx.amount, ts.money + money, ts.foyda + f))
+                            )
                         }
                     }
                 }
@@ -131,7 +140,7 @@ class Top30ViewModel @Inject constructor(
                 val newNames = firsts.filter { it.first >= start && it.first < end }.map { it.name }.toSet()
                 val newRows = newNames.map { n ->
                     yukMap[n] ?: TopRow(n, 0.0, pulMap[n] ?: 0.0, 0.0)
-                }.sortedByDescending { it.money }.take(50)
+                }.sortedByDescending { it.foyda }.take(50)   // v185: eng ko'p FOYDA keltirgan yangi klient yuqorida
                 Triple(yukRows, pulRows, newRows)
             }
             _state.update { it.copy(yukRows = result.first, pulRows = result.second, newRows = result.third, isLoading = false) }
@@ -205,11 +214,71 @@ fun Top30Screen(
                 FilterChip(selected = s.tab == 2, onClick = { vm.setTab(2) },
                     label = { Text("\uD83C\uDD95 Yangi", fontSize = 12.sp) }, modifier = Modifier.weight(1f))
             }
+            // v185: Yuk tabida TUR filtri — qaysi mijoz qaysi turdan ko'p olganini ko'rish
+            if (s.tab == 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(selected = s.typeFilter == "", onClick = { vm.setTypeFilter("") },
+                        label = { Text("Hamma", fontSize = 11.sp) }, modifier = Modifier.weight(1.3f))
+                    listOf("a", "b", "c", "d", "k").forEach { t ->
+                        FilterChip(selected = s.typeFilter == t, onClick = { vm.setTypeFilter(t) },
+                            label = { Text(t.uppercase(), fontSize = 11.sp) }, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
 
+            var detailRow by remember { mutableStateOf<TopRow?>(null) }
+            detailRow?.let { r ->
+                AlertDialog(
+                    onDismissRequest = { detailRow = null },
+                    title = { Text(r.name.replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column {
+                            Text(if (s.yearly) "${s.month.year}-yil bo'yicha:" else "${MONTHS_T30[s.month.monthValue - 1]} oyi bo'yicha:",
+                                fontSize = 12.sp, color = gray)
+                            Spacer(Modifier.height(8.dp))
+                            // v185: QAYSI YUKDAN QANCHA FOYDA — tur kesimi
+                            if (r.types.isEmpty()) {
+                                Text("Bu davrda yuk olmagan", fontSize = 13.sp, color = gray)
+                            } else {
+                                r.types.entries.sortedByDescending { it.value.foyda }.forEach { (code, ts) ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                        Text(code.uppercase(), fontWeight = FontWeight.Bold, color = ink,
+                                            modifier = Modifier.width(26.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text("${ts.qty.formatQty()} dona \u00b7 ${Math.round(ts.money).toDouble().formatMoney()} so'm", fontSize = 13.sp, color = ink)
+                                            Text("foyda: ${Math.round(ts.foyda).toDouble().formatMoney()} so'm",
+                                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                                color = if (ts.foyda >= 0) green else red)
+                                        }
+                                    }
+                                }
+                                HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                                Text("JAMI foyda: ${Math.round(r.foyda).toDouble().formatMoney()} so'm",
+                                    fontWeight = FontWeight.Bold, color = if (r.foyda >= 0) green else red)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { val n = r.name; detailRow = null; onOpenClient(n) }) { Text("Tarixni ochish") }
+                    },
+                    dismissButton = { TextButton(onClick = { detailRow = null }) { Text("Yopish") } }
+                )
+            }
             if (s.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                val rows = when (s.tab) { 0 -> s.yukRows; 1 -> s.pulRows; else -> s.newRows }
+                val rows = when (s.tab) {
+                    0 -> if (s.typeFilter.isBlank()) s.yukRows
+                         else s.yukRows.mapNotNull { r ->
+                             val ts = r.types[s.typeFilter] ?: return@mapNotNull null
+                             r.copy(qty = ts.qty, money = ts.money, foyda = ts.foyda)
+                         }.sortedByDescending { it.money }
+                    1 -> s.pulRows
+                    else -> s.newRows
+                }
                 if (rows.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Bu oyda ma'lumot yo'q", color = gray)
@@ -220,7 +289,7 @@ fun Top30Screen(
                             Surface(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .clickable { onOpenClient(r.name) },
+                                    .clickable { detailRow = r },   // v185: dialog — qaysi yukdan qancha foyda
                                 shape = RoundedCornerShape(14.dp),
                                 color = Color.White,
                                 shadowElevation = 1.dp
