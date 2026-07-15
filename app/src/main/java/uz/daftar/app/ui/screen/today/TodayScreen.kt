@@ -845,7 +845,7 @@ private fun ChatTopBar(
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Daftar · v189", fontWeight = FontWeight.SemiBold)
+                Text("Daftar · v190", fontWeight = FontWeight.SemiBold)
                 Text(todayStr, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF8A8A8A))
             }
         },
@@ -1944,6 +1944,42 @@ private fun ChatUserBubble(text: String) {
 
 @Composable
 private fun ChatBotBubble(text: String) {
+    // v190: Rasxod / to'lov / qarz eslatma xabarlari — chiroyli RANGLI karta (oddiy oq emas)
+    val special: Triple<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color, String>? = when {
+        text.startsWith("💸") || text.contains("Rasxod saqlandi") ->
+            Triple(androidx.compose.ui.graphics.Color(0xFFFFF3E0), androidx.compose.ui.graphics.Color(0xFFE65100), "💸")
+        text.startsWith("💰") || text.contains("qarzi yopildi") || text.contains("to'lov") ->
+            Triple(androidx.compose.ui.graphics.Color(0xFFE8F5E9), androidx.compose.ui.graphics.Color(0xFF2E7D32), "💰")
+        else -> null
+    }
+    if (special != null) {
+        val (bg, ink, emoji) = special
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+            Surface(
+                color = bg,
+                shape = RoundedCornerShape(16.dp),
+                shadowElevation = 1.dp,
+                modifier = Modifier.widthIn(max = 330.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(38.dp).clip(CircleShape).background(ink.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) { Text(emoji, fontSize = 18.sp) }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text.removePrefix(emoji).trim(),
+                        fontSize = 14.sp, fontWeight = FontWeight.Medium, color = ink,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+        return
+    }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Surface(
             color = androidx.compose.ui.graphics.Color.White,

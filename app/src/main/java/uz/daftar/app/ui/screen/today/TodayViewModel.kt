@@ -1588,7 +1588,9 @@ class TodayViewModel @Inject constructor(
         }
         val nameWord = nameWords.joinToString(" ")
         val onlyName = nameWord.isNotBlank()
-        updateSuggestions(if (onlyName) nameWord else "")
+        // v190: "dom 2" → "dom2" (raqam oldidagi bo'shliq olib tashlanadi) — bazadagi nom bilan mos, yordam chiqadi
+        val nameQuery = Regex("""\s+(\d)""").replace(nameWord) { it.groupValues[1] }
+        updateSuggestions(if (onlyName) nameQuery else "")
 
         // Jonli tarix preview — ism yozilsa (parsing yozuv topa olmasa)
         loadPreviewIfName(text)
@@ -2059,12 +2061,14 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    private fun updateSuggestions(prefix: String) {
+    private fun updateSuggestions(prefixRaw: String) {
         suggestJob?.cancel()
-        if (prefix.isBlank()) {
+        if (prefixRaw.isBlank()) {
             _state.update { it.copy(suggestions = emptyList(), quickFills = emptyList()) }
             return
         }
+        // v190: "dom 2" → "dom2" (baza "dom24 etaj" deb saqlaydi) — raqam oldidagi bo'shliq olib tashlanadi
+        val prefix = DaftarParser.normalizeName(prefixRaw)
         suggestJob = viewModelScope.launch {
             val list = repo.suggestClients(userId, prefix)
             val names = list.filter { n -> n != prefix.lowercase() }
