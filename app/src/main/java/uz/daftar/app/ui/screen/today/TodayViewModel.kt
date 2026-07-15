@@ -1584,6 +1584,13 @@ class TodayViewModel @Inject constructor(
             if (w.first().isLetter() && w.all { it.isLetter() || it == '\'' || it == '-' }) { nameWords.add(w); wj++ }
             // v189: SOF RAQAM ham ism qismi ("Dom 160", "Dom 24") — yordam yo'qolmasin
             else if (nameWords.isNotEmpty() && w.all { it.isDigit() }) { nameWords.add(w); wj++ }
+            // v191: HARF+RAQAM ("dom2","dom24") — yuk markeri (a10,c5,p200...) EMAS bo'lsa, ism.
+            // Yuk markeri = bitta harf (a/b/c/d/k/p/q/n/t) + raqam. Undan uzun so'z (dom2) — ism.
+            else if (w.first().isLetter() && w.any { it.isDigit() } &&
+                     !Regex("""^[abcdkpqnt]\d+([.,]\d+)?$""").matches(w) &&
+                     w.all { it.isLetterOrDigit() || it == '\'' || it == '-' }) {
+                nameWords.add(w); wj++
+            }
             else break
         }
         val nameWord = nameWords.joinToString(" ")
